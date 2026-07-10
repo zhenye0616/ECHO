@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { AgentKind } from '../echo-home/wizard/detect-agents.js';
+import { BRIEF_HELP, runBrief } from './commands/brief.js';
 import { DOCTOR_HELP, parseDoctorArgs, runDoctor } from './commands/doctor.js';
 import { runDaemon } from './commands/daemon.js';
 import { INIT_HELP, parseInitArgs, readPackageVersion, runInit } from './commands/init.js';
@@ -21,6 +22,7 @@ interface GlobalOpts {
 const HELP = `Usage: echoctl [--json] [--quiet] [--no-color] <command>
 
 Commands:
+  brief       Generate a local post-meeting brief from Granola
   init        Onboard ECHO into local AI clients
   doctor      Check daemon, state, adapter, and agent health
   daemon      Install and control the launchd-managed daemon
@@ -32,6 +34,7 @@ Commands:
 `;
 
 const COMMAND_HELP: Record<string, string> = {
+  brief: BRIEF_HELP,
   init: INIT_HELP,
   doctor: DOCTOR_HELP,
   daemon: 'Usage: echoctl daemon <install|start|stop|restart|status|logs|uninstall> [options]',
@@ -119,6 +122,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === 'init') {
       return await runInit({ ...globals, ...parseInitArgs(args) });
+    }
+    if (command === 'brief') {
+      return await runBrief({ ...globals, argv: args });
     }
     if (command === 'doctor') {
       return await runDoctor({ ...globals, ...parseDoctorArgs(args) });

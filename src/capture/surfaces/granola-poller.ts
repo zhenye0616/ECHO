@@ -1,10 +1,11 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { isNonEmptyString } from '../../guards.js';
 import { ECHO_HOME_PATHS } from '../../echo-home/paths.js';
 import { atomicWrite } from '../../echo-home/adapters/atomic-write.js';
 import { createLogger } from '../../logging/index.js';
-import type { CaptureEvent, Storage } from '../../storage/interface.js';
+import type { AtomIterationRecord, CaptureEvent, Storage } from '../../storage/interface.js';
 import { parseJson } from '../../util/json.js';
 import { processCandidate } from '../pipeline.js';
 
@@ -15,6 +16,10 @@ export const DEFAULT_GRANOLA_POLL_INTERVAL_MS = 60_000;
 export const DEFAULT_GRANOLA_REQUEST_TIMEOUT_MS = 15_000;
 export const DEFAULT_GRANOLA_PAGE_SIZE = 30; // Granola API caps page_size at 30; >30 → HTTP 400 (confirmed live 2026-06-21)
 export const GRANOLA_API_KEY_RE = /^grn_[A-Za-z0-9][A-Za-z0-9_-]*$/;
+export const DEFAULT_GRANOLA_CHECKPOINT_LOCK_TIMEOUT_MS = 10_000;
+export const DEFAULT_GRANOLA_CHECKPOINT_LOCK_STALE_MS = 60_000;
+export const DEFAULT_GRANOLA_CHECKPOINT_LOCK_RETRY_MS = 100;
+export const DEFAULT_GRANOLA_RATE_LIMIT_RETRY_AFTER_CAP_MS = 30_000;
 
 const log = createLogger('capture.surfaces.granola');
 
@@ -70,11 +75,20 @@ export interface GranolaCheckpoint {
   last_synced_at: string | null;
 }
 
+export interface CurrentGranolaNoteAtoms {
+  note_id: string;
+  summary?: CaptureEvent;
+  transcript?: CaptureEvent;
+}
+
 export interface GranolaPollOptions {
   checkpointPath?: string;
   now?: () => string;
   pageSize?: number;
   retryDelayMs?: number;
+  lockTimeoutMs?: number;
+  lockStaleMs?: number;
+  lockRetryMs?: number;
 }
 
 export type GranolaPollResult =
@@ -132,6 +146,143 @@ class GranolaCheckpointError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GranolaCheckpointError';
+  }
+}
+
+export interface GranolaCheckpointLockOptions {
+  timeoutMs?: number;
+  staleMs?: number;
+  retryMs?: number;
+}
+
+export interface GranolaCheckpointLock {
+  checkpointPath: string;
+  lockDir: string;
+  ownerToken: string;
+}
+
+interface LockMetadata {
+  owner_token: string;
+  pid: number;
+  acquired_at: string;
+}
+
+function lockMetadataPath(lockDir: string): string {
+  return join(lockDir, 'holder.json');
+}
+
+function lockTokenPath(lockDir: string): string {
+  return join(lockDir, 'owner-token');
+}
+
+function parseLockMetadata(lockDir: string): LockMetadata | null {
+  try {
+    const parsed = parseJson(readFileSync(lockMetadataPath(lockDir), 'utf8'));
+    if (!isPlainObject(parsed)) return null;
+    const ownerToken = parsed['owner_token'];
+    const pid = parsed['pid'];
+    const acquiredAt = parsed['acquired_at'];
+    if (
+      typeof ownerToken !== 'string' ||
+      typeof pid !== 'number' ||
+      typeof acquiredAt !== 'string'
+    ) {
+      return null;
+    }
+    return { owner_token: ownerToken, pid, acquired_at: acquiredAt };
+  } catch {
+    return null;
+  }
+}
+
+function isLockStale(lockDir: string, nowMs: number, staleMs: number): boolean {
+  const metadata = parseLockMetadata(lockDir);
+  if (metadata === null) return true;
+  const acquired = new Date(metadata.acquired_at).getTime();
+  return Number.isNaN(acquired) || nowMs - acquired > staleMs;
+}
+
+function removeStaleLock(lockDir: string): void {
+  const tombstone = `${lockDir}.stale-${randomUUID()}`;
+  renameSync(lockDir, tombstone);
+  rmSync(tombstone, { recursive: true, force: true });
+}
+
+export async function acquireGranolaCheckpointLock(
+  checkpointPath: string,
+  opts: GranolaCheckpointLockOptions = {},
+): Promise<GranolaCheckpointLock> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_GRANOLA_CHECKPOINT_LOCK_TIMEOUT_MS;
+  const staleMs = opts.staleMs ?? DEFAULT_GRANOLA_CHECKPOINT_LOCK_STALE_MS;
+  const retryMs = opts.retryMs ?? DEFAULT_GRANOLA_CHECKPOINT_LOCK_RETRY_MS;
+  const lockDir = `${checkpointPath}.lock`;
+  const start = Date.now();
+  try {
+    mkdirSync(dirname(checkpointPath), { recursive: true });
+  } catch (err) {
+    throw new GranolaCheckpointError(`checkpoint lock directory failed: ${(err as Error).message}`);
+  }
+
+  for (;;) {
+    try {
+      mkdirSync(lockDir);
+      const ownerToken = randomUUID();
+      const acquiredAt = new Date().toISOString();
+      writeFileSync(lockTokenPath(lockDir), `${ownerToken}\n`);
+      writeFileSync(
+        lockMetadataPath(lockDir),
+        `${JSON.stringify(
+          { owner_token: ownerToken, pid: process.pid, acquired_at: acquiredAt },
+          null,
+          2,
+        )}\n`,
+      );
+      return { checkpointPath, lockDir, ownerToken };
+    } catch (err) {
+      if (!isErrnoException(err) || err.code !== 'EEXIST') {
+        throw new GranolaCheckpointError(`checkpoint lock failed: ${(err as Error).message}`);
+      }
+      if (isLockStale(lockDir, Date.now(), staleMs)) {
+        try {
+          removeStaleLock(lockDir);
+          continue;
+        } catch (removeErr) {
+          if (!isErrnoException(removeErr) || removeErr.code !== 'ENOENT') {
+            throw new GranolaCheckpointError(
+              `checkpoint stale-lock takeover failed: ${(removeErr as Error).message}`,
+            );
+          }
+        }
+      }
+      if (Date.now() - start >= timeoutMs) {
+        throw new GranolaCheckpointError(`checkpoint lock timed out after ${timeoutMs}ms`);
+      }
+      await sleep(retryMs);
+    }
+  }
+}
+
+export function releaseGranolaCheckpointLock(lock: GranolaCheckpointLock): void {
+  try {
+    const token = readFileSync(lockTokenPath(lock.lockDir), 'utf8').trim();
+    if (token === lock.ownerToken) {
+      rmSync(lock.lockDir, { recursive: true, force: true });
+    }
+  } catch (err) {
+    if (!isErrnoException(err) || err.code !== 'ENOENT') throw err;
+  }
+}
+
+export async function withGranolaCheckpointLock<T>(
+  checkpointPath: string,
+  opts: GranolaCheckpointLockOptions,
+  fn: (lock: GranolaCheckpointLock) => Promise<T>,
+): Promise<T> {
+  const lock = await acquireGranolaCheckpointLock(checkpointPath, opts);
+  try {
+    return await fn(lock);
+  } finally {
+    releaseGranolaCheckpointLock(lock);
   }
 }
 
@@ -438,6 +589,100 @@ export function writeGranolaCheckpoint(
   });
 }
 
+export interface LockedCheckpointWriteOptions {
+  beforeCommit?: (tempPath: string) => void | Promise<void>;
+}
+
+export async function writeCheckpointJsonWithLock(
+  lock: GranolaCheckpointLock,
+  content: string,
+  opts: LockedCheckpointWriteOptions = {},
+): Promise<void> {
+  const token = readFileSync(lockTokenPath(lock.lockDir), 'utf8').trim();
+  if (token !== lock.ownerToken) {
+    throw new GranolaCheckpointError('checkpoint lock owner token mismatch before stage');
+  }
+  const tempPath = join(lock.lockDir, `pending-${lock.ownerToken}-${randomUUID()}`);
+  writeFileSync(tempPath, content);
+  const rereadToken = readFileSync(lockTokenPath(lock.lockDir), 'utf8').trim();
+  if (rereadToken !== lock.ownerToken) {
+    rmSync(tempPath, { force: true });
+    throw new GranolaCheckpointError('checkpoint lock owner token mismatch before commit');
+  }
+  await opts.beforeCommit?.(tempPath);
+  renameSync(tempPath, lock.checkpointPath);
+}
+
+async function writeGranolaCheckpointLocked(
+  lock: GranolaCheckpointLock,
+  checkpoint: GranolaCheckpoint,
+): Promise<void> {
+  await writeCheckpointJsonWithLock(lock, `${JSON.stringify(checkpoint, null, 2)}\n`);
+}
+
+function granolaAtomUpdatedAt(event: CaptureEvent): string | null {
+  const value = event.metadata?.['updated_at'];
+  if (typeof value !== 'string') return null;
+  return Number.isNaN(new Date(value).getTime()) ? null : new Date(value).toISOString();
+}
+
+function isGranolaRawAtom(event: AtomIterationRecord): boolean {
+  return event.source === GRANOLA_SOURCE;
+}
+
+function atomNoteId(event: CaptureEvent): string | null {
+  const value = event.metadata?.['note_id'];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function atomGranolaType(event: CaptureEvent): 'summary' | 'transcript' | null {
+  const value = event.metadata?.['granola_atom_type'];
+  return value === 'summary' || value === 'transcript' ? value : null;
+}
+
+function newerGranolaAtom(
+  candidate: AtomIterationRecord,
+  incumbent: CaptureEvent | undefined,
+): boolean {
+  if (incumbent === undefined) return true;
+  const candidateUpdatedAt = granolaAtomUpdatedAt(candidate);
+  const incumbentUpdatedAt = granolaAtomUpdatedAt(incumbent);
+  if (candidateUpdatedAt === null && incumbentUpdatedAt === null) return true;
+  if (candidateUpdatedAt === null) return false;
+  if (incumbentUpdatedAt === null) return true;
+  if (candidateUpdatedAt > incumbentUpdatedAt) return true;
+  if (candidateUpdatedAt < incumbentUpdatedAt) return false;
+  return true;
+}
+
+export async function resolveCurrentGranolaNotes(
+  storage: Storage,
+): Promise<Map<string, CurrentGranolaNoteAtoms>> {
+  const byNote = new Map<string, CurrentGranolaNoteAtoms>();
+  const atoms = await storage.iterateAtomsByAppendOrder({ sourcePrefixes: [GRANOLA_SOURCE] });
+  for (const atom of atoms) {
+    if (!isGranolaRawAtom(atom)) continue;
+    const noteId = atomNoteId(atom);
+    const atomType = atomGranolaType(atom);
+    if (noteId === null || atomType === null) continue;
+    const entry = byNote.get(noteId) ?? { note_id: noteId };
+    if (atomType === 'summary') {
+      if (newerGranolaAtom(atom, entry.summary)) entry.summary = atom;
+    } else if (newerGranolaAtom(atom, entry.transcript)) {
+      entry.transcript = atom;
+    }
+    byNote.set(noteId, entry);
+  }
+  return byNote;
+}
+
+export async function resolveCurrentGranolaNoteAtoms(
+  storage: Storage,
+  noteId: string,
+): Promise<CurrentGranolaNoteAtoms> {
+  return (await resolveCurrentGranolaNotes(storage)).get(noteId) ?? { note_id: noteId };
+}
+
 function maxIso(a: string | null, b: string | undefined): string | null {
   if (b === undefined || Number.isNaN(new Date(b).getTime())) return a;
   if (a === null) return new Date(b).toISOString();
@@ -546,7 +791,10 @@ async function withRateLimitRetry<T>(
     return await op();
   } catch (err) {
     if (!(err instanceof GranolaApiError) || err.reason !== 'rate_limited') throw err;
-    const delayMs = err.retryAfterMs ?? retryDelayMs;
+    const delayMs = Math.min(
+      err.retryAfterMs ?? retryDelayMs,
+      DEFAULT_GRANOLA_RATE_LIMIT_RETRY_AFTER_CAP_MS,
+    );
     log.warn('rate_limited_retry', { operation: label, delay_ms: delayMs });
     await sleep(delayMs);
     try {
@@ -558,6 +806,38 @@ async function withRateLimitRetry<T>(
       throw retryErr;
     }
   }
+}
+
+function noteUpdatedAt(note: GranolaListNote): string | null {
+  const raw = note.updated_at ?? note.created_at;
+  if (raw === undefined) return null;
+  const ms = new Date(raw).getTime();
+  return Number.isNaN(ms) ? null : new Date(ms).toISOString();
+}
+
+function currentStoredUpdatedAt(atoms: CurrentGranolaNoteAtoms): string | null {
+  const values = [atoms.summary, atoms.transcript]
+    .map((atom) => (atom === undefined ? null : granolaAtomUpdatedAt(atom)))
+    .filter((value): value is string => value !== null)
+    .sort();
+  return values.at(-1) ?? null;
+}
+
+function shouldFetchGranolaNote(
+  listNote: GranolaListNote,
+  ingestedNoteIds: Set<string>,
+  currentAtoms: CurrentGranolaNoteAtoms | undefined,
+): boolean {
+  if (!ingestedNoteIds.has(listNote.id)) return true;
+  if (
+    currentAtoms === undefined ||
+    (currentAtoms.summary === undefined && currentAtoms.transcript === undefined)
+  ) {
+    return false;
+  }
+  const liveUpdatedAt = noteUpdatedAt(listNote);
+  const storedUpdatedAt = currentStoredUpdatedAt(currentAtoms);
+  return liveUpdatedAt !== null && storedUpdatedAt !== null && liveUpdatedAt > storedUpdatedAt;
 }
 
 function errorReason(err: unknown): GranolaErrorReason {
@@ -585,107 +865,120 @@ export async function pollGranolaOnce(
   const checkpointPath = options.checkpointPath ?? granolaCheckpointPath();
   const pageSize = options.pageSize ?? DEFAULT_GRANOLA_PAGE_SIZE;
   const retryDelayMs = options.retryDelayMs ?? 1_000;
-  let stage = 'checkpoint_read';
+  let stage = 'checkpoint_lock';
   try {
-    const checkpoint = loadGranolaCheckpoint(checkpointPath);
-    const startingHighWaterMark = checkpoint.high_water_mark;
-    const ingestedNoteIds = new Set(checkpoint.ingested_note_ids);
-    let maxUpdatedAt = startingHighWaterMark;
-    const notes: GranolaListNote[] = [];
-    let cursor: string | undefined;
+    return await withGranolaCheckpointLock(
+      checkpointPath,
+      {
+        timeoutMs: options.lockTimeoutMs,
+        staleMs: options.lockStaleMs,
+        retryMs: options.lockRetryMs,
+      },
+      async (lock) => {
+        stage = 'checkpoint_read';
+        const checkpoint = loadGranolaCheckpoint(checkpointPath);
+        const startingHighWaterMark = checkpoint.high_water_mark;
+        const ingestedNoteIds = new Set(checkpoint.ingested_note_ids);
+        const currentNotes = await resolveCurrentGranolaNotes(storage);
+        let maxUpdatedAt = startingHighWaterMark;
+        const notes: GranolaListNote[] = [];
+        let cursor: string | undefined;
 
-    stage = 'list';
-    for (let page = 0; page < 1_000; page += 1) {
-      const response = await withRateLimitRetry(
-        'list_notes',
-        () =>
-          client.listNotes({
-            updated_after: startingHighWaterMark ?? undefined,
-            cursor,
-            page_size: pageSize,
-          }),
-        retryDelayMs,
-      );
-      notes.push(...response.notes);
-      for (const note of response.notes) {
-        maxUpdatedAt = maxIso(maxUpdatedAt, note.updated_at ?? note.created_at);
-      }
-      if (!response.hasMore) break;
-      if (!isNonEmptyString(response.cursor)) {
-        throw new GranolaApiError(
-          'Granola pagination indicated hasMore without cursor',
-          'pagination_failed',
-        );
-      }
-      cursor = response.cursor;
-      if (page === 999) {
-        throw new GranolaApiError(
-          'Granola pagination exceeded safety page cap',
-          'pagination_failed',
-        );
-      }
-    }
-
-    let notesIngested = 0;
-    let atomsWritten = 0;
-    for (const listNote of notes) {
-      if (ingestedNoteIds.has(listNote.id)) continue;
-
-      stage = `detail:${listNote.id}`;
-      const detail = await withRateLimitRetry(
-        'get_note',
-        () => client.getNote(listNote.id),
-        retryDelayMs,
-      );
-      const note = mergedDetail(listNote, detail);
-      maxUpdatedAt = maxIso(maxUpdatedAt, note.updated_at ?? note.created_at);
-
-      stage = `pipeline:${listNote.id}`;
-      const events = granolaNoteToCaptureEvents(note, now());
-      for (const event of events) {
-        const result = await processCandidate(event, storage);
-        if (!result.accepted) {
-          throw new Error(`Granola event rejected by pipeline: ${result.reason}`);
+        stage = 'list';
+        for (let page = 0; page < 1_000; page += 1) {
+          const response = await withRateLimitRetry(
+            'list_notes',
+            () =>
+              client.listNotes({
+                updated_after: startingHighWaterMark ?? undefined,
+                cursor,
+                page_size: pageSize,
+              }),
+            retryDelayMs,
+          );
+          notes.push(...response.notes);
+          for (const note of response.notes) {
+            maxUpdatedAt = maxIso(maxUpdatedAt, note.updated_at ?? note.created_at);
+          }
+          if (!response.hasMore) break;
+          if (!isNonEmptyString(response.cursor)) {
+            throw new GranolaApiError(
+              'Granola pagination indicated hasMore without cursor',
+              'pagination_failed',
+            );
+          }
+          cursor = response.cursor;
+          if (page === 999) {
+            throw new GranolaApiError(
+              'Granola pagination exceeded safety page cap',
+              'pagination_failed',
+            );
+          }
         }
-        atomsWritten += 1;
-      }
-      notesIngested += 1;
-      ingestedNoteIds.add(listNote.id);
 
-      stage = `checkpoint_partial:${listNote.id}`;
-      writeGranolaCheckpoint(
-        {
+        let notesIngested = 0;
+        let atomsWritten = 0;
+        for (const listNote of notes) {
+          if (!shouldFetchGranolaNote(listNote, ingestedNoteIds, currentNotes.get(listNote.id))) {
+            continue;
+          }
+
+          stage = `detail:${listNote.id}`;
+          const detail = await withRateLimitRetry(
+            'get_note',
+            () => client.getNote(listNote.id),
+            retryDelayMs,
+          );
+          const note = mergedDetail(listNote, detail);
+          maxUpdatedAt = maxIso(maxUpdatedAt, note.updated_at ?? note.created_at);
+
+          stage = `pipeline:${listNote.id}`;
+          const events = granolaNoteToCaptureEvents(note, now());
+          for (const event of events) {
+            const result = await processCandidate(event, storage);
+            if (!result.accepted) {
+              throw new Error(`Granola event rejected by pipeline: ${result.reason}`);
+            }
+            atomsWritten += 1;
+          }
+          notesIngested += 1;
+          ingestedNoteIds.add(listNote.id);
+          currentNotes.set(listNote.id, {
+            note_id: listNote.id,
+            summary: undefined,
+            transcript: undefined,
+          });
+
+          stage = `checkpoint_partial:${listNote.id}`;
+          await writeGranolaCheckpointLocked(lock, {
+            schema_version: GRANOLA_CHECKPOINT_SCHEMA_VERSION,
+            high_water_mark: startingHighWaterMark,
+            ingested_note_ids: [...ingestedNoteIds].sort(),
+            last_synced_at: now(),
+          });
+        }
+
+        stage = 'checkpoint_final';
+        await writeGranolaCheckpointLocked(lock, {
           schema_version: GRANOLA_CHECKPOINT_SCHEMA_VERSION,
-          high_water_mark: startingHighWaterMark,
+          high_water_mark: maxUpdatedAt,
           ingested_note_ids: [...ingestedNoteIds].sort(),
           last_synced_at: now(),
-        },
-        checkpointPath,
-      );
-    }
-
-    stage = 'checkpoint_final';
-    writeGranolaCheckpoint(
-      {
-        schema_version: GRANOLA_CHECKPOINT_SCHEMA_VERSION,
-        high_water_mark: maxUpdatedAt,
-        ingested_note_ids: [...ingestedNoteIds].sort(),
-        last_synced_at: now(),
+        });
+        log.info('poll_ok', {
+          notes_seen: notes.length,
+          notes_ingested: notesIngested,
+          atoms_written: atomsWritten,
+          high_water_mark: maxUpdatedAt,
+        });
+        return {
+          status: 'ok',
+          notes_seen: notes.length,
+          notes_ingested: notesIngested,
+          atoms_written: atomsWritten,
+        };
       },
-      checkpointPath,
     );
-    log.info('poll_ok', {
-      notes_seen: notes.length,
-      notes_ingested: notesIngested,
-      atoms_written: atomsWritten,
-      high_water_mark: maxUpdatedAt,
-    });
-    return {
-      status: 'ok',
-      notes_seen: notes.length,
-      notes_ingested: notesIngested,
-      atoms_written: atomsWritten,
-    };
   } catch (err) {
     logPollError(err, stage);
     return { status: 'error', reason: errorReason(err), message: (err as Error).message };

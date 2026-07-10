@@ -11,6 +11,11 @@ import { parseBrainName, preflightBrain, runBrain, type BrainName } from '../bra
 import type { CaptureEvent, EventId, Storage } from '../storage/interface.js';
 import { parseJson } from '../util/json.js';
 import {
+  resolveCurrentGranolaNotes,
+  withGranolaCheckpointLock,
+  writeCheckpointJsonWithLock,
+} from '../capture/surfaces/granola-poller.js';
+import {
   GRANOLA_SIGNALS_WORKER,
   writeWorkerHeartbeat,
   type WorkerHeartbeat,
@@ -27,6 +32,9 @@ export const DEFAULT_GRANOLA_SIGNAL_LOW_CONFIDENCE = 0.5;
 export const DEFAULT_GRANOLA_SIGNAL_MAX_RETRIES = 2;
 export const DEFAULT_GRANOLA_SIGNAL_MAX_NOTES_PER_TICK = 5;
 export const DEFAULT_GRANOLA_SIGNAL_BRAIN_TIMEOUT_MS = 180_000;
+export const DEFAULT_GRANOLA_SIGNAL_FAILURE_RETRY_AFTER_MS = 3_600_000;
+export const DEFAULT_GRANOLA_SIGNAL_MAX_FAILURE_ATTEMPTS = 3;
+export const GRANOLA_SIGNAL_BRAIN_TIMEOUT_CAP_MS = 600_000;
 
 const log = createLogger('enrich.granola-signals');
 
@@ -87,6 +95,8 @@ export interface GranolaSignalCheckpointEntry {
   last_success_at?: string;
   last_failure_at?: string;
   last_failure_reason?: string;
+  retry_after_at?: string;
+  failure_attempts?: number;
 }
 
 export interface GranolaSignalCheckpoint {
@@ -113,6 +123,12 @@ export interface GranolaSignalWorkerOptions {
   maxRetries?: number;
   maxNotesPerTick?: number;
   retryDelayMs?: number;
+  failureRetryAfterMs?: number;
+  maxFailureAttempts?: number;
+  targetNoteId?: string;
+  lockTimeoutMs?: number;
+  lockStaleMs?: number;
+  lockRetryMs?: number;
   workerIntervalMs?: number;
   runOnStart?: boolean;
   env?: NodeJS.ProcessEnv;
@@ -185,6 +201,13 @@ class GranolaSignalCheckpointError extends Error {
   }
 }
 
+export class GranolaExtractorParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GranolaExtractorParseError';
+  }
+}
+
 export function granolaSignalCheckpointPath(): string {
   return join(ECHO_HOME_PATHS.state, 'granola-signals-checkpoint.json');
 }
@@ -248,6 +271,11 @@ export function loadGranolaSignalCheckpoint(
     copyOptionalString(value, entry, 'last_success_at');
     copyOptionalString(value, entry, 'last_failure_at');
     copyOptionalString(value, entry, 'last_failure_reason');
+    copyOptionalString(value, entry, 'retry_after_at');
+    const failureAttempts = value['failure_attempts'];
+    if (typeof failureAttempts === 'number' && Number.isInteger(failureAttempts)) {
+      entry.failure_attempts = failureAttempts;
+    }
     notes[noteId] = entry;
   }
   return { schema_version: GRANOLA_SIGNAL_CHECKPOINT_SCHEMA_VERSION, notes };
@@ -261,10 +289,17 @@ export function writeGranolaSignalCheckpoint(
   atomicWrite({ filePath, content: `${JSON.stringify(checkpoint, null, 2)}\n` });
 }
 
+async function writeGranolaSignalCheckpointLocked(
+  lock: { checkpointPath: string; lockDir: string; ownerToken: string },
+  checkpoint: GranolaSignalCheckpoint,
+): Promise<void> {
+  await writeCheckpointJsonWithLock(lock, `${JSON.stringify(checkpoint, null, 2)}\n`);
+}
+
 function copyOptionalString(
   from: Record<string, unknown>,
   to: GranolaSignalCheckpointEntry,
-  key: 'last_success_at' | 'last_failure_at' | 'last_failure_reason',
+  key: 'last_success_at' | 'last_failure_at' | 'last_failure_reason' | 'retry_after_at',
 ): void {
   const value = from[key];
   if (typeof value === 'string') to[key] = value;
@@ -389,8 +424,9 @@ function parseTranscriptTime(value: string): string | number {
 }
 
 function inputFingerprint(note: RawGranolaNote): string {
+  const contentHash = stableHash(`${note.summary_text}\n${note.transcript_text}`);
   return stableHash(
-    `${note.note_id}\n${note.updated_at}\n${note.summary_dedupe_key}\n${note.transcript_dedupe_key}`,
+    `${note.note_id}\n${note.updated_at}\n${note.summary_dedupe_key}\n${note.transcript_dedupe_key}\n${contentHash}`,
   );
 }
 
@@ -420,6 +456,9 @@ function shouldExtractNote(
   checkpoint: GranolaSignalCheckpoint,
   currentRuns: Map<string, GranolaSignalRunManifest>,
   extractorVersion: string,
+  nowIso: string,
+  failureRetryAfterMs: number,
+  maxFailureAttempts: number,
 ): boolean {
   const entry = checkpoint.notes[note.note_id];
   const fingerprint = inputFingerprint(note);
@@ -429,7 +468,12 @@ function shouldExtractNote(
     entry.extractor_version === extractorVersion &&
     entry.last_failure_at !== undefined
   ) {
-    return false;
+    const attempts = entry.failure_attempts ?? 1;
+    if (attempts >= maxFailureAttempts) return false;
+    const retryAfter =
+      entry.retry_after_at ??
+      new Date(new Date(entry.last_failure_at).getTime() + failureRetryAfterMs).toISOString();
+    return new Date(nowIso).getTime() >= new Date(retryAfter).getTime();
   }
   if (!hasCurrentRun) return true;
   return entry?.input_fingerprint !== fingerprint || entry.extractor_version !== extractorVersion;
@@ -629,14 +673,35 @@ function updateCheckpointFailure(
   extractorVersion: string,
   at: string,
   reason: string,
+  retryAfterMs: number,
 ): void {
+  const previous = checkpoint.notes[note.note_id];
+  const sameInput =
+    previous?.input_fingerprint === inputFingerprint(note) &&
+    previous.extractor_version === extractorVersion;
+  const failureAttempts = sameInput ? (previous.failure_attempts ?? 1) + 1 : 1;
   checkpoint.notes[note.note_id] = {
     input_fingerprint: inputFingerprint(note),
     extractor_version: extractorVersion,
     last_attempted_at: at,
     last_failure_at: at,
     last_failure_reason: reason.slice(0, 200),
+    retry_after_at: new Date(new Date(at).getTime() + retryAfterMs).toISOString(),
+    failure_attempts: failureAttempts,
   };
+}
+
+export async function clearGranolaSignalFailure(
+  noteId: string,
+  checkpointPath = granolaSignalCheckpointPath(),
+): Promise<void> {
+  await withGranolaCheckpointLock(checkpointPath, {}, async (lock) => {
+    const checkpoint = loadGranolaSignalCheckpoint(checkpointPath);
+    const entry = checkpoint.notes[noteId];
+    if (entry === undefined || entry.last_failure_at === undefined) return;
+    delete checkpoint.notes[noteId];
+    await writeGranolaSignalCheckpointLocked(lock, checkpoint);
+  });
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -669,6 +734,7 @@ async function extractWithRetries(
       );
     } catch (err) {
       lastError = err;
+      if (err instanceof GranolaExtractorParseError) throw err;
       if (attempt < maxRetries) await sleep(retryDelayMs * 2 ** attempt);
     }
   }
@@ -697,126 +763,175 @@ export async function runGranolaSignalWorkerOnce(
   const maxRetries = options.maxRetries ?? DEFAULT_GRANOLA_SIGNAL_MAX_RETRIES;
   const maxNotesPerTick = options.maxNotesPerTick ?? DEFAULT_GRANOLA_SIGNAL_MAX_NOTES_PER_TICK;
   const retryDelayMs = options.retryDelayMs ?? 1_000;
+  const failureRetryAfterMs =
+    options.failureRetryAfterMs ?? DEFAULT_GRANOLA_SIGNAL_FAILURE_RETRY_AFTER_MS;
+  const maxFailureAttempts =
+    options.maxFailureAttempts ?? DEFAULT_GRANOLA_SIGNAL_MAX_FAILURE_ATTEMPTS;
 
-  let checkpoint: GranolaSignalCheckpoint;
   try {
-    checkpoint = loadGranolaSignalCheckpoint(checkpointPath);
+    return await withGranolaCheckpointLock(
+      checkpointPath,
+      {
+        timeoutMs: options.lockTimeoutMs,
+        staleMs: options.lockStaleMs,
+        retryMs: options.lockRetryMs,
+      },
+      async (lock) => {
+        let checkpoint: GranolaSignalCheckpoint;
+        try {
+          checkpoint = loadGranolaSignalCheckpoint(checkpointPath);
+        } catch (err) {
+          log.error('checkpoint_read_failed', { message: (err as Error).message });
+          return { status: 'error', reason: 'checkpoint_failed', message: (err as Error).message };
+        }
+
+        const observability = emptyObservability();
+        const manifestEvents = await storage.query({ source: GRANOLA_SIGNAL_INDEX_SOURCE });
+        const currentRuns = resolveCurrentGranolaSignalRuns(manifestEvents);
+        const allRawEvents = await storage.query({ source: GRANOLA_RAW_SOURCE });
+        buildRawGranolaNotes(allRawEvents, observability);
+        const currentRawAtoms = await resolveCurrentGranolaNotes(storage);
+        const rawEvents = [...currentRawAtoms.values()]
+          .flatMap((entry) => [entry.summary, entry.transcript])
+          .filter((event): event is CaptureEvent => event !== undefined);
+        const rawNotes = buildRawGranolaNotes(rawEvents, emptyObservability());
+        const nowIso = now();
+        const candidates = rawNotes
+          .filter(
+            (note) => options.targetNoteId === undefined || note.note_id === options.targetNoteId,
+          )
+          .filter((note) => isSettled(note, nowIso, settleMs, observability))
+          .filter((note) =>
+            shouldExtractNote(
+              note,
+              checkpoint,
+              currentRuns,
+              extractorVersion,
+              nowIso,
+              failureRetryAfterMs,
+              maxFailureAttempts,
+            ),
+          )
+          .slice(0, options.targetNoteId === undefined ? maxNotesPerTick : 1);
+
+        let notesExtracted = 0;
+        let signalAtomsWritten = 0;
+        let manifestsWritten = 0;
+        for (const note of candidates) {
+          const extractionRunId = randomUUID();
+          const completedAt = now();
+          let extracted: GranolaExtractedSignal[];
+          try {
+            extracted = await extractWithRetries(
+              extractFn,
+              note,
+              extractorVersion,
+              maxRetries,
+              retryDelayMs,
+            );
+          } catch (err) {
+            const message = (err as Error).message;
+            log.error('extraction_failed', { note_id: note.note_id, message });
+            updateCheckpointFailure(
+              checkpoint,
+              note,
+              extractorVersion,
+              now(),
+              message,
+              failureRetryAfterMs,
+            );
+            await writeGranolaSignalCheckpointLocked(lock, checkpoint);
+            return { status: 'error', reason: 'extraction_failed', message };
+          }
+
+          const prepared = prepareSignals(note, extracted, {
+            extractorVersion,
+            extractionRunId,
+            lowConfidenceThreshold,
+          });
+          const signalAtomIds: EventId[] = [];
+          try {
+            for (const signal of prepared) {
+              const id = await storage.append({
+                source: GRANOLA_SIGNAL_SOURCE,
+                timestamp: completedAt,
+                content: signal.content,
+                metadata: signal.metadata,
+              });
+              signalAtomIds.push(id);
+            }
+            signalAtomsWritten += signalAtomIds.length;
+            const manifest: GranolaSignalRunManifest = {
+              note_id: note.note_id,
+              extractor_version: extractorVersion,
+              extraction_run_id: extractionRunId,
+              completed_at: completedAt,
+              supersedes: currentRuns.get(note.note_id)?.extraction_run_id ?? null,
+              signal_atom_ids: signalAtomIds,
+            };
+            await storage.append({
+              source: GRANOLA_SIGNAL_INDEX_SOURCE,
+              timestamp: completedAt,
+              content: JSON.stringify(manifest),
+              metadata: {
+                manifest_type: 'granola_signal_run',
+                ...manifest,
+              },
+            });
+            manifestsWritten += 1;
+          } catch (err) {
+            const message = (err as Error).message;
+            log.error('append_failed', { note_id: note.note_id, message });
+            return { status: 'error', reason: 'append_failed', message };
+          }
+
+          updateCheckpointSuccess(checkpoint, note, extractorVersion, completedAt);
+          try {
+            await writeGranolaSignalCheckpointLocked(lock, checkpoint);
+          } catch (err) {
+            log.error('checkpoint_write_failed', {
+              note_id: note.note_id,
+              message: (err as Error).message,
+            });
+            return {
+              status: 'error',
+              reason: 'checkpoint_failed',
+              message: (err as Error).message,
+            };
+          }
+          notesExtracted += 1;
+          currentRuns.set(note.note_id, {
+            note_id: note.note_id,
+            extractor_version: extractorVersion,
+            extraction_run_id: extractionRunId,
+            completed_at: completedAt,
+            supersedes: currentRuns.get(note.note_id)?.extraction_run_id ?? null,
+            signal_atom_ids: signalAtomIds,
+          });
+        }
+
+        log.info('worker_ok', {
+          notes_seen: rawNotes.length,
+          notes_extracted: notesExtracted,
+          signal_atoms_written: signalAtomsWritten,
+          manifests_written: manifestsWritten,
+          observability,
+        });
+        return {
+          status: 'ok',
+          notes_seen: rawNotes.length,
+          notes_extracted: notesExtracted,
+          signal_atoms_written: signalAtomsWritten,
+          manifests_written: manifestsWritten,
+          observability,
+        };
+      },
+    );
   } catch (err) {
-    log.error('checkpoint_read_failed', { message: (err as Error).message });
+    if ((err as Error).name !== 'GranolaCheckpointError') throw err;
+    log.error('checkpoint_lock_failed', { message: (err as Error).message });
     return { status: 'error', reason: 'checkpoint_failed', message: (err as Error).message };
   }
-
-  const observability = emptyObservability();
-  const manifestEvents = await storage.query({ source: GRANOLA_SIGNAL_INDEX_SOURCE });
-  const currentRuns = resolveCurrentGranolaSignalRuns(manifestEvents);
-  const rawEvents = await storage.query({ source: GRANOLA_RAW_SOURCE });
-  const rawNotes = buildRawGranolaNotes(rawEvents, observability);
-  const nowIso = now();
-  const candidates = rawNotes
-    .filter((note) => isSettled(note, nowIso, settleMs, observability))
-    .filter((note) => shouldExtractNote(note, checkpoint, currentRuns, extractorVersion))
-    .slice(0, maxNotesPerTick);
-
-  let notesExtracted = 0;
-  let signalAtomsWritten = 0;
-  let manifestsWritten = 0;
-  for (const note of candidates) {
-    const extractionRunId = randomUUID();
-    const completedAt = now();
-    let extracted: GranolaExtractedSignal[];
-    try {
-      extracted = await extractWithRetries(
-        extractFn,
-        note,
-        extractorVersion,
-        maxRetries,
-        retryDelayMs,
-      );
-    } catch (err) {
-      const message = (err as Error).message;
-      log.error('extraction_failed', { note_id: note.note_id, message });
-      updateCheckpointFailure(checkpoint, note, extractorVersion, now(), message);
-      writeGranolaSignalCheckpoint(checkpoint, checkpointPath);
-      return { status: 'error', reason: 'extraction_failed', message };
-    }
-
-    const prepared = prepareSignals(note, extracted, {
-      extractorVersion,
-      extractionRunId,
-      lowConfidenceThreshold,
-    });
-    const signalAtomIds: EventId[] = [];
-    try {
-      for (const signal of prepared) {
-        const id = await storage.append({
-          source: GRANOLA_SIGNAL_SOURCE,
-          timestamp: completedAt,
-          content: signal.content,
-          metadata: signal.metadata,
-        });
-        signalAtomIds.push(id);
-      }
-      signalAtomsWritten += signalAtomIds.length;
-      const manifest: GranolaSignalRunManifest = {
-        note_id: note.note_id,
-        extractor_version: extractorVersion,
-        extraction_run_id: extractionRunId,
-        completed_at: completedAt,
-        supersedes: currentRuns.get(note.note_id)?.extraction_run_id ?? null,
-        signal_atom_ids: signalAtomIds,
-      };
-      await storage.append({
-        source: GRANOLA_SIGNAL_INDEX_SOURCE,
-        timestamp: completedAt,
-        content: JSON.stringify(manifest),
-        metadata: {
-          manifest_type: 'granola_signal_run',
-          ...manifest,
-        },
-      });
-      manifestsWritten += 1;
-    } catch (err) {
-      const message = (err as Error).message;
-      log.error('append_failed', { note_id: note.note_id, message });
-      return { status: 'error', reason: 'append_failed', message };
-    }
-
-    updateCheckpointSuccess(checkpoint, note, extractorVersion, completedAt);
-    try {
-      writeGranolaSignalCheckpoint(checkpoint, checkpointPath);
-    } catch (err) {
-      log.error('checkpoint_write_failed', {
-        note_id: note.note_id,
-        message: (err as Error).message,
-      });
-      return { status: 'error', reason: 'checkpoint_failed', message: (err as Error).message };
-    }
-    notesExtracted += 1;
-    currentRuns.set(note.note_id, {
-      note_id: note.note_id,
-      extractor_version: extractorVersion,
-      extraction_run_id: extractionRunId,
-      completed_at: completedAt,
-      supersedes: currentRuns.get(note.note_id)?.extraction_run_id ?? null,
-      signal_atom_ids: signalAtomIds,
-    });
-  }
-
-  log.info('worker_ok', {
-    notes_seen: rawNotes.length,
-    notes_extracted: notesExtracted,
-    signal_atoms_written: signalAtomsWritten,
-    manifests_written: manifestsWritten,
-    observability,
-  });
-  return {
-    status: 'ok',
-    notes_seen: rawNotes.length,
-    notes_extracted: notesExtracted,
-    signal_atoms_written: signalAtomsWritten,
-    manifests_written: manifestsWritten,
-    observability,
-  };
 }
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
@@ -847,10 +962,11 @@ function resolveBrainExtractorConfig(env: NodeJS.ProcessEnv): BrainExtractorConf
 
 function defaultExtractorFromBrain(config: BrainExtractorConfig): GranolaSignalExtractor {
   return async (input) => {
-    const result = await runBrain(buildExtractionPrompt(input), {
+    const prompt = buildExtractionPrompt(input);
+    const result = await runBrain(prompt, {
       brain: config.brain,
       contextRepoPath: config.contextRepoPath,
-      timeoutMs: config.timeoutMs,
+      timeoutMs: computeGranolaSignalBrainTimeoutMs(config.timeoutMs, prompt.length),
       env: config.env,
     });
     if (!result.ok || result.answer === undefined) {
@@ -860,30 +976,70 @@ function defaultExtractorFromBrain(config: BrainExtractorConfig): GranolaSignalE
   };
 }
 
-function buildExtractionPrompt(input: GranolaSignalExtractionInput): string {
+export function computeGranolaSignalBrainTimeoutMs(base: number, promptChars: number): number {
+  const scaled = base + 1000 * Math.max(0, Math.ceil(promptChars / 1024) - 1);
+  return Math.min(Math.max(scaled, base), GRANOLA_SIGNAL_BRAIN_TIMEOUT_CAP_MS);
+}
+
+export function buildExtractionPrompt(input: GranolaSignalExtractionInput): string {
+  const promptInput = {
+    note_id: input.note_id,
+    meeting_title: input.meeting_title,
+    updated_at: input.updated_at,
+    summary_text: input.summary_text,
+    summary_dedupe_key: input.summary_dedupe_key,
+    transcript_text: input.transcript_text,
+    transcript_dedupe_key: input.transcript_dedupe_key,
+  };
   return [
     'Extract Granola meeting signals as JSON only.',
     'Return {"signals":[...]} with only decision, rationale, and action signal_type values.',
     'Every signal must include text, canonical_subject, source_span, and confidence.',
+    'Action signals must include owner when the speaker assigns or implies one; omit owner only when unassigned.',
     // Item 118 AC2: pin the canonical_subject shape so cross-meeting subjects
     // vary less. normalizeSubject remains the authority; this only reduces
     // variance at the source.
     'canonical_subject must be a space-separated lowercase noun phrase — no snake_case, no camelCase, no underscores or hyphens.',
     'Use only the meeting content below; do not infer rationale that was not said.',
     '',
-    JSON.stringify(input, null, 2),
+    JSON.stringify(promptInput, null, 2),
   ].join('\n');
 }
 
-function parseExtractorAnswer(answer: string): GranolaExtractedSignal[] {
-  const parsed = parseJson(answer.trim());
+function extractJsonCandidate(answer: string): string {
+  let text = answer.trim();
+  const fence = /^```(?:json|JSON)?\s*\n([\s\S]*?)\n```\s*$/.exec(text);
+  if (fence !== null) text = fence[1]!.trim();
+  const firstObject = text.indexOf('{');
+  const firstArray = text.indexOf('[');
+  const starts = [firstObject, firstArray].filter((index) => index >= 0).sort((a, b) => a - b);
+  if (starts.length === 0) return text;
+  const start = starts[0]!;
+  const end = text[start] === '{' ? text.lastIndexOf('}') : text.lastIndexOf(']');
+  return end >= start ? text.slice(start, end + 1).trim() : text;
+}
+
+export function parseExtractorAnswer(answer: string): GranolaExtractedSignal[] {
+  let parsed: unknown;
+  try {
+    parsed = parseJson(extractJsonCandidate(answer));
+  } catch (err) {
+    throw new GranolaExtractorParseError(
+      `extractor returned invalid JSON: ${(err as Error).message}`,
+    );
+  }
   const signals = Array.isArray(parsed)
     ? parsed
     : isPlainObject(parsed) && Array.isArray(parsed['signals'])
       ? parsed['signals']
       : null;
-  if (signals === null) throw new Error('extractor returned invalid JSON signal list');
-  return signals.map(parseExtractedSignal);
+  if (signals === null)
+    throw new GranolaExtractorParseError('extractor returned invalid JSON signal list');
+  try {
+    return signals.map(parseExtractedSignal);
+  } catch (err) {
+    throw new GranolaExtractorParseError((err as Error).message);
+  }
 }
 
 function parseExtractedSignal(value: unknown): GranolaExtractedSignal {
