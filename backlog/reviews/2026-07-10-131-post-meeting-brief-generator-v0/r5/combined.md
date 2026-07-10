@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R5 — verification-only round returned proceed/proceed with zero findings. Convergence arc: r1 five convergent gaps patched; r2-r4 the AC4 lock refined to termination (r3 removed the false renamer-claim invariant; r4 closed the final window structurally via the stage-fence-commit in-lock-temp protocol). Builder notes carried in-spec: win32 lock-dir rename risk = escalate for guarantee-narrowing, never new machinery; the 60s stale threshold's false-takeover is safe by design (fenced write aborts).
 
