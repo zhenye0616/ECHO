@@ -466,3 +466,13 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right — active trigger accepted for both reviewers.
 - **Note:** dispatch-next-round.py could not handle the inbox-parked artifact (find_artifact scans kanban stages only) — branch (b) reproduced manually via request.py --artifact-path; followup filed in backlog/_followups.md. First r1 reviewer tick also lost a push race to codex-ops and its worktree discarded a completed 132 review (re-run succeeded); push-with-retry gave up after 2 attempts inside the reviewer wrapper — worth watching for a retry-budget bump if it recurs.
 - **Conjecture:** none
+
+### 2026-07-10 14:32 PDT — watcher r1 tick on 133: coord_invoke active trigger for r2
+
+- **Trigger:** /review-queue-watch r1 tick on 2026-07-10-133-product-ports-extraction completed branch (b) (5 findings patched + A4 donor-bias fold at 3a6dbc32, r2 dispatched at 8cd69156); 057b post-push hook.
+- **Query inputs:** coord_invoke ×2 {roles codex + codex-ops; backlog/reviews/2026-07-10-133-product-ports-extraction/r2/request.md} — raw MCP POST to :38478, X-Echo-Role: claude.
+- **Returned:** both ok.
+- **Sources:** write-path only — daemon coord dispatch.
+- **Verdict:** ✅ right.
+- **Note:** same manual branch-(b) reproduction as 132's tick (inbox --artifact-path gap, followup already filed). Both parked specs now have r2 in flight at their patched SHAs.
+- **Conjecture:** none
