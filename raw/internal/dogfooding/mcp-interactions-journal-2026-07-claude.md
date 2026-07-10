@@ -476,3 +476,13 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right.
 - **Note:** same manual branch-(b) reproduction as 132's tick (inbox --artifact-path gap, followup already filed). Both parked specs now have r2 in flight at their patched SHAs.
 - **Conjecture:** none
+
+### 2026-07-10 14:45 PDT — watcher r2 tick on 132: coord_invoke active trigger for r3
+
+- **Trigger:** /review-queue-watch r2 tick on 2026-07-10-132-product-module-carve-out completed branch (b) (4 findings patched at b70902ec: MOVE SOURCE enumeration, four-worker contract, pid-lock conflict test, OPEN-block option compatibility; r3 dispatched at f18d0ac0); 057b post-push hook.
+- **Query inputs:** coord_invoke ×2 {codex, codex-ops; backlog/reviews/2026-07-10-132-product-module-carve-out/r3/request.md}.
+- **Returned:** both ok.
+- **Sources:** write-path only — daemon coord dispatch.
+- **Verdict:** ✅ right.
+- **Note:** r2 responses arrived ~13 min after r2 dispatch via active trigger — no launchd-cadence wait. Reframe gate checked, not fired (1 of 4 findings targeted r1-patch text).
+- **Conjecture:** none
