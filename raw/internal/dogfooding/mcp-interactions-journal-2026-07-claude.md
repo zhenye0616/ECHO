@@ -486,3 +486,13 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right.
 - **Note:** r2 responses arrived ~13 min after r2 dispatch via active trigger — no launchd-cadence wait. Reframe gate checked, not fired (1 of 4 findings targeted r1-patch text).
 - **Conjecture:** none
+
+### 2026-07-10 14:58 PDT — watcher r2 tick on 133: reframe gate + coord_invoke for r3
+
+- **Trigger:** /review-queue-watch r2 tick on 2026-07-10-133-product-ports-extraction. REFRAME GATE FIRED (3/3 codex findings targeted r1-patch text); fresh-context investigator returned propagation_completion; 3 patches applied at aa5f5cd1; r3 dispatched at 3068ae2e + this coord_invoke pair. codex-ops hit proceed/zero-findings at r2.
+- **Query inputs:** coord_invoke ×2 {codex, codex-ops; backlog/reviews/2026-07-10-133-product-ports-extraction/r3/request.md}.
+- **Returned:** both ok.
+- **Sources:** write-path only — daemon coord dispatch.
+- **Verdict:** ✅ right.
+- **Note:** first reframe-gate firing on a PARKED-inbox item; investigator agreed the r1 mechanisms were load-bearing responses to r1 findings, so completion not removal. Watch r3: if codex finds new bugs in the aa5f5cd1 propagation text, that's the 057a patch-spiral signature and the next disposition should consider cutting the sweep-grep for an AST/import sweep (investigator's named risk).
+- **Conjecture:** none
