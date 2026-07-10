@@ -1,10 +1,43 @@
 ---
 id: 2026-07-10-131-post-meeting-brief-generator-v0
 title: "Post-meeting brief generator v0: harden the meeting→brief fast path around six root causes; canonical tool-agnostic brief object + markdown render as a CLI command"
-status: proposed
+status: complete
 priority: HIGH
 estimate: 2d
 created: 2026-07-10
+review_notes: |
+  Merged on 2026-07-10 via strategist-run merge under founder standing
+  authorization ("proceed" on the 131 full-auto loop, same pattern as 130).
+
+  Conflicts resolved:
+  - none (merge --no-ff clean; zero file overlap with main-side movement)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none — reviewer verdict was merge as-is
+
+  Fixups deferred to follow-up items (see backlog/_followups.md):
+  - RC4 residual: cross-checkpoint manifest skip in shouldExtractNote
+  - cosmetic FENCE ENOENT path tidy in writeCheckpointJsonWithLock
+  - optional adoption of the rebound holdout suite as permanent regressions
+
+  Verify: 2117/2117 tests pass (21 skipped, 1 todo); lint, typecheck,
+  coupled-invariants, sync-skills clean post-merge on fresh install.
+
+  HOLDOUT GATE (first use of the blind red-first discipline): 20-test suite
+  written from the stress-test findings BEFORE the build, builder-blind on
+  branch holdout/131-confirmation. Result at b58f558e: 19/20 green-equivalent
+  (6 green on real seams pre-rebind; 12 prototype-copy tests rebound by the
+  verifier to the shipped modules, all green; 1 stale-shape green on the real
+  locked path; 1 genuine residual red OUT of committed AC4 scope — filed).
+  Rebound suite preserved on the holdout branch (tests/holdout-131-rebound/).
+
+  Review provenance: spec converged r1-r5 in the two-codex queue (reframe gate
+  fired r2/r3/r4; the AC4 lock took three refinement rounds ending in the
+  stage-fence-commit structural close). Build: single cycle, zero redos —
+  the builder proactively covered packaging (130's lesson held). Final delta
+  review verdict: merge as-is at b58f558ebebd0bcbf6893c8fea5dcda5404f3ef0.
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-10-brief-path-stress-test.md      # the agent-team findings this spec collapses — 30 verified failure modes, 12 classes; READ FIRST (HTML rendering: https://claude.ai/code/artifact/ea615495-b1b1-47db-8b3b-c140868df3ac)
