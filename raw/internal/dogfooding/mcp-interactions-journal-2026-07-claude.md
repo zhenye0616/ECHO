@@ -428,3 +428,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** notable AC8 disposition: reviewers wanted committed golden fixtures; chose a machine-local comparator with visible SKIP instead — meeting content (EchoBrain Legal) cannot land as goldens in a PUBLIC repo. Sensitive-content-vs-testability is becoming a recurring design tension (same root as the station-4 safety call).
 - **Conjecture:** none
+
+### 2026-07-09 22:45 PDT — watcher tick r2→r3 on item 131, reframe gate (coord_invoke ×2)
+- **Trigger:** 131 r2 — 6 findings = 4 roots, all on r1-patch mechanisms; gate fired; investigator ruled propagation_completion AND explicitly falsified the structural alternative (no daemon work-submission endpoint exists → single-writer would be new architecture); patched 72b8b70a (tombstone takeover + token release, first-KiB timeout reservation, T1-T3 sanitization contract, files_to_modify bookkeeping); r3 dispatched (8de6a845) verification-only
+- **Query inputs:** coord_invoke{role: codex, .../131/r3/request.md}; coord_invoke{role: codex-ops, same}
+- **Returned:** both ok
+- **Sources:** write-path only
+- **Verdict:** ✅ right
+- **Note:** the lock contract is now on its second refinement round — matches the 057a pattern where concurrency mechanisms attract findings until the protocol is fully pinned; the investigator's structural check kept us from over-building (single-writer daemon RPC rejected as new architecture).
+- **Conjecture:** none
