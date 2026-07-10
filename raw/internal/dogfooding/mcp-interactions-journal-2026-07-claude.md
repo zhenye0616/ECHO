@@ -516,3 +516,13 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** 🟡 partial — chain landed on the right thread, but "connect to my current active session" via echo_resolve_mru resolved to the CALLING session itself (its first turn is already captured by the time the MCP call runs), which is a self-reference trap; the real target was the second-most-recent claude_code session, reachable only by the source_app-wide search and manual exclusion of self.
 - **Note:** resolve_mru has no "exclude this session" affordance and capture latency is low enough that the asking session always wins MRU. A `exclude_source` param or self-session awareness would make this resume shape one call instead of three.
 - **Conjecture:** the 14 single-atom codex clusters are the same brain-exec cluster-fragmentation noted at 11:22 PDT today; still uncollapsed.
+
+### 2026-07-10 17:05 PDT — connect-to-codex review handoff (ratify halt-lift rule)
+
+- **Trigger:** Founder asked strategist to "use echo and connect to codex," review the current-truth paragraph / capability matrix / halt register the codex pass produced, then ratify or edit the halt-lift rule.
+- **Query inputs:** (1) `echo_resolve_mru({sources: ["codex"], repo_path: "/Users/zhenye/Desktop/Project_echo"})`; (2) `search_memories({source: "fs:.../rollout-2026-07-10T15-56-36-019f4def-....jsonl", limit: 10})` — note: hand-typed source with a transcription typo (4def vs 4e3f); (3) same call with the exact descriptor source.
+- **Returned:** (1) descriptor for the 15:56 codex rollout. (2) 0 matches (typo'd path — exact-match source filter is unforgiving). (3) 1 atom: codex session turn 0 (gpt-5.6-sol, ultra effort, 3 spawned agents, 92 tool calls) — founder-directed strategist pass over the two 5bfb407b artifacts; its closing handoff line named exactly the review this session then performed.
+- **Sources:** (2)/(3) `fs:~/.codex/sessions/2026/07/10/rollout-...019f4e3f....jsonl`; work products verified via git diff of the working tree, not ECHO.
+- **Verdict:** ✅ right (after self-inflicted retry) — the chain recovered the cross-tool handoff context in one atom; the codex turn's final message was the actual baton.
+- **Note:** copy the `source` string from the resolver output verbatim; exact-source search returns empty (not an error) on a one-character typo, indistinguishable from "session not captured" without re-checking the path. A resolver→search compositional call that passes the descriptor through mechanically would remove this failure class.
+- **Conjecture:** none

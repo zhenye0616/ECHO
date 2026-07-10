@@ -1,10 +1,12 @@
 # Full project map — known knowns / known unknowns / unknown knowns / unknown unknowns
 
-**Date:** 2026-07-10 (evening, post-halt) · **Author:** strategist (Claude Code) at founder request
+**Date:** 2026-07-10 (evening, post-halt) · **Author:** strategist (Claude Code) at founder request · **Evidence baseline:** `5bfb407b`
 
-**Provenance.** Built by a 15-agent workflow: 8 read-only domain surveys (strategy archive, backlog state, code reality, validation evidence, client readiness, repo hygiene, docs-vs-code drift, public-repo exposure; 227 raw items), 4 per-quadrant consolidators, then two adversarial critics (a completeness critic and an evidence auditor that re-opened every high-stakes citation) plus a sprint planner. The critics' corrections are applied in this text — most importantly, the map is rebased onto commit `0ab0af05` (specs 132/133 withdrawn, clarity halt declared), which landed while the surveys ran. Companion doc: `2026-07-10-clarity-sprint-plan.md`.
+**Provenance.** Built by a 15-agent workflow: 8 read-only domain surveys (strategy archive, backlog state, code reality, validation evidence, client readiness, repo hygiene, docs-vs-code drift, public-repo exposure; 227 raw items), 4 per-quadrant consolidators, then two adversarial critics (a completeness critic and an evidence auditor that sampled 12 high-stakes citations, verifying 9 exactly) plus a sprint planner. The critics' corrections are applied in this text — most importantly, the map is rebased onto commit `0ab0af05` (specs 132/133 withdrawn, clarity halt declared), which landed while the surveys ran. Companion docs: `2026-07-10-project-echo-orientation-and-closure.md` (read first) and `2026-07-10-clarity-sprint-plan.md`.
 
-**How to read.** KK = evidence-backed shipped/validated reality (the ground the sprint stands on). KU = tracked open questions, ranked by when they bite. UK = things the project acts on that are written nowhere, or that written docs contradict — the cheapest clarity wins. UU = blind-spot *classes*, each paired with the cheapest detection instrument that converts it into a KU. This map is the deliverable the Part-4 halt names: dev resumes when the founder judges it complete.
+**How to read.** KK = evidence-backed facts, including both shipped reality and ratified-but-unbuilt decisions. KU = tracked open questions, ordered roughly by when they bite. UK = things the project acts on that are written nowhere, or that written docs contradict — the cheapest clarity wins. UU = blind-spot *classes*, each paired with the cheapest detection instrument that converts it into a KU. These quadrants are epistemic lenses, not maturity states; use the companion orientation view's `live / shipped / concierge / decided / open / deferred / absent / retired` and `E0-E4` vocabulary for delivery claims. This register is the evidence deliverable named by the Part-4 halt; dev resumes only after a separate founder halt-lift decision at a named SHA.
+
+**Evidence boundary.** Repository paths, code lines, commits, and committed journal entries are independently recoverable. Citations labeled `memory` or `MEMORY` refer to Claude-private/founder memory that is not tracked in this repo; treat those as founder testimony (`E1`), not a self-contained evidence chain, until a committed source replaces them. Absence greps and “verified this run” claims are snapshots at the baseline SHA, not durable proofs.
 
 ## Domain survey summaries
 
@@ -21,7 +23,7 @@
 
 ## 1. Known knowns — the asset inventory
 
-*The KK quadrant is unusually strong for a pre-client sprint: the strategy spine (scope pin, deploy model, resolved unknowns, customer identity) was all locked 07-09/07-10 and is internally coherent; the meeting→brief loop exists in code with real tests and was hardened through a 30-finding stress test plus a blind holdout gate; and the loop has been proven live end-to-end on real meetings with a founder 5/5 extraction verdict. Operational landmines (launchd env reload, Granola freshness bound, egress profile) are documented at code-line level. The coordination pipeline is fully drained, giving a clean runway for cleanup/reorg. The two firm negative assets — public-repo content exposure and zero adapter code for the client's actual tools — are themselves verified knowns the sprint can plan against. (Corrections applied post-critique: the 132/133 'parked' framing is replaced by the 0ab0af05 withdrawal + standing-decisions reality, and the halt itself is now the first entry.)*
+*The KK quadrant is unusually strong for a pre-client sprint: the strategy spine (scope pin, deploy model, resolved unknowns, pilot-candidate identity) was locked 07-09/07-10; the meeting→brief path exists in code with real tests and was hardened through a 30-finding stress test plus a blind holdout gate; and that path has run live on real founder meetings with a 5/5 extraction verdict. This is not proof of all five stages or a non-founder client outcome. Operational landmines (launchd env reload, Granola freshness bound, egress profile) are documented at code-line level. The coordination pipeline is fully drained. The two firm negative assets — public-repo content exposure and zero adapter code for the pilot candidate's actual tools — are themselves verified knowns the sprint can plan against.*
 
 ### FULL HALT ON DEV declared (2026-07-10 evening) — the governing frame of this map
 *strategy · client-relevance high*
@@ -32,10 +34,10 @@ Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md P
 
 **Action:** Every action in this map is analysis / decision / documentation / cleanup. Build-shaped fixes are named and queued but not specced until the halt lifts.
 
-### Client scope pinned: meeting→brief loop only, achieved by configuration
+### Client scope pinned to meeting→brief; behavior is config-selected but runtime is not isolated
 *strategy · client-relevance high*
 
-Client-facing scope was pinned 2026-07-10 to the meeting→brief loop only, implemented as configuration not code: the item-109 intake bridge is off-by-default and fails closed, the Slack responder is credential-gated, so a Granola-only profile yields exactly poller→signals→brief.
+Client-facing scope was pinned 2026-07-10 to the meeting→brief loop only. The visible behavior is selected by configuration rather than a product carve: the item-109 intake bridge is off-by-default and fails closed, and the Slack responder is credential-gated, so a Granola-only profile exposes poller→signals→brief. The current daemon still boots the full lab worker set, including dev extractors; this is a scope decision, not an isolated client runtime.
 
 Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md Part 2 addenda · src/daemon/index.ts:72-98 (bridge default-off among boot workers)
 
@@ -57,21 +59,21 @@ Founder resolved A1 = retrieval-less product mode, B2 = dedicated box, B3 = foun
 
 Evidence: 2026-07-10-product-carve-unknowns-register.md lines 46-49 (A1/B2/B3/B4) + Part 2 line 55-57 (API-key brain) + Part 4 standing-decisions list
 
-**Action:** Client-prep docs can state the exact install contract; the API-key brain item is the one decided-but-unspecced piece to watch.
+**Action:** Client-prep docs must state two contracts: current full-daemon + authenticated CLI, and target API-key product brain. The latter is decided but unbuilt; do not describe it as today's install path.
 
-### First customer = university lab; Justinian void; zero adapter code exists
+### First pilot candidate = university lab; Justinian void; zero adapter code exists
 *strategy · client-relevance high*
 
-Customer switched 2026-07-09 to a university lab (Zoom + self-hosted Mattermost); the Justinian pilot is cancelled and its target human declared VOID. Two adapters are owed, and grep confirms zero Zoom or Mattermost code anywhere in src/ or tests/. The withdrawn ports spec (ex-133) built only ports and explicitly excluded both adapters — that exclusion is now a historical fact recoverable at 95a6b581 / 71647084.
+The active pilot candidate switched 2026-07-09 to a university lab (Zoom + self-hosted Mattermost); the Justinian pilot is cancelled and its target human declared VOID. Two adapters are owed, and grep confirms zero Zoom or Mattermost code anywhere in src/ or tests/. The withdrawn ports spec (ex-133) built only ports and explicitly excluded both adapters — that exclusion is now a historical fact recoverable at 95a6b581 / 71647084. WTP, pilot terms, and a client install have not yet made the lab a validated customer.
 
 Evidence: 2026-07-07-office-hours-org-recap-pilot.md Addendum 5 · grep -riE 'zoom|mattermost' src/ tests/ = empty (verified) · git history: 95a6b581 (spec), 71647084 (convergence)
 
 **Action:** Known gap, not a surprise: the client's actual tools are 100% unbuilt — client-facing prep must not imply otherwise.
 
-### Five-stage decision-loop canonical model with honest per-stage status
+### Five-stage decision-loop model is canonical; its proof conditions need qualification
 *strategy · client-relevance high*
 
-The 2026-07-09 canonical model pins per-stage reality: S1 Extract shipped (Granola only); S2 Triage MISSING (concierge); S3 Validate built and proven; S4 Dispatch plumbing exists (fail-closed create, 130 tier-1 passed); S5 Backflow partial (capture built, composition concierge; 131 brief v0 complete 07-10). ECHO owns stages 2/3/5; the decision ledger never lives in rented SaaS.
+The 2026-07-09 model pins the five contracts: S1 Extract shipped (Granola only); S2 Triage MISSING (concierge); S3 Validate built and proven only while the hand-run responder is available; S4 Dispatch plumbing exists but its live proof belongs to the cancelled Justinian regime; S5 Backflow partial (capture built, composition concierge; 131 brief v0 complete 07-10). ECHO owns stages 2/3/5; the decision ledger never lives in rented SaaS. The source model still needs these proof qualifiers written into it.
 
 Evidence: raw/internal/decisions/2026-07-09-decision-loop-canonical-model.md · backlog/complete/2026-07-10-131-post-meeting-brief-generator-v0.md
 
@@ -95,14 +97,14 @@ Evidence: 2026-07-04-station-2-signal-formation-lock-in.md · 2026-07-04-expansi
 
 **Action:** The owed Zoom adapter has a pre-agreed shape: allowlist entry + template, no chassis edits — cite this in the adapter spec.
 
-### NORTH_STAR is current and matches the July reframe
+### NORTH_STAR's three-scope strategy is current; its sprint-focus block is stale
 *strategy · client-relevance medium*
 
-docs/NORTH_STAR.md was rewritten 2026-07-03 to the org-alignment framing (one substrate, three scopes) with an explicit revisit trigger for the deliberately-undersupported machine-scope beta; it is the one top-level strategy doc that is not stale.
+docs/NORTH_STAR.md was rewritten 2026-07-03 to the durable org-alignment framing (one substrate, three scopes) with an explicit revisit trigger for the deliberately-undersupported machine-scope beta. That strategic ontology remains the best template; its `Current Sprint Focus` block predates the 07-09/10 lab-pilot pivot and must be refreshed.
 
 Evidence: docs/NORTH_STAR.md lines 5-35 · 2026-07-01-org-alignment-reframe.md
 
-**Action:** Use NORTH_STAR as the template/tone anchor when rewriting the stale CLAUDE.md V1 block and wiki/product pages.
+**Action:** Preserve NORTH_STAR's three-scope model while updating its sprint-focus block; use the durable portion as the template/tone anchor for stale operating docs.
 
 ### Meeting→brief loop exists end-to-end in code, hardened via blind holdout gate
 *product-loop · client-relevance high*
@@ -113,10 +115,10 @@ Evidence: src/cli/commands/brief.ts:24,135-137; src/enrich/post-meeting-brief.ts
 
 **Action:** This is the client deliverable core — the strongest single asset; wiki coverage for it is owed but the code+tests are solid ground.
 
-### Loop proven live on real meetings; founder extraction verdict 5/5
+### Meeting→card→concierge-triage→brief path proven live; founder extraction verdict 5/5
 *product-loop · client-relevance high*
 
-The full 5-stage loop ran live on a real advisor meeting 2026-07-09 (stages 2/3/5 concierge): capture → extraction (6 decisions/3 actions/6 rationales) → card → triage → brief hand-pasted to Mattermost; meeting-end→card ~70 min dominated by human gates (compute ~100s). Two prior meeting→card runs succeeded 07-08 (~20 min, Granola-latency-dominated), including fail-honest behavior on an empty-agenda meeting (one defensible card, no fabrication). Founder verdict: 5/5 useful, zero dismissals; binding constraint = confirm-gate friction, not extraction quality.
+The meeting→brief path ran live on a real advisor meeting 2026-07-09: capture → extraction (6 decisions/3 actions/6 rationales) → card → concierge triage/confirm → brief hand-pasted to Mattermost. Dispatch did not run in this lab cycle. Meeting-end→card was ~70 min, dominated by human gates (compute ~100s). Two prior meeting→card runs succeeded 07-08 (~20 min, Granola-latency-dominated), including fail-honest behavior on an empty-agenda meeting (one defensible card, no fabrication). Founder verdict: 5/5 useful, zero dismissals; binding constraint = confirm-gate friction, not extraction quality.
 
 Evidence: raw/internal/decisions/2026-07-09-first-advisor-loop-cycle.md · mcp-interactions-journal-2026-07-claude.md entries 07-08 00:05, 13:38, 23:22 PDT · 2026-07-08-decision-confirm-friction.md
 
@@ -174,7 +176,7 @@ Daemon boot unconditionally starts fs-watcher, git-watcher, granola-poller, enri
 
 Evidence: src/daemon/index.ts:72-98
 
-**Action:** This is exactly what item 132's carve fixes; until then, client-prep docs must describe which workers no-op on a client box rather than claiming they don't run.
+**Action:** This is what the withdrawn 132 design intended to fix and what a post-halt successor carve must revisit; until then, client-prep docs must describe which workers no-op on a client box rather than claiming they do not run.
 
 ### Brain layer today = local CLI subprocess, codex default
 *product-loop · client-relevance high*
@@ -212,14 +214,14 @@ Evidence: journal 2026-07-07 11:05 PDT note · memory reference_slack_decision_g
 
 **Action:** These belong verbatim in the (unwritten) box runbook — they were learned the hard way once and will recur on every env change.
 
-### npm tarball contents are allowlist-controlled; leakage-by-packaging is impossible
+### npm tarball path inclusion is allowlist-controlled; raw/env files are excluded at the baseline
 *deploy · client-relevance high*
 
-package.json's explicit files manifest ships only dist JS/SQL, assets/echo-{skills,roles,workflows}, review-queue config JSONs/schemas, and a hand-whitelisted 13-file ceo-slack-responder dist subset — so raw/, journals, and env files structurally cannot ship in the npm-pack artifact; echoctl-*.tgz and dist/ are gitignored. Known wart: the tarball does ship lab orchestration assets and the Slack responder.
+package.json's explicit files manifest ships only dist JS/SQL, assets/echo-{skills,roles,workflows}, review-queue config JSONs/schemas, and a hand-whitelisted 13-file ceo-slack-responder dist subset. At `5bfb407b`, that prevents path-based inclusion of raw/, journals, and env files; echoctl-*.tgz and dist/ are gitignored. It does not prove compiled output contains no embedded paths or client-irrelevant code: the tarball deliberately ships lab orchestration assets, founder defaults, and the Slack responder.
 
 Evidence: package.json:12-41 (files field) · .gitignore:43,53
 
-**Action:** The deploy artifact is safe by construction; trimming the orchestration/responder payload is a clean, low-risk cleanup-sprint win.
+**Action:** Treat raw/env path exclusion as the proven property; audit compiled defaults separately, and trim the orchestration/responder payload only in the post-halt carve.
 
 ### Storage is append-only in code and the retention property is proven live
 *data · client-relevance high*
@@ -230,19 +232,19 @@ Evidence: src/storage/sqlite.ts:79-85 + grep (0 UPDATE/DELETE hits) · wiki/arch
 
 **Action:** A genuine differentiator AND a consent obligation: the lab-pilot data-handling story must disclose no-deletion and unbounded growth explicitly.
 
-### Client-path capture is gate-enforced and the newest architecture wiki pages match code
+### External Granola capture is gate-enforced; derived client atoms use writer-site guards
 *data · client-relevance medium*
 
-The Granola poller routes through processCandidate → gate() and rejects on gate failure; wiki/architecture/signal-formation.md is accurate (settle default 600_000ms, signal_type ∈ {decision,rationale,action}, correct file paths); daemon lifecycle matches local-daemon.md's lifecycle section (PID lock first, mcp_port in started payload, reverse-order shutdown).
+The Granola poller routes external input through processCandidate → gate() and rejects on gate failure. Derived signal/team-decision atoms bypass that gate and rely on allowlist checks at writer sites, a two-tier reality the older capture-gate docs do not state. wiki/architecture/signal-formation.md is accurate (settle default 600_000ms, signal_type ∈ {decision,rationale,action}, correct file paths); daemon lifecycle matches local-daemon.md's lifecycle section (PID lock first, mcp_port in started payload, reverse-order shutdown).
 
 Evidence: src/capture/surfaces/granola-poller.ts:10,940 + src/capture/pipeline.ts:31 · src/enrich/granola-signals.ts:30,488-492,760 · src/daemon/index.ts:55-56,100-120
 
 **Action:** The post-June wiki pages are trustworthy — the docs-drift cleanup only needs to target the pre-Granola-era pages, not everything.
 
-### Coordination pipeline fully drained; protocol integrity checks all pass
+### Coordination pipeline fully drained; core claim/review checks pass, maintenance checks do not
 *coordination · client-relevance medium*
 
-backlog/proposed, ready, claimed, and pending_review are all empty with 132 items in complete/; after the 0ab0af05 withdrawal, inbox/ contains ONLY the zombie duplicate of shipped item 081 (the 132/133 files and their reviews/ dirs are deleted at HEAD). Every live review round ended converged before withdrawal; tools/sync-skills.sh --check passes; claim mechanics match CLAUDE.md; 2026-07 journal shards are correctly per-actor.
+backlog/proposed, ready, claimed, and pending_review are all empty with 130 completed item specs plus one legacy `.review.md` sidecar in complete/; after the 0ab0af05 withdrawal, inbox/ contains ONLY the zombie duplicate of shipped item 081 (the 132/133 files and their reviews/ dirs are deleted at HEAD). Every live review round ended converged before withdrawal; tools/sync-skills.sh --check passes; claim mechanics match CLAUDE.md. Separate self-maintenance gaps remain: journal-cat fails on the July Codex shard marker, and sync-skills checks only canonical→adapter drift, not orphan adapters.
 
 Evidence: ls backlog/{proposed,ready,claimed,pending_review,inbox} at HEAD · commit 0ab0af05 · tools/sync-skills.sh --check output
 
@@ -260,16 +262,16 @@ Evidence: vitest.product.config.ts + vitest.orchestration.config.ts; package.jso
 ### CLI and MCP surface inventory is exact
 *hygiene · client-relevance medium*
 
-echoctl registers exactly 9 commands (brief, init, doctor, daemon, orchestration, project, uninstall, run, selftest + global --json/--quiet/--no-color); the MCP server registers 14 tools plus optionally-loaded propose_decision and conditional coord_status/coord_invoke, with the deprecated get_recent_work_context wrapper still registered.
+echoctl registers exactly 9 commands (brief, init, doctor, daemon, orchestration, project, uninstall, run, selftest + global --json/--quiet/--no-color). The MCP server registers 12 unconditional tools, optionally `propose_decision`, and conditionally `coord_status` + `coord_invoke` when deadlines are enabled (15 maximum); the deprecated get_recent_work_context wrapper remains registered.
 
 Evidence: src/cli/index.ts:22-45,123-198 · src/mcp/server.ts:271-313
 
-**Action:** A ready-made checklist for the client-vs-lab surface split: decide per-command/per-tool which side of the 132 carve it lands on.
+**Action:** A ready-made checklist for the client-vs-lab surface split: decide per-command/per-tool which side of the post-halt successor carve it lands on.
 
-### No live secrets anywhere — but nothing automated keeps it that way
+### No tracked-HEAD token-pattern hits were found; nothing automated preserves that baseline
 *exposure · client-relevance high*
 
-Greps for token patterns (xoxb-/xapp-/sk-ant-/ghp_/AKIA/private keys) return only placeholders and test fakes; .env/.env.slack/.env.fly-secrets are gitignored and were never committed in any branch's history; no dist/tgz/db/node_modules tracked at HEAD. However, neither CI workflow has a secret-scanning job and no scanner config exists — only gitignore stands between a future commit and the public tree.
+Greps over tracked HEAD for common token patterns (xoxb-/xapp-/sk-ant-/ghp_/AKIA/private keys) returned only placeholders and test fakes; .env/.env.slack/.env.fly-secrets are gitignored, and no dist/tgz/db/node_modules are tracked at HEAD. This is a bounded pattern-scan result, not proof that all reachable history or semantic content is clean. Neither CI workflow has a secret-scanning job and no scanner config exists — only workflow discipline and gitignore stand between a future commit and the public tree.
 
 Evidence: git grep token-pattern sweep (survey-run, clean) · git log --all --diff-filter=A on env patterns = only .env.example · .github/workflows/ci.yml + release.yml (build/test/pack only)
 
@@ -286,7 +288,7 @@ Evidence: LICENSE:1; git grep counts (22 employer files, 10 name files, 142 path
 
 ## 2. Known unknowns — the open-question register
 
-*The KU register is unusually well-tracked — nearly every open question already lives in the unknowns register (A1-A7/B1-B6), the trap map, the brief-path stress test, or backlog/_followups.md — but almost none has an owning backlog item: proposed/ready/claimed/pending_review are all empty. The dominant cluster is client install/first-run correctness (signals cutoff, API-key brain, cold-db quality, silent-fail config, deploy story), followed by steady-state loop reliability (brief --wait, re-ingest freeze, confirm leg, silent-drop classes), then business gates (WTP screens, pricing, definition of done) and promotion mechanics (132/133 A7 staleness, followup sweep). The single highest-leverage act for the clarity sprint is converting this register into ~10 small specced items and running the two never-run empirical gates (cold-db extraction, off-founder-machine deploy). (Post-critique additions: the T-series residue, legal/entity readiness, the YC-vs-halt collision, and Granola vendor economics. All 'resolve' actions are analysis/decision/doc-shaped per the halt.)*
+*The KU register is unusually well-tracked — nearly every open question already lives in the unknowns register (A1-A7/B1-B6), the trap map, the brief-path stress test, or backlog/_followups.md — but almost none has an owning backlog item: proposed/ready/claimed/pending_review are all empty. The dominant cluster is client install/first-run correctness (signals cutoff, API-key brain, cold-db quality, silent-fail config, deploy story), followed by steady-state loop reliability (brief --wait, re-ingest freeze, confirm leg, silent-drop classes), then business gates (WTP screens, pricing, definition of done) and successor-carve staleness. During the halt, the highest-leverage act is to give every item a written disposition, queue rank, owner, and closure condition, then run the permitted empirical gates. Conversion into `backlog/proposed/` specs begins only after a founder halt-lift decision. (Post-critique additions: the T-series residue, legal/entity readiness, the YC-vs-halt collision, and Granola vendor economics.)*
 
 ### Signals extraction has no first-run cutoff and starves the newest meeting
 *product-loop · client-relevance high*
@@ -300,18 +302,18 @@ Evidence: src/enrich/granola-signals.ts:791 (all-atoms query) and :392 (ascendin
 ### Brain binding is founder CLI auth; API-key product brain unspecced, headless auth-expiry behavior unknown
 *deploy · client-relevance high*
 
-Extraction shells out to the founder's personally-logged-in codex/claude CLIs (register A3); the Anthropic-API-key brain — the named resolution that makes client deploy = node + tarball + 2 keys + launchd — has no spec, and nobody knows whether an unattended box hangs or fails loud when CLI auth expires.
+Granola extraction shells out to the founder's personally-logged-in codex/claude CLIs (register A3); the Anthropic-API-key brain — the named resolution that makes the target client deploy = node + tarball + 2 keys + launchd — has no spec, and nobody knows whether an unattended box hangs or fails loud when CLI auth expires. A direct Claude Agent SDK + ANTHROPIC_API_KEY binding already ships for the intake agent, so the provider call pattern is reusable, but it is not wired to Granola extraction and does not make the target install contract current.
 
-Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md A3 + Part 2 'new high-leverage item' + must-verify (2) · raw/internal/decisions/2026-07-10-client-machine-trap-map.md section 1 (src/brain/brain.ts:122-143) · backlog pipeline dirs empty (verified)
+Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md A3 + Part 2 'new high-leverage item' + must-verify (2) · raw/internal/decisions/2026-07-10-client-machine-trap-map.md section 1 (src/brain/brain.ts:122-143) · src/surfaces/ceo-slack-responder/intake-agent.ts:65-150 (direct SDK reuse asset) · backlog pipeline dirs empty (verified)
 
 **Action:** Bites install + steady-state on the unattended box. Per the halt (register Part 4), A3 is an ANALYSIS deliverable this sprint, not a build: Anthropic commercial-terms/ToS check for delivering API-keyed output to a third party, a per-meeting cost model from the two real meetings' token counts, and a decision on whose account/org holds the key. The spec/build lands post-halt. The box-day expired-auth probe (hang vs fail-loud) stays.
 
 ### A2: extraction quality on a cold db has never been tested (the retrieval-less price-check)
 *product-loop · client-relevance high*
 
-Every live extraction ran against the founder's warm, 89+-signal history-rich store; the client box starts cold, and 132's retrieval-less product mode makes this the core quality question — what does running the client brain WITHOUT MCP retrieval cost brief/card quality?
+Every live extraction ran against the founder's warm, 89+-signal history-rich store; the client box starts cold, and the resolved A1 retrieval-less product-mode decision makes this the core quality question — what does running the client brain WITHOUT MCP retrieval cost brief/card quality?
 
-Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md A2 + 'still open' line 50 · backlog/inbox/2026-07-10-132-product-module-carve-out.md line 78 (owed empirical check)
+Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md A2 + 'still open' line 50 · historical spec blob at `95a6b581:backlog/inbox/2026-07-10-132-product-module-carve-out.md` (owed empirical check)
 
 **Action:** Bites pre-pilot/first-run. Resolves: run the named gate — scratch ECHO_HOME + fresh db on a real meeting, grade extraction vs the warm-db baseline — before the pilot install, ideally this sprint.
 
@@ -338,9 +340,9 @@ Evidence: raw/external/precedents/granola-api-access-model.md:7,25 · raw/intern
 
 The stress test designates a calendar-trigger item as the only structural fix for the wrong-meeting/invisible-note class and the home for all auto-send prerequisites (recipient⊆attendees, note-identity ack, retry-until-published), and allocates it guards — but no spec exists anywhere in the backlog.
 
-Evidence: raw/internal/decisions/2026-07-10-brief-path-stress-test.md section 3 'Calendar-trigger item' · backlog/proposed|ready|inbox contents verified (only 081/132/133 parked)
+Evidence: raw/internal/decisions/2026-07-10-brief-path-stress-test.md section 3 'Calendar-trigger item' · backlog/proposed and ready empty; inbox contains only zombie 081 at HEAD
 
-**Action:** Bites steady-state (any auto-send ambition) and the moment briefs go to a non-founder recipient. Resolves: write the spec during the clarity sprint so the guard inventory doesn't rot; note the founder's calendar-less meetings partially defeat it (pairs with --wait).
+**Action:** Bites steady-state (any auto-send ambition) and the moment briefs go to a non-founder recipient. During the halt, preserve the guard inventory as a ranked disposition and acceptance outline; convert it into a proposed spec only after halt lift. Note that the founder's calendar-less meetings partially defeat it (pairs with --wait).
 
 ### Silent-fail configuration classes: missing API key quietly disables poller; env typo permanently kills signals worker
 *deploy · client-relevance high*
@@ -356,9 +358,9 @@ Evidence: raw/internal/decisions/2026-07-10-client-machine-trap-map.md sections 
 
 The B2 dedicated-box decision moved com.echo.product.daemon from 'someday' to 'needed for pilot uptime', and today's tarball-deploy decision has never been run off the founder's machine — no spec, no doc, no rehearsal; daemon lifecycle is launchd-only with silent no-ops elsewhere.
 
-Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md B2 resolution · backlog/inbox/2026-07-10-132-product-module-carve-out.md After Completion notes · code-reality survey: launchd-only lifecycle, tarball ships lab assets
+Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md B2 resolution · historical spec blob at `95a6b581:backlog/inbox/2026-07-10-132-product-module-carve-out.md` After Completion notes · code-reality survey: launchd-only lifecycle, tarball ships lab assets
 
-**Action:** Bites install day, hard. Resolves: write the item-134 spec + client install/onboarding doc this sprint, then a full deploy rehearsal on a non-founder machine (scratch user or spare box) before the pilot.
+**Action:** Bites install day, hard. During the halt, write the deploy contract/acceptance outline and the current-vs-target install docs; convert the outline into a proposed deploy item after halt lift. Run a full deployment rehearsal on a non-founder machine (scratch user or spare box) before the pilot.
 
 ### 130 meeting→card go-live gates: opt-in env, confirm-after-edit, classifier semantics, store-path parity, prod fixture pollution, RC3 residual
 *product-loop · client-relevance high*
@@ -453,11 +455,11 @@ Evidence: raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md B
 ### Zoom/Mattermost adapters have zero code and 133's ports are provisional-by-design (A4 donor bias)
 *product-loop · client-relevance high*
 
-The two adapters owed to the first customer have no code anywhere in src/ (grep-verified); 133's MeetingSource inherits Granola pull-polling assumptions and ChatChannel inherits Slack Socket Mode, so the first real adapter item is EXPECTED to force a port-shape revision — plus filterToCurrentSignalRuns fails OPEN for non-Granola signal sources (HIGH in the expansion-invariants audit), a landmine timed exactly for signal source #2.
+The two adapters owed to the pilot candidate have no code anywhere in src/ (grep-verified); the withdrawn 133 design's MeetingSource inherits Granola pull-polling assumptions and ChatChannel inherits Slack Socket Mode, so the first real adapter item is EXPECTED to force a port-shape revision — plus filterToCurrentSignalRuns fails OPEN for non-Granola signal sources (HIGH in the expansion-invariants audit), a landmine timed exactly for signal source #2.
 
-Evidence: grep -il zoom|mattermost src = 0 files · backlog/inbox/2026-07-10-133-product-ports-extraction.md 'Known limitation — donor bias' · backlog/_followups.md line 453 + raw/internal/decisions/2026-07-04-expansion-invariants-additive-backcompat.md
+Evidence: grep -il zoom|mattermost src = 0 files · historical spec blob at `95a6b581:backlog/inbox/2026-07-10-133-product-ports-extraction.md` 'Known limitation — donor bias' · backlog/_followups.md line 453 + raw/internal/decisions/2026-07-04-expansion-invariants-additive-backcompat.md
 
-**Action:** Bites pilot delivery (post-sprint build) but the KNOWN-unknowns — does the port shape survive contact, and is the extractor-#2 preconditions bundle (parameterized resolver, keyed dispatch, shared buildSignalCore) done first — should be specced during this sprint so the adapter item lands clean.
+**Action:** Bites pilot delivery (post-halt build). During the halt, record the port-shape risk and extractor-#2 preconditions bundle (parameterized resolver, keyed dispatch, shared buildSignalCore) in the ranked closure register; spec only after halt lift and vendor-access discovery.
 
 ### Stage-2 triage (the moat stage) runs concierge; automation deferred until 2-3 advisor meetings stabilize the pattern
 *product-loop · client-relevance high*
@@ -489,11 +491,11 @@ Evidence: backlog/_followups.md lines 489-490 · .github/workflows/ci.yml matrix
 ### Inbox convention gaps: dispatch tooling blind to inbox/, convention undocumented, zombie 081 parked
 *coordination · client-relevance medium*
 
-tools/review-queue/dispatch-next-round.py's find_artifact scans only kanban stages so inbox-parked specs (132's r1→r2 tick) need manual reproduction — the fix (thread artifact_path to request.py) is written but unfiled and duplicates the older 'inbox specs unreviewable' bullet; backlog/README.md never documents the inbox convention; and a stale duplicate of shipped item 081 still sits in inbox/ (verified).
+tools/review-queue/dispatch-next-round.py's find_artifact scans only kanban stages, so the historical 132 r1→r2 tick required manual reproduction and any future parked inbox spec would hit the same gap. The fix (thread artifact_path to request.py) is written but unfiled and duplicates the older 'inbox specs unreviewable' bullet; backlog/README.md never documents the inbox convention; and a stale duplicate of shipped item 081 still sits in inbox/ (verified).
 
 Evidence: backlog/_followups.md lines 516 and 243 · ls backlog/inbox/ shows 2026-05-29-081-raycast-command-disposition-and-removal.md (verified) · memory project_parked_specs_inbox_convention
 
-**Action:** Bites the next inbox-spec review round (132/133 promotion re-review). Resolves during cleanup sprint: file the dispatch fix, document the convention in backlog/README.md, delete/archive the 081 zombie.
+**Action:** Bites the next inbox-spec review round, not a 132/133 promotion. Resolve during cleanup: rank the dispatch fix for post-halt conversion, document the convention in backlog/README.md, and delete/archive the 081 zombie.
 
 ### Leaked selftest daemons drive load to ~100 and flake the gates; teardown fix owed
 *hygiene · client-relevance medium*
@@ -592,7 +594,7 @@ Evidence: wiki/product/v1-spec.md:12 'Locked 2026-04-30. Treat as source of trut
 ### docs/NORTH_STAR.md sprint focus predates the 07-09/10 pivot
 *strategy · client-relevance high*
 
-The mandatory daily-orient read carries 'Current Sprint Focus (set 2026-07-03)' of Linear backflow + brain A/B + intake hardening — missing the lab-pilot first customer, the meeting->brief-only client pin, and the clarity/cleanup sprint that is now the actual plan.
+The mandatory daily-orient read carries 'Current Sprint Focus (set 2026-07-03)' of Linear backflow + brain A/B + intake hardening — missing the university-lab pilot candidate, the meeting->brief-only client pin, and the clarity/cleanup sprint that is now the actual plan.
 
 Evidence: docs/NORTH_STAR.md:1-27 sprint focus block (rewritten 2026-07-03) · 2026-07-09 Recap-pilot decision + commit c2ea91cd (2026-07-10 scope pin)
 
@@ -616,14 +618,14 @@ Evidence: git log --since=2026-07-06 -- wiki/ shows only dd4e3cb8 · no wiki/sur
 
 **Action:** Run the owed strategist wiki-promotion pass for 124-131 (the process explicitly permits it now that items are in complete/): create surfaces/post-meeting-brief.md, surfaces/decision-changeset-compiler.md, a capture page for the Granola poller/intake path, plus the 124/127/129 updates; regenerate manifest + index.
 
-### The only customer-facing install docs describe the retired product
+### The public README and customer-facing install docs describe the retired product
 *deploy · client-relevance high*
 
-docs/echo-init.customer.example.json ('customer' profile = claude-code/codex context-layer agents), docs/SEND-TO-TESTER.md (Windows dev-capture beta), and docs/echoctl-install.md (repo-based install, vendor CLI login, MCP registration) are the entire install-doc surface — none describes the pinned macOS meeting->brief tarball client, and a reader would conclude the customer installs the dev context layer.
+README.md compresses the project to a local daemon/MCP plus Machine-scope adapters and hardcodes installation of `echoctl-0.1.0.tgz`, while `npm pack` at the baseline produces `echoctl-0.1.0-beta.1.tgz`. docs/echo-init.customer.example.json ('customer' profile = claude-code/codex context-layer agents), docs/SEND-TO-TESTER.md (Windows dev-capture beta), and docs/echoctl-install.md (repo-based install, vendor CLI login, MCP registration) also describe the retired dev-context-layer offer. None represents Machine/Fleet/Team plus the pinned macOS meeting->brief pilot boundary.
 
-Evidence: docs/echo-init.customer.example.json content · docs/SEND-TO-TESTER.md:1-15 · docs/echoctl-install.md:7-29
+Evidence: README.md:7-23 · package.json version 0.1.0-beta.1 · docs/echo-init.customer.example.json content · docs/SEND-TO-TESTER.md:1-15 · docs/echoctl-install.md:7-29
 
-**Action:** Write the client-profile install/onboarding doc (per the 07-09 tarball-deploy decision) and banner or move the three retired docs to an archive/ subfolder so they can't be handed to the lab by accident.
+**Action:** Correct README as the public orientation/install front door; write separate current-vs-target pilot install contracts; banner or move the three retired docs to an archive/ subfolder so they cannot be handed to the lab by accident.
 
 ### wiki/architecture/local-daemon.md omits the client product's entire boot spine
 *product-loop · client-relevance high*
@@ -695,7 +697,7 @@ Every must-fix from the trap map, register, and stress test (signals first-run c
 
 Evidence: all four kanban dirs empty (verified this run) · 2026-07-10-client-machine-trap-map.md:82 '(already queued ...)' (verified this run) · item 134 referenced as if scheduled; no file matches in any kanban dir
 
-**Action:** Reconcile in one sitting: spec the must-fixes as inbox/proposed items (or explicitly disposition them as post-sprint), and correct trap-map line 82 — the register/trap-map must not claim queue state the backlog contradicts.
+**Action:** Reconcile in one sitting: give each must-fix a pre-lift disposition, owner, and queue rank; after halt lift, convert approved work only into `backlog/proposed/` items. Correct trap-map line 82 — the register/trap-map must not claim queue state the backlog contradicts.
 
 ### The brief's brain dependency and its security posture are documented only in an in-tree README
 *deploy · client-relevance high*
@@ -709,11 +711,11 @@ Evidence: src/cli/commands/brief.ts imports startGranolaSignalWorker; src/enrich
 ### The client tarball ships the lab: unconditional dev extractors, founder paths, orchestration assets
 *deploy · client-relevance high*
 
-The scope pin says meeting->brief only, but the daemon unconditionally starts Claude Code/Codex/Cursor extractors and an fs-watcher over hardcoded macOS paths with no off-switch; DEFAULT_GIT_REPOS is the founder's personal '~/Desktop/Project_echo/' merged into capture config at every boot; and the npm tarball manifest includes echoctl orchestration onboarding, echo-skills/roles/workflows assets, and review-queue reviewer bindings. Items 132/133 (the carve) are inbox-parked until post-Jul-24, so pre-carve reality contradicts the pin everywhere except in raw/ prose.
+The scope pin says meeting->brief only, but the daemon unconditionally starts Claude Code/Codex/Cursor extractors and an fs-watcher over hardcoded macOS paths with no off-switch; DEFAULT_GIT_REPOS is the founder's personal '~/Desktop/Project_echo/' merged into capture config at every boot; and the npm tarball manifest includes echoctl orchestration onboarding, echo-skills/roles/workflows assets, and review-queue reviewer bindings. Items 132/133 were withdrawn at `0ab0af05`; until a post-halt successor carve lands, runtime reality contradicts the client boundary everywhere except in raw/ prose.
 
-Evidence: src/daemon/index.ts:81-90; src/capture/sources.ts:7-21 DEFAULT_GIT_REPOS + fs_paths (verified this run) · package.json:29-35 files manifest; src/cli/index.ts:29,135-137 orchestration command · backlog/inbox/2026-07-10-132/133 parked
+Evidence: src/daemon/index.ts:81-90; src/capture/sources.ts:7-21 DEFAULT_GIT_REPOS + fs_paths (verified this run) · package.json:29-35 files manifest; src/cli/index.ts:29,135-137 orchestration command · register Part 4 + `0ab0af05` withdrawal
 
-**Action:** Write the interim truth into the client install doc + item 134 deploy spec: 'pre-132 the tarball boots the full lab stack; here is what runs on the client box and why it is inert there' — a paragraph, not a code change, is the sprint-scoped fix.
+**Action:** Write the interim truth into the client install doc + deploy acceptance outline: 'before the successor carve, the tarball boots the full lab stack; here is what runs on the client box and why it is inert there.' The paragraph is halt-compatible; the spec is post-lift.
 
 ### All pricing thinking is attached to the cancelled customer
 *strategy · client-relevance high*
@@ -763,9 +765,9 @@ Evidence: 2026-07-10-client-machine-trap-map.md section 2 (single 'secret' menti
 ### The backlog's real topology (inbox, archive, reviews, task-state, client-vs-dev axis) is undocumented
 *coordination · client-relevance medium*
 
-backlog/README.md documents five lifecycle stages and never mentions inbox/ (where the only in-flight items 132/133 live), archive/, reviews/, or task-state/; docs/BACKLOG.md's generator emits no Inbox section at all, so parked items are invisible in the founder-visible index by construction; a zombie stale duplicate of shipped item 081 sits in inbox/ reading as open work; and the ~150+ open _followups bullets have no client-vs-dev axis, leaving the cleanup sprint no written basis for deprioritizing dev-side bullets.
+backlog/README.md documents five lifecycle stages and never mentions inbox/, archive/, reviews/, or task-state/. At HEAD there are no legitimate in-flight inbox items — only a zombie duplicate of shipped item 081 — but the undocumented parked-item convention and docs/BACKLOG.md generator blindness remain real future gaps. The ~150+ open _followups bullets also have no client-vs-dev axis, leaving the cleanup sprint no written basis for deprioritizing dev-side bullets.
 
-Evidence: grep inbox backlog/README.md = 0 hits; inbox/ contains 081-zombie + 132 + 133 (verified this run) · tools/backlog_index.py sections: Proposed/Ready/Claimed/Pending Review/Complete only · diff complete/081 vs inbox/081 differ; 081 shipped all-REMOVE (9bf44cea) · _followups.md R1-R6 lack any client/dev tag
+Evidence: grep inbox backlog/README.md = 0 hits; inbox/ contains only 081-zombie at HEAD · `0ab0af05` removed 132/133 · tools/backlog_index.py sections: Proposed/Ready/Claimed/Pending Review/Complete only · diff complete/081 vs inbox/081 differ; 081 shipped all-REMOVE (9bf44cea) · _followups.md R1-R6 lack any client/dev tag
 
 **Action:** Sprint-scoped fixes: document inbox/ (+ archive/reviews/task-state) in backlog/README.md, add an Inbox section to backlog_index.py, git rm the 081 zombie, and add a client/dev tag convention to _followups.md's preamble.
 
@@ -799,7 +801,7 @@ Evidence: grep ECHO_ src = ~50 tokens; docs/+wiki/+README grep = 0 hits for the 
 ### Secondary shipped-wiki drift: tool counts, storage contract, extension status, phantom 'planned' pages
 *hygiene · client-relevance medium*
 
-Four smaller shipped-page contradictions: mcp-server.md says 12+2 tools when reality is 13 base (+optional propose_decision path) +2 gated; storage.md claims 'three operations, no others' and a 'no-op MemoryStorage' when the interface has 7+ methods and MemoryStorage is fully functional; browser-extension.md (shipped) claims live store wiring while local-daemon.md says none exists and no extension code is in the repo; and hotkey-overlay/audit-page carry status:planned for April commitments the YC cut list excludes — while a full Tauri overlay app actually sits under tools/echo-overlay/ (37 tracked files, 2.2G build tree) against the taxonomy's src/surfaces placement.
+Four smaller shipped-page contradictions: mcp-server.md's 12+2 shorthand omits the optional propose_decision path (reality: 12 unconditional + 1 optional + 2 deadline-gated); storage.md claims 'three operations, no others' and a 'no-op MemoryStorage' when the interface has 7+ methods and MemoryStorage is fully functional; browser-extension.md (shipped) claims live store wiring while local-daemon.md says none exists and no extension code is in the repo; and hotkey-overlay/audit-page carry status:planned for April commitments the YC cut list excludes — while a full Tauri overlay app actually sits under tools/echo-overlay/ (37 tracked files, 2.2G build tree) against the taxonomy's src/surfaces placement.
 
 Evidence: src/mcp/server.ts:205,271-289,303,313 vs mcp-server.md tool table · src/storage/interface.ts:65-113 + src/storage/memory.ts:38-46 vs storage.md · wiki/surfaces/browser-extension.md:2,14-24 vs local-daemon.md 'Does Not Do (Yet)' · git ls-files tools/echo-overlay = 37 files; wiki hotkey-overlay/audit-page status:planned
 
@@ -825,7 +827,7 @@ Evidence: journal-cat 2026-07 exit=1: codex shard missing '## Interactions' mark
 
 ## 4. Unknown unknowns — blind-spot classes + detection instruments
 
-*ECHO's unknown-unknowns cluster along one seam: everything about the product was proven on exactly one regime — founder's macOS machine, founder's months-deep db, founder as operator, grader, and only recipient. Twelve blind-spot classes fall out: five are the unwritten client journey (vendor access, consent/offboarding, threat model, deploy path, unattended ops), three are never-exercised runtime regimes (cold db, fault/concurrency envelope, no meters), two are demand-signal voids (no non-founder verdict, no current-product eval), and two are self-inflicted instrumentation gaps (repo-state rot with no freshness checks; public-repo exposure never scanned retro- or prospectively). Each class has a cheap converter — a drill, a scan, a scratch-box rehearsal, or an n=1 question at the advisor meeting — that turns it into a known-unknown before real lab data enters the pipeline.*
+*ECHO's unknown-unknowns cluster along one seam: everything about the product was proven on exactly one regime — founder's macOS machine, founder's months-deep db, founder as operator, grader, and only recipient. Thirteen blind-spot classes fall out: five are the unwritten client journey (vendor access, consent/offboarding, threat model, deploy path, unattended ops), three are never-exercised runtime regimes (cold db, fault/concurrency envelope, no meters), two are demand-signal voids (no non-founder verdict, no current-product eval), two are self-inflicted instrumentation gaps (repo-state rot with no freshness checks; public-repo exposure never scanned retro- or prospectively), and one is founder continuity. Each class has a cheap converter — a drill, a scan, a scratch-box rehearsal, or an n=1 question at the advisor meeting — that turns it into a known-unknown before real lab data enters the pipeline.*
 
 ### Zoom/Mattermost adapter + vendor-access void
 *product-loop · client-relevance high*
@@ -852,7 +854,7 @@ Security thinking exists only as fragments — plaintext API-key custody, founde
 
 Evidence: src/daemon/index.ts:89 startMcpServer unconditional; src/mcp/server.ts:269-313 (14 tools, localhost-binding is the only authz) · 2026-07-10-client-machine-trap-map.md section 2 (plaintext key custody) · product-carve-unknowns-register.md A6 + B3 ('Slack-backfill sensitivity lesson applies directly')
 
-**Action:** Detection: a one-page data-handling + threat-model doc written as a gate on the first real lab meeting (what's stored, where, who can read it, what the MCP port exposes), plus a client-mode config decision on disabling MCP registration (natural item-133 territory).
+**Action:** Detection: a one-page data-handling + threat-model doc written as a gate on the first real lab meeting (what's stored, where, who can read it, what the MCP port exposes), plus a client-mode config decision on disabling MCP registration (successor-carve territory after halt lift).
 
 ### Retrospective public-repo exposure never scanned
 *exposure · client-relevance high*
@@ -881,19 +883,19 @@ Evidence: diff -q echoctl-agent-onboard-runbook.md docs/echoctl-agent-onboard-ru
 
 **Action:** Detection: scripted install+upgrade+rollback dry-run on a clean macOS VM/scratch box with copied prod data before box day, exercising the 12-class trap map; plus a send-to-tester script that regenerates the tarball and checksums the runbook against docs/; OS-matrix workflow_dispatch stays the deferred instrument for the non-mac branch.
 
-### Unattended-box operation has no telemetry, alerting, backup, or meters
+### Unattended-box operation has local measurements but no active alerting, backup, or spend meter
 *deploy · client-relevance high*
 
-Nothing measures a running client box: heartbeats are fail-soft local file writes with no consumer that pages anyone (a dead loop-of-record box is discovered by the customer noticing missing briefs); there is no backup/restore story for echo.db; the append-only sqlite has zero DELETE/VACUUM and has never run beyond weeks; and per-meeting brain spend has never been measured despite the API-key binding making it a direct founder invoice — surprises hide here because every metric that would reveal them simply does not exist yet.
+Shipped items 117/120/122/124 provide local measurements: `echoctl doctor` stations 1-3 status, heartbeat artifacts, a local loop dashboard, and observed-vs-inferred health. What does not exist is an unattended consumer that pages anyone: a dead loop-of-record box is still discovered only when a human checks or notices missing briefs. There is also no backup/restore story for echo.db; the append-only sqlite has zero DELETE/VACUUM and has never run beyond weeks; and per-meeting brain spend has never been measured despite the API-key binding making it a direct founder invoice.
 
-Evidence: grep -c DELETE src/storage/sqlite.ts = 0 (re-verified this run); workers write heartbeats every tick (src/enrich/worker-heartbeat.ts:64-72, fail-soft) · trap map sections 3 (heartbeat swallowed) and 12 (cost qualitative only, no numbers anywhere) · no runbook/SLA/support doc in docs/; B2 notes launchd unit 'needed for pilot uptime' but unspecced
+Evidence: backlog/complete/2026-07-05-117-loop-observability-stations-1-3.md + items 120/122/124 · grep -c DELETE src/storage/sqlite.ts = 0 (re-verified this run); workers write heartbeats every tick (src/enrich/worker-heartbeat.ts:64-72, fail-soft) · trap map sections 3 and 12 · no runbook/SLA/support doc in docs/; B2 notes launchd unit 'needed for pilot uptime' but unspecced
 
 **Action:** Detection: (1) a kill-the-worker drill on the box measuring time-to-founder-notice, backed by a heartbeat-staleness alert (even cron + Slack DM); (2) db-size + atom-count gauges in doctor/heartbeat; (3) tokens/cost logged per extraction run from day one of the API-key item; (4) one written support-expectation line in the pilot agreement.
 
 ### Cold-db formation regime never exercised
 *product-loop · client-relevance high*
 
-Every live validation ran on the founder's 89+-signal, months-deep database; a fresh customer db holds only meeting atoms, and with A1 resolved as retrieval-less mode the product deliberately ships WITHOUT the cross-tool context the moat claim (axiom #7) says is load-bearing — extraction quality in this regime has literally never been observed, so the first customer-facing run could be the first experiment.
+Every live validation ran on the founder's 89+-signal, months-deep database; a fresh pilot db holds only meeting atoms, and with A1 resolved as retrieval-less mode the product deliberately ships WITHOUT the cross-tool context the moat claim (axiom #7) says is load-bearing — extraction quality in this regime has literally never been observed, so the first pilot-facing run could be the first experiment.
 
 Evidence: 2026-07-10-product-carve-unknowns-register.md A2 ('the empirical price check' on retrieval-less mode) + A1 resolution note · all live cycles (07-08 meetings, 07-09 advisor loop) ran on the founder's production db
 
@@ -908,14 +910,14 @@ Evidence: raw/internal/decisions/2026-07-09-first-advisor-loop-cycle.md (verdict
 
 **Action:** Detection: a per-brief recipient feedback question (one line: useful/wrong/why) attached to every delivered brief, plus the recap-pilot-mandated WTP screen executed at the advisor meeting.
 
-### Live-loop failure envelope: only the happy path has signal
+### Real-provider and concurrent live-loop failure envelope remains unexercised
 *product-loop · client-relevance high*
 
-Three never-exercised failure zones ride under every brief: (1) brain.ts is 1185 lines of spawn/timeout/JSON-parse/scoped-MCP-proxy logic with no tests/brain suite and live evidence only for the codex brain on the founder's machine; (2) the real Granola API contract (auth expiry, rate limits, upstream schema drift) is untested — all poller/signals tests inject fake clients; (3) the stress test's concurrency failure classes (checkpoint clobber, double extraction, orphan signals) were confirmed statically but never observed live because only one process runs on the founder's machine, while a prod box runs daemon poll + on-demand brief concurrently.
+Three residual failure zones ride under every brief: (1) brain spawn/preflight/timeout/proxy behavior has automated coverage, but real-vendor auth expiry, output/schema drift, and rate-limit behavior are live-proven only for the founder's current CLI regime; (2) the real Granola API contract (auth expiry, rate limits, upstream schema drift) is untested — poller/signals tests inject fake clients; (3) the stress test's concurrency failure classes (checkpoint clobber, double extraction, orphan signals) were confirmed statically but never observed live because only one process runs on the founder's machine, while a prod box runs daemon poll + on-demand brief concurrently.
 
-Evidence: tests/brain does not exist (re-verified this run); wc -l src/brain/brain.ts = 1185 · src/capture/surfaces/granola-poller.ts:1005-1010 + BriefCommandOptions.client test seam in src/cli/commands/brief.ts:44 (fake-client injection everywhere) · 2026-07-10-brief-path-stress-test.md Concurrency section (static confirmation only, no live observation)
+Evidence: tests/surfaces/ceo-slack-brain.test.ts:75-197 (success/error/timeout/preflight) · tests/enrich/brain-retrieval-capture.test.ts:106-180 (proxy failure + child env) · src/capture/surfaces/granola-poller.ts:1005-1010 + BriefCommandOptions.client test seam in src/cli/commands/brief.ts:44 · 2026-07-10-brief-path-stress-test.md Concurrency section (static confirmation only, no live observation)
 
-**Action:** Detection: (1) fault-injection harness around runBrain (kill mid-stream, malformed JSON, missing executable, timeout) on the client-path config; (2) recorded-fixture contract tests + a scheduled canary poll alerting on Granola shape drift; (3) a soak test running daemon poll + repeated `echoctl brief` against the same note.
+**Action:** Detection: (1) a real-provider probe for expired auth, malformed/changed output, and rate-limit behavior on the client-path config; (2) recorded-fixture contract tests + a scheduled canary poll alerting on Granola shape drift; (3) a soak test running daemon poll + repeated `echoctl brief` against the same note.
 
 ### Current-product eval/regression void
 *data · client-relevance medium*
@@ -964,6 +966,6 @@ Added beyond the agenda: legal/entity readiness, the YC-application-vs-halt coll
 ## Meta: what the critics changed
 
 - **Refuted:** '132/133 review-converged and parked until ≥07-25' (withdrawn at 0ab0af05); 'brief-now.mjs deleted' (preserved at raw/internal/prototypes/); 'inbox has 3 files' (1 at HEAD); the trap map's '(already queued)' claim about the API-key brain item remains false at HEAD — no kanban dir contains it.
-- **Re-anchored:** every citation into the deleted backlog/inbox/132·133 files now points at the register (Parts 2/4) and git history (95a6b581, 18f72f89, 71647084).
+- **Re-anchored:** live citations into deleted backlog/inbox/132·133 files point at the register (Parts 2/4) or explicit historical blobs at 95a6b581; convergence remains anchored at 18f72f89 / 71647084.
 - **Reclassified:** backup rule and migration ordering moved UU→KU (they are tracked T9/T10).
-- **Evidence auditor verdict:** 9 of 12 sampled high-stakes entries verified exactly at file/line level; the code-level and doc-drift claims are trustworthy; everything hung on the pre-withdrawal 132/133 state was corrected as above.
+- **Evidence auditor verdict:** 9 of 12 sampled high-stakes entries verified exactly at file/line level. Treat code-line claims as strong where pinned; treat `MEMORY`, mutable absence greps, and `verified this run` as weaker evidence until promoted into committed artifacts. The post-withdrawal rebase was completed editorially in this pass.
