@@ -506,3 +506,13 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right.
 - **Note:** full arc: 132 = r1(4 findings + unknowns fold)→r2(4)→r3(clean), 3 rounds. 133 = r1(5 + A4 fold)→r2(reframe gate fired, propagation_completion, 3)→r3(clean). Active coord_invoke triggering held ~5-13 min reviewer latency all day — zero launchd-cadence waits across 6 dispatched rounds.
 - **Conjecture:** none
+
+### 2026-07-10 15:37 PDT — connect-to-active-session resume ("start a new discussion thread of that context")
+
+- **Trigger:** Fresh session after /clear; founder asked to connect to his current active session via ECHO and continue the discussion in a new thread.
+- **Query inputs:** (1) `find_clusters({})` no-args resume; (2) `echo_resolve_mru({sources: ["claude_code","codex","cursor"]})`; (3) `search_memories({source: "fs:.../4c614216-....jsonl", limit: 20})` (this session's own file); (4) `search_memories({source_app: "claude_code", since: "2026-07-10T15:00:00Z", limit: 15})`.
+- **Returned:** (1) 15 clusters / 104 atoms; top cluster ctx_fc464c72 (94 atoms, 12:16–15:34 PDT, label "work on project_echo", 1 unresolved open-loop hint) + 14 single-atom codex clusters (overnight-style brain exec runs). (2) MRU claude_code = THIS session's jsonl — self-reference; codex MRU = 14:29 rollout. (3) 1 atom only (this session's own first turn) — dead end. (4) 15 rich turns across the two real strategist sessions: f36aebb9 (client-facing product thread: repo-vs-box, tarball loop, prod/dev topology, T1–T4 unknowns, client-machine trap map w/ 2 subagent sweeps) and b3983569 (131 follow-ups + tool-agnostic loop recap).
+- **Sources:** (1) top cluster git 55 / claude_code 33 / codex 2. (4) all `fs:~/.claude/projects/-Users-zhenye-Desktop-Project-echo/{f36aebb9,b3983569}*.jsonl` incl. one subagent shard.
+- **Verdict:** 🟡 partial — chain landed on the right thread, but "connect to my current active session" via echo_resolve_mru resolved to the CALLING session itself (its first turn is already captured by the time the MCP call runs), which is a self-reference trap; the real target was the second-most-recent claude_code session, reachable only by the source_app-wide search and manual exclusion of self.
+- **Note:** resolve_mru has no "exclude this session" affordance and capture latency is low enough that the asking session always wins MRU. A `exclude_source` param or self-session awareness would make this resume shape one call instead of three.
+- **Conjecture:** the 14 single-atom codex clusters are the same brain-exec cluster-fragmentation noted at 11:22 PDT today; still uncollapsed.

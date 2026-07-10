@@ -60,3 +60,18 @@ Pre-freeze demo work keeps mutating exactly the files 132 moves. Every merge bet
 ## Part 3 — client-machine trap map (2026-07-10, code-grounded)
 
 Full audit: [2026-07-10-client-machine-trap-map.md](./2026-07-10-client-machine-trap-map.md) — 12 assumption classes, file:line evidence, [NEW]/[known] tagging. Headline NEW findings: signals path has NO first-run cutoff (intake's item-128 lookback has no signals sibling) + oldest-first extraction ordering = fresh-machine install day starves the just-ended meeting behind the entire backlog; env-var typos permanently disable the worker while missing binaries only degrade; WAL sqlite unsafe on network FS; brief renders in machine TZ with machine-clock freshness; extraction requires BOTH summary+transcript atoms; external-attendee gate silently zeroes internal-only meetings; English-only prompt, uncapped transcript embed. Must-fix before any fresh-machine run: signals cutoff + newest-first ordering item.
+
+## Part 4 — specs withdrawn; clarity halt declared (founder, 2026-07-10 evening)
+
+Items **2026-07-10-132-product-module-carve-out** and **2026-07-10-133-product-ports-extraction** — both review-converged (r3 proceed/proceed, zero findings) — are WITHDRAWN and deleted from the working tree at founder instruction; the numbers 132/133 are freed for reuse. Full text and review arcs remain recoverable in git history (specs landed 95a6b581; convergence at 18f72f89/71647084).
+
+**Phase declaration: FULL HALT ON DEV until the unknowns map is filled with max clarity.** No new build specs, no carve, no box until the founder judges the map complete. What survives the withdrawal as standing decisions (they were made in conversation and recorded here, independent of the spec files): the `product` name and lab/product boundary concept; shared single-schema db with source-filtered instances; retrieval-less product brain mode (A1); dedicated founder-run Mac box (B2); founder accounts in client workspaces (B3); macOS-only phase 1 (B4); tarball deploys, no repo on the box (T4); org repo reserved for phase-2 clean split; client scope = meeting→brief only; promote-to-product graduation mechanism (skill retained, dormant).
+
+**The map-filling agenda (what "max clarity" must close):**
+- Trap-map must-verifies: first-run backfill bound behavior (confirmed absent — needs a decision, currently the top unmitigated trap), brain-auth expiry behavior unattended.
+- A2 cold-db extraction quality — empirical run, scratch ECHO_HOME, real meeting.
+- A3 brain economics/ToS (API-key path scoping — analysis, not build).
+- A5 multi-tenant topology; A6 secret-history-scan + data-handling story.
+- B1 rollout calendar (lab expectations); B5 pricing + customer-visible name; B6 phase-1 definition of done.
+- T-series residue: T1 product source allowlist, T2 sidecar classification, T5 remote-write path, T7 cross-instance row identity, T8 embeddings-on-prod, T9 backup rule, T10 migration ordering, T11 Granola quota check.
+- Trap map §3 classes 8/9 client-reality checks: lab's Granola transcript settings, meeting language/length distribution, internal-vs-external meeting mix.
