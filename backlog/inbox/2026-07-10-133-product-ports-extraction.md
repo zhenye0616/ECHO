@@ -16,8 +16,13 @@ spec_refs:
   - src/surfaces/ceo-slack-responder/linear-client.ts          # pre-132 path — Tracker shape source: issue creation, provenance fields
   - src/enrich/granola-intake-candidates.ts                    # pre-132 path — ChatChannel consumer (card posting)
   - raw/internal/decisions/2026-07-09-decision-loop-canonical-model.md  # the tool-agnostic loop model these ports serve
+  - raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md # A4 donor-bias limitation folded into Context; ports are provisional pending first real Zoom/Mattermost adapter
 files_to_modify:
-  # PROVISIONAL — builder refines, no scope expansion. All paths are POST-132 locations.
+  # PROVISIONAL BY DESIGN — exact paths cannot exist until 132's move lands. This item REMAINS
+  # INBOX-PARKED until 132 is in complete/; at promotion the strategist replaces this list with
+  # exact post-132 file paths (no wildcards, no "if any" conditionals) and re-pins
+  # ready_content_sha. A builder must never claim this item while wildcards remain.
+  # All paths below are the POST-132 layout as specced in 132 AC1.
   - src/product/ports.ts                             # NEW: the three interfaces + doc comments citing each method's existing caller
   - src/product/capture/granola-poller.ts            # implements MeetingSource
   - src/product/surfaces/decision-responder/**       # Slack usage behind ChatChannel; Linear usage behind Tracker
@@ -33,12 +38,14 @@ Item 132 carves the customer-facing meeting→decision loop into `src/product/` 
 
 This is **extract-interface refactoring, not new architecture**: every port method must be traceable to an existing call site in the Granola/Slack/Linear code. The friction-first rule applies — no speculative surface.
 
+**Known limitation — donor bias (unknowns register A4, folded by founder instruction 2026-07-10):** these ports are shaped by their donors and inherit their assumptions — `MeetingSource` from Granola (pull polling, no webhooks, transcript present at poll time; Zoom differs: OAuth app review, cloud-recording perms, transcript lands minutes–hours post-meeting), `ChatChannel` from Slack Socket Mode (Slack-proprietary; the lab's self-hosted Mattermost has a different websocket/confirm model). The "cite an existing caller" rule guarantees this bias by construction — that is the accepted trade against speculative design. **The ports are therefore provisional:** the first real Zoom/Mattermost adapter item is EXPECTED to force a port-shape revision, and that revision is in-scope for the adapter item, not a failure of this one. Do not defend these interfaces against the pilot's reality.
+
 ## Acceptance Criteria
 
 - **AC1 (ports shaped by reality):** `src/product/ports.ts` defines `MeetingSource`, `ChatChannel`, `Tracker`. Every method on every interface carries a doc comment naming ≥1 pre-existing call site it was extracted from; a method with no existing caller is spec violation, not judgment. No config/options parameter that no current caller passes.
-- **AC2 (adapters implement, consumers depend on ports):** the Granola poller implements `MeetingSource`; the decision responder's Slack usage is accessed through `ChatChannel`; Linear issue creation through `Tracker`. After extraction, an import/identifier sweep of `src/product/**` shows `granola`/`slack`/`linear`-specific identifiers confined to the adapter files and persisted source-string constants — extraction/brief/intake logic references only the ports.
-- **AC3 (injection at composition roots only):** concrete adapters are constructed and injected in `src/product/daemon.ts` and the product CLI entry — nowhere else. No service locator, no registry, no env-var-driven adapter selection in this item.
-- **AC4 (behavior-neutral):** full suite green with zero assertion changes in existing tests; NEW `ports-conformance.test.ts` exercises each adapter against its port contract using existing fixtures. Byte-identical brief output for the AC8-style parity fixtures (reuse item 131's normalized comparator where applicable).
+- **AC2 (adapters implement, consumers depend on ports):** the Granola poller implements `MeetingSource`; the decision responder's Slack usage is accessed through `ChatChannel`; Linear issue creation through `Tracker`. **Sweep contract (pinned):** `grep -riE 'granola|slack|linear' src/product --include='*.ts' -l` must return ONLY (i) adapter files, (ii) files whose only hits are persisted source-string constants (`api:granola`, `derived:granola-signals`, …), and (iii) the composition roots — `src/product/daemon.ts` and the product CLI entry — which necessarily import and construct the concrete adapters. This allowlist is deliberate, not a loophole: injection *sites* are vendor-aware by definition (AC3 requires it); extraction/brief/intake *logic* is not. Builder records the sweep output + per-file classification in `agent_notes`.
+- **AC3 (injection at composition roots only):** concrete adapters are constructed and injected in `src/product/daemon.ts` and the product CLI entry — nowhere else. No service locator, no registry, no env-var-driven adapter selection in this item. **Unattended-startup wiring test:** a smoke test boots the rewired product daemon entrypoint non-interactively against a scratch ECHO_HOME (sanitized env per 132 AC2's pinned clause) and asserts constructor/injection/module-resolution succeed and shutdown is bounded — wiring regressions must fail in CI, not at launchd runtime.
+- **AC4 (behavior-neutral, reproducible):** verification commands pinned — `npm run typecheck && npm run lint && npm run test:product` green with zero assertion changes in existing tests; `npx vitest run tests/product/ports-conformance.test.ts` green. `ports-conformance.test.ts` exercises each adapter against its port contract using existing fixtures under `tests/fixtures/**` and the moved `tests/product/**` fixtures — **hermetic (pinned):** no live credentials, no network access, no wall-clock polling waits, no real Granola/Slack/Linear API calls; transports mocked at the port boundary. Brief parity: byte-identical brief output via item 131's normalized comparator (`tests/product/` post-move home of the AC8 comparator; machine-local skip semantics preserved) — any decided/actions text delta fails.
 - **AC5 (no persisted drift):** source strings, dedupe keys, checkpoint paths, prompts unchanged (same pin as 132 AC7).
 
 ## Out of Scope (Don't Drift)
