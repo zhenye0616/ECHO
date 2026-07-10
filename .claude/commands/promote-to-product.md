@@ -4,9 +4,9 @@ description: Graduation gate for client-facing code — the checklist and mechan
 
 # Promote to Product — the code graduation gate
 
-`src/product/` is the repo's ratified ledger: code there is client-facing, ships in the deploy tarball's active surface, and is protected by the product boundary fence (item 132). Everything outside it is the lab — valuable, live-tested by the founder's own loop, but *candidate*, not ratified. This skill is the confirm-leg between the two, applying the same philosophy as the decision loop's stage 3 (nothing enters the record unratified) to the codebase itself.
+`src/product/` is the repo's ratified ledger: code there is client-facing, ships in the deploy tarball's active surface, and is protected by the product boundary fence. Everything outside it is the lab — valuable, live-tested by the founder's own loop, but *candidate*, not ratified. This skill is the confirm-leg between the two, applying the same philosophy as the decision loop's stage 3 (nothing enters the record unratified) to the codebase itself.
 
-**Effective after item 132 lands** (the fence, composition roots, and closure tests this gate relies on ship there). Until then this file is the spec of the mechanism, not an executable protocol.
+**Effective once the product carve ships** (the fence, composition roots, and closure tests this gate relies on). The original carve specs (items 132/133, 2026-07-10) were review-converged then WITHDRAWN by the founder the same day in favor of a full dev halt until the fresh-machine unknowns map reaches max clarity; the carve will be re-specced post-halt, inheriting the register's standing decisions (naming = `product`, kernel/fence boundary, retrieval-less brain mode, tarball deploys). Until then this file is the spec of the mechanism, not an executable protocol.
 
 ## The two levers (do not conflate them)
 
@@ -44,8 +44,8 @@ Per the canonical five-stage loop (`raw/internal/decisions/2026-07-09-decision-l
 
 | Stage | Capability | Status |
 |---|---|---|
-| 1 Extract | Granola binding → poller/signals/brief | graduates in item 132 (the founding graduation) |
+| 1 Extract | Granola binding → poller/signals/brief | graduates in the founding carve (re-spec pending post-halt) |
 | 2 Triage | reconcile-vs-ledger classifier | lab — missing its core (zero-retrieval today); farthest from graduation |
-| 3 Validate | propose→confirm gate (station 4) | code graduates in 132; founder-side profile only (Slack-bound) |
-| 4 Dispatch | Linear issue creation w/ provenance | code graduates in 132; founder-side profile only |
-| 5 Backflow | done-vs-decided composition | lab/concierge — pre-meeting brief + 134 status atoms are its path in |
+| 3 Validate | propose→confirm gate (station 4) | code graduates with the carve; founder-side profile only (Slack-bound) |
+| 4 Dispatch | Linear issue creation w/ provenance | code graduates with the carve; founder-side profile only |
+| 5 Backflow | done-vs-decided composition | lab/concierge — pre-meeting brief + polish-capture status atoms are its path in |
