@@ -675,3 +675,12 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-07-10-131-post-meeting-brief-generator-v0/r5/request.md`; artifact `backlog/proposed/2026-07-10-131-post-meeting-brief-generator-v0.md@5c398542035e921b93618909ba03affbf102a31a`; response `backlog/reviews/2026-07-10-131-post-meeting-brief-generator-v0/r5/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-80E11A5A-980C-4C0F-BA20-B1005EF28D8C/raw/internal/review-queue/1e1ccd34-500c-43d3-affb-60826182da5d/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-80E11A5A-980C-4C0F-BA20-B1005EF28D8C/raw/internal/review-queue/1e1ccd34-500c-43d3-affb-60826182da5d/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-07-09 22:45 PDT - codex builder MCP pre-claim context
+
+- **Trigger:** Builder-agent `/process-backlog` run started in Codex, verified ECHO MCP reachability, and checked recent Project_echo cross-tool context before claim/reconcile.
+- **Query inputs:** `mcp__echo.echo_ping({ message: "codex builder process-backlog smoke test before claim" })`; `mcp__echo.find_clusters({ repo_path: "/Users/zhenye/Desktop/Project_echo", since: "2026-07-09T00:00:00-07:00", format: "skeleton", view: "compact" })`.
+- **Returned:** Ping returned `pong=true`, `ts=2026-07-10T05:45:48.781Z`. `find_clusters` returned 1 cluster: `ctx_2329b02a`, label `work on project_echo`, 191 atom ids, rank reasons `["has_open_loop","code_session_anchor"]`, warnings `[]`.
+- **Sources:** `source_breakdown={"claude_code":80,"git":105,"codex":6}`; time range `2026-07-09T08:09:35.794Z` to `2026-07-10T05:45:01.328Z`; repo filter `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** partial - useful broad signal that current work is concentrated in this repo, but not item-specific enough to replace filesystem/git backlog selection.
+- **Note:** I did not hydrate atom bodies because the builder protocol makes `tools/blocked.py`, the claimed item, and its `spec_refs` the authoritative implementation context.
