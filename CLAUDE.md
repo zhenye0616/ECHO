@@ -162,18 +162,7 @@ The agent operates across **two directories**: backlog state changes happen in t
 
 **Reading the journal.** "Read the journal" means `tools/dogfooding/journal-cat.sh YYYY-MM`, which merges all per-actor shards plus the frozen legacy shared file for that month in chronological entry order. Humans, HTML regeneration, and end-of-window synthesis should read the merged stream, not a single shard.
 
-**Required entry shape** (the template lives in each shard preamble; copy it verbatim):
-
-```
-### YYYY-MM-DD HH:MM PDT — <one-line context>
-- **Trigger:** what the user (or AI client) just did that called the tool
-- **Query inputs:** since=…  until=…  artifact_hint=…  (or other args)
-- **Returned:** N clusters, M atoms; top cluster: "<label or none>"; rank_reasons: […]
-- **Sources:** source_breakdown={…} for trace; OR per-match source-prefix list for search; OR the specific jsonl/git/fs paths the atoms came from. ALWAYS shown — a reader must be able to tell which capture surfaces contributed and which were silently absent.
-- **Verdict:** ✅ right / 🟡 partial / ❌ wrong
-- **Note:** observation — what felt right or off
-- **Conjecture:** (optional) what algorithm/config change might help — observations only, don't design fixes here
-```
+**Required entry shape:** the canonical template lives in each shard's preamble — copy it verbatim from there (7 fields: Trigger, Query inputs, Returned, Sources, Verdict, Note, optional Conjecture).
 
 The **Sources** field is non-optional. Source-volume bias and silent omission (e.g., a window whose git rows all got dropped by Bug A's text-compare WHERE clause) are the most-recurring failure modes; without explicit per-call source attribution, future readers can't tell whether a 1-cluster trace response is "right and narrow" or "wrong because all git rows got dropped." Codex started doing this organically at 2026-05-08 00:46 PDT and earlier; the discipline is now project-wide.
 
