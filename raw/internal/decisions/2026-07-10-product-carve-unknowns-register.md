@@ -40,3 +40,11 @@ Pre-freeze demo work keeps mutating exactly the files 132 moves. Every merge bet
 - A7 → promotion-gate re-verify text in 132.
 - A4 → provisional-ports note in 133.
 - A2, A3, A5, A6, B1–B6 → this register is their tracking home; end-of-window synthesis turns ripe ones into backlog items. None block 132/133 review convergence.
+
+## Founder decisions — 2026-07-10 review session (post-convergence)
+
+- **A1 — RESOLVED: option (b), explicit retrieval-less product mode.** 132's OPEN block converted to RESOLVED; AC2 amended with the pinned retrieval-less clause (deliberate no-retrieval distinguishable from broken capture). Bundled-MCP deferred to self-install phase as its own spec + review. A2's cold-db test remains the empirical price check on this mode.
+- **B2 — RESOLVED: dedicated box the founder controls.** Consequence: the `com.echo.product.daemon` launchd unit + install story (132 After Completion follow-on) moves from "someday" to "needed for pilot uptime" — spec it after 132 merges. Hosted (fly.io) not pursued for phase 1.
+- **B3 — RESOLVED: founder's accounts/bots invited into the lab's workspaces.** Fastest start; accepted trade: murkier data custody (couples to A6 — the data-handling story must now cover "founder's account can see lab content") and pilot breaks if access is revoked. Revisit custody at self-install.
+- **B4 — RESOLVED: macOS-only for phase 1.** The Windows beta tester waits on the daemon-lifecycle port; Windows is NOT on the pilot critical path. B2's dedicated box is a Mac.
+- Still open: A2 (run the cold-db gate pre-pilot), A3 (brain account — needs an owning item before phase 2), A5 (before customer #2), A6 (secret-history-scan owed; data-retention story now urgent-adjacent given B3), B1 (rollout calendar), B5 (pricing + name), B6 (phase-1 definition of done).
