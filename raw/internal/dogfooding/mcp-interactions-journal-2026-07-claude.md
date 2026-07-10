@@ -456,3 +456,13 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** 🟡 partial — the chain recovered the resume state well (131 merged, loop status, pending Granola flip), but the cluster's "unresolved open loop" hints all pointed at automated backfill extraction runs, not human-facing threads; the actually-open human loop (founder hasn't said "flipped") lived in the claude_code session tail, found only via the third call. Also get_atoms silently budget-dropped the one atom from the justinian cluster.
 - **Note:** open_loop_hints conflate agent-harness prompts ("Return only the final Slack-ready answer") with genuine founder-facing open threads — every overnight brain run registers as an unresolved loop. Resume UX would improve if open-loop detection discounted headless exec sessions.
 - **Conjecture:** the 131 backfill's per-note codex runs (27 single-atom codex clusters in the window) are cluster-fragmenting the resume view; a source-aware collapse of same-harness exec runs would cut noise.
+
+### 2026-07-10 14:20 PDT — watcher r1 tick on 132: coord_invoke active trigger for r2
+
+- **Trigger:** /review-queue-watch r1 tick on 2026-07-10-132-product-module-carve-out completed branch (b) (4 findings patched + founder-requested unknowns-register fold at a1518ac2, r2 dispatched at 2aa7a05d); 057b post-push hook fires coord_invoke per headless reviewer.
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-10-132-product-module-carve-out/r2/request.md, correlation_id=<r2 frontmatter>); coord_invoke(role=codex-ops, same path/corr) — raw MCP POST to :38478 with X-Echo-Role: claude.
+- **Returned:** both calls HTTP-ok with reviewer_invoked_id acks (40195343…, 33540786…).
+- **Sources:** n/a (coordination tool, not retrieval) — target = production daemon MCP :38478; roles resolved from tools/review-queue/coord-roles.json.
+- **Verdict:** ✅ right — active trigger accepted for both reviewers.
+- **Note:** dispatch-next-round.py could not handle the inbox-parked artifact (find_artifact scans kanban stages only) — branch (b) reproduced manually via request.py --artifact-path; followup filed in backlog/_followups.md. First r1 reviewer tick also lost a push race to codex-ops and its worktree discarded a completed 132 review (re-run succeeded); push-with-retry gave up after 2 attempts inside the reviewer wrapper — worth watching for a retry-budget bump if it recurs.
+- **Conjecture:** none
