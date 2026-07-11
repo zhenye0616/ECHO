@@ -1,7 +1,11 @@
 {
+  "_RETIRED_2026_07_11": "Not the client-runtime answer file. 'profile: customer' is the legacy Machine-context audience split (filters coordination assets only) — NOT a Team-product runtime/composition selector. Do not hand to a client. See docs/echo-init.customer.example.README.md and docs/install-contracts.md.",
   "_comment": "Phase-1 beta install answer file (context layer only). Copy to /tmp/echo-init.json, set default_project_repo_root, then: echoctl init --json --answer-file /tmp/echo-init.json. See docs/echoctl-agent-onboard-runbook.md.",
   "confirm_setup": true,
   "profile": "customer",
-  "selected_agents": ["claude-code", "codex"],
+  "selected_agents": [
+    "claude-code",
+    "codex"
+  ],
   "default_project_repo_root": "/Users/<user>/path/to/their/main/repo"
 }

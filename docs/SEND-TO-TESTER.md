@@ -1,5 +1,7 @@
 # ECHO beta — Windows install (context layer only)
 
+> **RETIRED (2026-07-11) — do not send to any client or lab.** This describes the Phase-1 *Windows dev-capture context-layer beta*, a passive cross-tool capture install that is **not** the Team decision product and **not** the meeting→brief wedge. Superseded by the current install contracts (`docs/install-contracts.md`). The commercial product is the Team wedge; its client endpoint (Contract B) is not yet shipped. Kept for historical reference only.
+
 Thanks for testing ECHO. This installs a **local, private context layer**: a small daemon
 passively captures your work across Claude Code, Codex, and git into a local SQLite store on your
 own machine (nothing leaves it), so any of your AI tools can recall what you did in the others.

@@ -1,5 +1,7 @@
 # echoctl Install
 
+> **SCOPE (2026-07-11): this is the CURRENT full-lab / diagnostic install (Contract A).** It boots the entire ECHO lab daemon and is intended for founder-operated lab use and clean-machine rehearsal, **not** for client delivery. The client product install (Contract B: versioned product package + `ANTHROPIC_API_KEY` + product-only composition root) is not yet built. See `docs/install-contracts.md` for the two-contract separation before using this for anything client-facing.
+
 ECHO V1 installs as an npm-packed `echoctl` CLI plus a macOS launchd daemon. The daemon runs from the installed package's `dist/daemon/index.js`; it does not depend on the source repo being present.
 
 ## Install
