@@ -11,6 +11,16 @@
 4. **Dispatch** (execute) — resolved decisions become issues/tasks/projects in the execution layer, provenance-linked. Execution store is rented and headless (Linear driven by ECHO; advisor/team never needs to visit it). Plumbing exists (108/109 fail-closed create). Discipline: task-shaped content only in third-party stores; transcripts/rationale stay in the owned ledger.
 5. **Backflow** (observe) — execution evidence flows back up: issue-state changes, eng capture, commit activity → next brief/meeting opens with done-vs-decided, stalls, and drift (activity contradicting a ratified decision). Partial today: capture exists; composition is concierge.
 
+### Per-stage evidence qualifiers (annotated 2026-07-11)
+
+The model above is the abstraction; each stage's "proven" claim holds only under the named conditions. "Full five-stage loop ran live" is too strong — the honest live sequence is capture → extraction → concierge triage/confirm → brief → manual delivery. Maturity per `2026-07-11-team-product-graduation-pipeline.md`: the current candidate is DEV with predecessor founder-regime evidence.
+
+1. **Extract** — proven on Granola only, on the founder's warm months-deep db, with founder CLI auth (not the API-key client binding). Cold-db (A2) and Zoom/Mattermost are unproven.
+2. **Triage** — never automated; the one live cycle (n=1 advisor) was strategist-concierge; the intake classifier still runs `zero_retrievals`.
+3. **Validate** — proven only while the hand-started local Socket Mode responder and its credentials are up; a founder-authorized confirm had no sanctioned execution path when the responder was down (journaled red 2026-07-08); confirm-after-edit gap open.
+4. **Dispatch** — plumbing live-tested only in the cancelled Justinian regime; not revalidated for the current wedge and excluded from the first client scope.
+5. **Backflow** — no-synthesis today: capture exists, composition is founder concierge; Linear read-side status Q&A validated only against Justinian-era state.
+
 ## Division of labor (locked)
 
 Stage-1 surfaces belong to capture vendors (Granola et al.). Stage-4 surfaces belong to PM vendors (Linear et al.). **ECHO owns stages 2, 3, 5 and the joins between all five.** The ledger (append-only, subject-keyed supersession, ratification + provenance) lives only in the owned substrate (`echo.db` / org-hub store) — never in a rented SaaS. Surfaces are pluggable per customer; the loop is the identity.

@@ -79,7 +79,7 @@ Documented manual steps a client (or the box, unattended) would not know: the vi
 ## What this map demands (proposed follow-ups)
 
 1. **Signals first-run cutoff + newest-first ordering** (item 128's sibling, must land before ANY fresh-machine run — fixes §7's two must-fixes in one small spec).
-2. **API-key brain binding** (already queued — kills §1 entirely for clients).
+2. **API-key brain binding** (named, not yet specced — no kanban item exists; correction 2026-07-11 — kills §1 entirely for clients).
 3. **`--wait` flag** (already prescribed by the stress-test follow-ups; §8 latency).
 4. **Client onboarding doc** distilled from §8/§10: workspace habit, key coverage test poll, internalDomains config, transcript requirement.
 5. Box checklist inherits: local-disk db (§3 WAL), TZ set to meeting-owner TZ (§11), plaintext-key handling (§2).
