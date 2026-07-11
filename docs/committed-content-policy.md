@@ -6,11 +6,11 @@ The ECHO repo is public (since 2026-06-06). Every commit to any branch is world-
 
 ## Forbidden content classes
 
-Never commit any of the following to the tracked tree (or leave it in reachable history):
+Never commit any of the following to the tracked tree going forward:
 
-1. **Secrets.** API keys (`grn_*` Granola keys, `ANTHROPIC_API_KEY`, brain-vendor tokens), `.env*` values, `~/.echo/state` credential files, Slack bot/app tokens, OAuth client secrets, session cookies, private keys. This class is machine-detectable; the CI secret gate (WS2) enforces it, but authors are the first line.
+1. **Secrets.** API keys (`grn_*` Granola keys, `ANTHROPIC_API_KEY`, brain-vendor tokens), `.env*` values, `~/.echo/state` credential files, Slack bot/app tokens, OAuth client secrets, session cookies, private keys. This class is machine-detectable, but **no CI secret gate exists yet** — it is an owed WS2 deliverable, and until it lands, `.gitignore` plus author discipline are the only line.
 2. **Third-party personal names from live captures.** Real attendee names, coworker names, lead names, or advisor names that entered the repo via a captured meeting, transcript, Slack export, or brief. Fictional/placeholder names in fixtures are fine and required (see redaction rule below).
-3. **Meeting titles and Granola note IDs from real workspaces.** A note ID (e.g. the advisor-call ID in `2026-07-09-first-advisor-loop-cycle.md`) is a live-workspace pointer, not an opaque token; treat it as identifying.
+3. **Meeting titles and Granola note IDs from real workspaces.** A note ID is a live-workspace pointer, not an opaque token; treat it as identifying. (Known residual: two note IDs remain pinned in `backlog/complete/2026-07-10-131-…` AC8 as a machine-local test contract — inventoried, deliberate.)
 4. **Verbatim meeting or Slack quotes.** Any pasted line of real transcript, real brief body, or real Slack message content. Describe the *shape* ("a two-line decision row with owner + date"), never the text.
 5. **Employer-identifying material.** Workspace names, channel names, project codenames, or content that identifies a real employer/client organization tied to captured data.
 
@@ -38,3 +38,7 @@ If forbidden content lands in a commit:
 1. **Redact at HEAD immediately** — replace the content with a placeholder or remove it, commit the redaction, push. This stops the *tracked-tree* exposure and is the minimum required before any further client-derived artifact is committed.
 2. **Record it in the exposure register** — the WS2 tracking artifact that distinguishes the three jobs (June db token scan / git-history secret scan / filter-repo content rewrite). Log what leaked, which commit introduced it, the redaction commit, and whether history still retains it.
 3. **State the residual honestly.** A HEAD redaction does **not** remove the content from history — it remains reachable via the pre-redaction SHA (and in any clone/fork/cache) until and unless a `filter-repo` history rewrite is executed. Note in the register whether the item is now a filter-repo target. The rewrite is a separate founder decision (`raw/internal/decisions/2026-07-11-filter-repo-decision-template.md`); redaction-at-HEAD is not a substitute for it.
+
+## Known residuals (this policy does not pretend the tree is clean)
+
+This policy governs future commits; it coexists with inventoried residuals it does not erase: the history anchors awaiting the filter-repo decision (lead list, coworker notes, dump, pitch drafts); dogfooding-journal entries containing live-capture names (in-the-moment records — inventoried, not rewritten); the 131 AC8 note-ID test contract; the already-initial-redacted employer references; and founder absolute paths (~142 files). The authoritative list is `raw/internal/decisions/2026-07-11-exposure-semantic-content-inventory.md`. A new commit that ADDS to any of these classes violates this policy even though residual instances exist.
