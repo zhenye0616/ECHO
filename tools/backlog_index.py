@@ -115,7 +115,55 @@ def render(repo_root: Path) -> str:
                     + " |"
                 )
         lines.append("")
+    lines.extend(render_inbox(repo_root))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def render_inbox(repo_root: Path) -> list[str]:
+    """Inbox is parked, non-kanban state: invisible to blocked.py selection by
+    design, but the index must still show it so parked specs cannot rot unseen."""
+    lines = [
+        "## Inbox (parked)",
+        "",
+        "Parked specs gated on a non-item condition; not claimable, invisible to"
+        " `tools/blocked.py`. Promotion is a manual `git mv` to `ready/` when the"
+        " gate fires.",
+        "",
+        "| Status | Priority | Created | ID | Title | Estimate | Blocked By |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    inbox_dir = repo_root / "backlog" / "inbox"
+    inbox_files = sorted(inbox_dir.glob("*.md")) if inbox_dir.is_dir() else []
+    if not inbox_files:
+        lines.append("| - | - | - | _(empty)_ | - | - | - |")
+    else:
+        for path in inbox_files:
+            try:
+                fm = blocked.parse_frontmatter(path.read_text(encoding="utf-8"))
+            except Exception:
+                fm = {}
+            path_rel = path.relative_to(repo_root)
+            item_id = str(fm.get("id") or path.stem)
+            blocked_by = fm.get("blocked_by") or []
+            if isinstance(blocked_by, list):
+                blocked_by = ", ".join(str(b) for b in blocked_by)
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        "PARKED",
+                        esc(fm.get("priority", "MED")),
+                        esc(fm.get("created", "")),
+                        f"[{item_id}](../{path_rel})",
+                        esc(item_title(path)),
+                        esc(item_estimate(path)),
+                        esc(blocked_by or "-"),
+                    ]
+                )
+                + " |"
+            )
+    lines.append("")
+    return lines
 
 
 def write_item(repo: Path, stage: str, item_id: str, title: str, extra: str = "") -> Path:
@@ -188,6 +236,14 @@ Do not edit by hand.
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
 | - | - | - | _(empty)_ | - | - | - |
+
+## Inbox (parked)
+
+Parked specs gated on a non-item condition; not claimable, invisible to `tools/blocked.py`. Promotion is a manual `git mv` to `ready/` when the gate fires.
+
+| Status | Priority | Created | ID | Title | Estimate | Blocked By |
+|---|---|---|---|---|---|---|
+| PARKED | HIGH | 2026-06-03 | [2026-06-03-004-parked-item](../backlog/inbox/2026-06-03-004-parked-item.md) | Parked item | 1d | - |
 """
 
 
@@ -201,6 +257,7 @@ def run_fixture_check() -> int:
         ready = write_item(root, "ready", "2026-06-03-002-ready-item", "Ready item")
         seal_ready(ready)
         write_item(root, "ready", "2026-06-03-003-stale-ready", "Stale ready")
+        write_item(root, "inbox", "2026-06-03-004-parked-item", "Parked item")
         rendered = render(root)
         expected = fixture_expected()
         if rendered != expected:
