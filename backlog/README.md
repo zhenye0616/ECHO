@@ -2,6 +2,8 @@
 
 Kanban-style work coordination across strategic conversations, one or more autonomous build agents, and founder review.
 
+> **Current operating gate (2026-07-11):** while G2 (the clarity-halt lift) is unsigned, the claim/build loop below is suspended for product work — no `proposed/` or `ready/` product specs are created, and nothing is claimed or built. Product decisions land in the closure register or `raw/internal/decisions/`. See `CLAUDE.md` "Current Commercial Focus" and `AGENTS.md` "Current operating gate" for the full rule; this README documents the mechanics that resume after G2 (and that continue now for explicitly permitted non-product maintenance).
+
 ## The Three Roles
 
 1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/proposed/` items. Does **not** write to `wiki/` until an item is shipped. **May also review and prep merges** for items in `pending_review/` — see the Reviewer Independence Rule below.
@@ -47,12 +49,22 @@ This makes spec/build divergence structurally impossible — the wiki cannot cla
 ```
 backlog/
 ├── README.md            (this file)
+├── _followups.md        # flat post-merge followup queue (see "Followup Queue")
 ├── proposed/            # spec draft in spec-review; reviewable, never claimable
 ├── ready/               # claimable; sealed by ready_content_sha
 ├── claimed/             # agent has atomically claimed; in-progress
 ├── pending_review/      # agent done; awaits founder review + merge
-└── complete/            # founder approved + merged; wiki update pending
+├── complete/            # founder approved + merged; wiki update pending
+├── inbox/               # PARKED, non-kanban (see "Non-Kanban State" below)
+├── reviews/             # cross-vendor review-queue rounds (non-kanban)
+├── task-state/          # role-typed working-memory pointers (non-kanban)
+└── archive/             # archived full spec bodies + stubs (see archive/README.md)
 ```
+
+The first six entries are the kanban pipeline; `tools/blocked.py` and the claim
+flow see only those. The last four are supporting state documented in
+"Non-Kanban State" below — they are real, load-bearing directories that were
+previously undocumented here.
 
 ## Item Lifecycle
 
@@ -74,6 +86,53 @@ pending_review/  ← agent done; founder reviews diff/tests/notes; merges PR
      ├── approved → complete/  ← strategist promotes decisions to wiki/ in next conversation
      └── rejected → proposed/ if the spec needs review again, or ready/ only with a fresh ready_content_sha
 ```
+
+## Non-Kanban State
+
+Four directories live alongside the pipeline but are **not** stages. Nothing in
+them is claimable, and `tools/blocked.py` ignores them by design.
+
+### `inbox/` — parked specs (manual promotion gate)
+
+A spec gated on a **non-item condition** (something `blocked_by:` cannot
+express — e.g. "AC8 fired", "post-demo window opens") is parked here instead of
+`ready/`. Properties:
+
+- **Invisible to selection.** `blocked.py` and the claim flow never look here;
+  parking is not a way around spec review or the current operating gate.
+- **Manual promotion.** When the gate fires, a human `git mv`s the file to
+  `ready/` (via normal review if content is stale) — there is no automation.
+- **Indexed.** `docs/BACKLOG.md` renders an "Inbox (parked)" section so parked
+  specs cannot rot unseen. The directory may be absent from disk when empty
+  (git does not track empty dirs); that is normal.
+
+### `reviews/` — cross-vendor review-queue rounds
+
+`reviews/<item-id>/rN/` holds one review round: `request.md` (written by
+`tools/review-queue/request.py`) plus one response file per reviewer
+(`claude.md`, `codex.md`, `codex-ops.md`, `cursor.md`). This is the on-disk
+substrate of the review-queue skills (`review-queue-*`, `review-queue-watch`);
+see those skills for the protocol. Rounds are append-only history — closed
+rounds are never edited, and reviewers always review at the round's pinned
+`spec_commit_sha`, not at HEAD.
+
+### `task-state/` — role-typed working-memory pointers
+
+`task-state/<task-id>/<role>.md` holds the compact cold-start snapshots defined
+in `skills/role-typed-task-state.md` (strategist/builder/watcher/dispatcher).
+**Reviewer ticks must not read or write these** — fresh-eyes-at-SHA is
+preserved deliberately. Lint with `python3 tools/task-state/lint.py <path>`.
+Pointers for long-completed items are archive candidates (see the clarity
+sprint's reorg inventory); until archived, prefer the item's `complete/` spec
+over a stale pointer.
+
+### `archive/` — compacted shipped history
+
+Wiki-promoted `complete/` items are reduced to stubs in place; the full spec
+body moves to `archive/shipped/<YYYY-MM>/<item-id>.md`. Schema and rules:
+[`archive/README.md`](./archive/README.md). Today `archive/` holds only
+`shipped/`; archiving closed review rounds or dead task-state pointers here is
+inventoried reorg work (WS7), not yet practice.
 
 ## Atomic Claim (Multi-Agent Safe)
 
