@@ -2,6 +2,22 @@
 
 This is the 2026-07 per-actor shard for codex. Entries land here when this actor invokes ECHO MCP tools.
 
+**Timezone convention:** all times in this journal are founder local time (PDT/PST, America/Los_Angeles) unless explicitly noted. Source data stores ISO 8601 UTC; entries here are converted on write.
+
+## Quick-Fill Template
+
+    ### YYYY-MM-DD HH:MM PDT - <one-line context>
+
+    - **Trigger:** <why the tool was called>
+    - **Query inputs:** <tool(args), one line or compact numbered list>
+    - **Returned:** <N clusters/M atoms, N matches, N turns, warnings, top label/rank reasons>
+    - **Sources:** <source_breakdown | source_resolved | per-match prefixes | exact paths>
+    - **Verdict:** <right | partial | wrong> - <short reason>
+    - **Note:** <what felt useful/off>
+    - **Conjecture:** <optional>
+
+## Interactions
+
 ### 2026-07-01 09:37 PDT - codex resume/status lookup for Project_echo
 
 - **Trigger:** Founder asked Codex to use ECHO and git to understand where work left off and the most recent status.
