@@ -510,14 +510,14 @@ Evidence: backlog/_followups.md lines 489-490 · .github/workflows/ci.yml matrix
 
 **Action:** Bites future install, not macOS phase 1. Pre-lift: preserve the CI-only reproduction and explicit deferral trigger. Any Windows-chain build item waits for G2 and a founder decision to reactivate Windows scope.
 
-### Inbox convention gaps: dispatch tooling blind to inbox/, convention undocumented, zombie 081 parked
+### PARTIAL 2026-07-11 — Inbox convention gaps: 081 deleted, convention documented, index fixed; dispatch fix still owed
 *coordination · client-relevance medium*
 
 tools/review-queue/dispatch-next-round.py's find_artifact scans only kanban stages, so the historical 132 r1→r2 tick required manual reproduction and any future parked inbox spec would hit the same gap. The fix (thread artifact_path to request.py) is written but unfiled and duplicates the older 'inbox specs unreviewable' bullet; backlog/README.md never documents the inbox convention; and a stale duplicate of shipped item 081 still sits in inbox/ (verified).
 
 Evidence: backlog/_followups.md lines 516 and 243 · ls backlog/inbox/ shows 2026-05-29-081-raycast-command-disposition-and-removal.md (verified) · memory project_parked_specs_inbox_convention
 
-**Action:** Bites the next inbox-spec review round, not a 132/133 promotion. Resolve during cleanup: rank the dispatch fix for post-halt conversion, document the convention in backlog/README.md, and delete/archive the 081 zombie.
+**Action:** PARTIAL close (maint/clarity-phase1): 081 zombie deleted (`b6fc242a`), inbox/reviews/task-state/archive documented in backlog/README.md (`d7298a40`), docs/BACKLOG.md indexes inbox via the generator (`401ccc38`). Remaining: the dispatch-next-round artifact_path fix stays ranked pre-lift, proposed only after G2.
 
 ### Leaked selftest daemons drive load to ~100 and flake the gates; teardown fix owed
 *hygiene · client-relevance medium*
@@ -845,7 +845,7 @@ Several tools/docs that declare their own maintenance guarantees currently viola
 
 Evidence: journal-cat 2026-07 exit=1: codex shard missing '## Interactions' marker (verified this run) · ls skills/ (12) vs .claude/commands/ (13, incl. office-hours); --check OK · docs/architecture-map/index.md @0f77efa1 2026-07-03; grep brief src-cli.md = 0 · src/mcp/server.ts:274-276 removal note; src/index.ts:1
 
-**Action:** Cleanup-sprint checklist item: fix the codex shard marker, make sync-skills --check bidirectional (flag orphan adapters), regenerate architecture-map, unregister the deprecated tool, and delete or justify the dead stubs — each is a self-description the repo currently falsifies.
+**Action:** PARTIAL close (maint/clarity-phase1): codex shard marker fixed, journal-cat 2026-07 exits 0 (`0122fa41`); sync-skills --check now flags orphan adapters and canonical skills/office-hours.md exists (`10a3d95d`). Remaining: architecture-map regeneration, deprecated get_recent_work_context unregistration, and dead-stub disposition — each still a falsified self-description; the code-touching two wait for G2 or an explicit maintenance allowance.
 
 ## 4. Unknown unknowns — blind-spot classes + detection instruments
 
