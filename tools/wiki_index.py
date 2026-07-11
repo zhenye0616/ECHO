@@ -78,6 +78,9 @@ def render_index(manifest: dict) -> tuple[str, int]:
     total = len(entries)
     shipped = sum(1 for _, e in entries.items() if e.get("status") == "shipped")
     planned = sum(1 for _, e in entries.items() if e.get("status") == "planned")
+    retired = sum(
+        1 for _, e in entries.items() if e.get("lifecycle") == "retired"
+    )
 
     lines: list[str] = []
     lines.append("# ECHO Wiki — Index")
@@ -87,9 +90,12 @@ def render_index(manifest: dict) -> tuple[str, int]:
         "Do not edit by hand."
     )
     lines.append("")
-    lines.append(
-        f"**Status:** {total} pages · {shipped} shipped · {planned} planned"
-    )
+    status_line = f"**Status:** {total} pages · {shipped} shipped · {planned} planned"
+    if retired:
+        status_line += (
+            f" · {retired} retired (historical; superseded, not current direction)"
+        )
+    lines.append(status_line)
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -119,6 +125,8 @@ def render_index(manifest: dict) -> tuple[str, int]:
                 summary = entry.get("summary", "")
                 status = entry.get("status", "shipped")
                 tag = " *(planned)*" if status == "planned" else ""
+                if entry.get("lifecycle") == "retired":
+                    tag = " *(retired — historical)*"
                 lines.append(f"- [[{link}|{title}]]{tag} — {summary}")
             lines.append("")
         lines.append("---")

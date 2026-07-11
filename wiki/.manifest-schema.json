@@ -10,7 +10,9 @@
       "aliases": ["Title Case", "CamelCase", "other common references"],
       "topic": "Topic from taxonomy",
       "subtopic": "Specific area within topic",
-      "raw": "path/to/source/file.md (source pages only, omit for principles/surfaces/architecture)"
+      "raw": "path/to/source/file.md (source pages only, omit for principles/surfaces/architecture)",
+      "lifecycle": "active (default, may be omitted) | deferred | retired",
+      "superseded_by": "path/to/superseding decision or page (required when lifecycle: retired)"
     }
   },
 
@@ -21,7 +23,9 @@
     "summary_field": "Max 120 chars. Written during manifest generation so consolidation never parses page content.",
     "aliases_field": "Must include at least the Title Case version of the filename. Obsidian uses these to resolve [[wikilinks]].",
     "topic_field": "Must match the taxonomy below. Reuse existing topics before creating new ones.",
-    "raw_field": "Relative path from project root. Only on pages whose authority is a separate source file (e.g., capture-allowlist mirrors src/capture/sources.ts)."
+    "raw_field": "Relative path from project root. Only on pages whose authority is a separate source file (e.g., capture-allowlist mirrors src/capture/sources.ts).",
+    "lifecycle_field": "Separate axis from status (2026-07-11). status stays delivery-state (shipped|planned); lifecycle says whether the page is strategically current. active = current authority (default when omitted). deferred = unbuilt commitment intentionally parked with an owner/trigger. retired = formerly current/shipped, now superseded — page body is historical evidence, not direction. Never infer current product direction from status: shipped alone.",
+    "superseded_by_field": "Required with lifecycle: retired; points at the superseding decision doc or wiki page. Mirrors the page's own frontmatter superseded_by + dated banner."
   },
 
   "_folders": {

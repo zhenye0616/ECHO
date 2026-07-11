@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 76 pages · 73 shipped · 2 planned
+**Status:** 76 pages · 73 shipped · 2 planned · 2 retired (historical; superseded, not current direction)
 
 ---
 
@@ -29,9 +29,9 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 - [[bundle-decision|Bundle Decision]] — V1 bundle: Cursor + Claude Code + GitHub + Slack + web AI extension. Why these 5; why not Zoom/email.
 - [[echo-pro-coordinate-layer|ECHO Pro — Coordinate Layer]] — Customer-facing install boundary above the substrate — ~/.echo global home, role TOMLs, adapter sync, onboarding wizard, echoctl binary, packaged daemon. Design intent paid; shipped code has no billing (items 070-076).
+- [[v1-spec|Historical V1 Spec (Superseded)]] *(retired — historical)* — Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done
 - [[narrowest-v1-scope|Narrowest V1 Scope]] — L1 (passive ingestion) + L3 (summoned, Q&A + assembly) + minimal L5. Cut L2 and L4.
 - [[tier-vs-vertical-slice|Tier-by-Tier vs Vertical Slice]] — Why building tier-by-tier (universal categories first) is wrong. Ship vertical slice across tiers instead.
-- [[v1-spec|V1 Spec (Locked)]] — Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done
 
 ---
 
@@ -57,7 +57,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 ### V1 Scope
 
-- [[drift-prevention|Drift Prevention]] — The discipline of not silently diverging V1 build from V1 spec. Five drift patterns + weekly audit.
+- [[drift-prevention|Drift Prevention]] *(retired — historical)* — The discipline of not silently diverging V1 build from V1 spec. Five drift patterns + weekly audit.
 
 ---
 

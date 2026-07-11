@@ -552,6 +552,8 @@
   },
   "principles/drift-prevention.md": {
     "status": "shipped",
+    "lifecycle": "retired",
+    "superseded_by": "raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md",
     "title": "Drift Prevention",
     "link": "drift-prevention",
     "summary": "The discipline of not silently diverging V1 build from V1 spec. Five drift patterns + weekly audit.",
@@ -719,7 +721,9 @@
   },
   "product/v1-spec.md": {
     "status": "shipped",
-    "title": "V1 Spec (Locked)",
+    "lifecycle": "retired",
+    "superseded_by": "raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md",
+    "title": "Historical V1 Spec (Superseded)",
     "link": "v1-spec",
     "summary": "Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done",
     "aliases": [
