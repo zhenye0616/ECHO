@@ -18,9 +18,18 @@ There are two contracts. One is a **diagnostic/lab install that exists today**. 
 - **An installed and authenticated brain CLI** — Codex (`codex login`) or Claude Code — because extraction spawns `codex exec … --sandbox read-only` or `claude --dangerously-skip-permissions -p`. **Vendor login cannot be self-healed by the installer:** a fresh box stays `doctor: degraded / auth-required` until a human runs `codex login`. Version-pinned expectations exist (codex-cli 0.137.0, Claude Code 2.1.183).
 - **launchd** manages the daemon; it serves MCP on `127.0.0.1:38478`.
 
-### Install shape
+### Install shape (executable steps)
 
-`npm pack` → `npm install -g <tarball>` → `echoctl daemon install` → `echoctl init` → `echoctl doctor`, then `codex login` and re-check `doctor`. (Canonical steps: `docs/echoctl-install.md`.)
+1. **Install the package + daemon:** `npm pack` → `npm install -g <tarball>` → `echoctl daemon install` → `echoctl init` → `echoctl doctor`. (Canonical steps: `docs/echoctl-install.md` — ships inside the package alongside this file, so the installed box carries its own instructions.)
+2. **Configure the Granola key** (either form; must match `/^grn_/`):
+   - env for the daemon: `GRANOLA_API_KEY` in the launchd plist environment (re-add after ANY daemon reinstall — plist-wipe trap), or
+   - fallback file: `~/.echo/state/granola.json` containing `{"api_key": "grn_…"}`.
+3. **Authenticate the brain CLI** (cannot be self-healed by the installer): run `codex login` (or authenticate Claude Code) as the daemon's user, then re-run `echoctl doctor` — a fresh box reads `degraded / auth-required` until this human step happens.
+4. **Internal-meeting gate workaround:** the intake gate skips meetings with no external attendee. For internal-heavy calendars (the lab's usual case), set `ECHO_GRANOLA_INTAKE_INTERNAL_DOMAINS=""` (empty list ⇒ every attendee counts as external ⇒ gate passes). Document the choice; this is the sanctioned bypass, not a hack.
+5. **Workspace/transcript preflight (before the first real meeting):**
+   - the `grn_` key can NEVER see private "My Notes" — confirm meetings land in a shared workspace/folder the key can see (test: one throwaway note in that space, then poll);
+   - confirm the workspace produces BOTH a summary atom AND a transcript atom for a test meeting — a note missing either is dropped-with-warning and never extracted;
+   - verify title/date/attendees before relying on a brief (first ingest freezes content — edit before ECHO polls, never after).
 
 ### Known operational caveats (from the trap map — must be conveyed, not left as folklore)
 

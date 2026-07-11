@@ -34,6 +34,8 @@
     "tools/review-queue/reviewers.json",
     "tools/review-queue/schemas/**",
     "docs/echoctl-install.md",
+    "docs/install-contracts.md",
+    "docs/lab-data-handling.md",
     "./CHANGELOG.md",
     "./LICENSE",
     "./package.json",

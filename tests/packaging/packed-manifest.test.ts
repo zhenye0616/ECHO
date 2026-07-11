@@ -339,6 +339,8 @@ describe('packed package manifest', () => {
         "dist/util/timestamp.d.ts",
         "dist/util/timestamp.js",
         "docs/echoctl-install.md",
+        "docs/install-contracts.md",
+        "docs/lab-data-handling.md",
         "package.json",
         "tools/review-queue/coord-roles.json",
         "tools/review-queue/reviewer-bindings.json",
