@@ -1,5 +1,7 @@
 # YC application demo sprint — scope, sequence, freeze date
 
+> **SUSPENDED (2026-07-11) — do not execute as written.** Three parts of this plan no longer hold: (1) Scene 1 demos the cross-tool "stranger" capability — that markets Machine context, which the 2026-07-11 commercial-focus decision makes an internal asset, not the product; a demo leading with it now tells the wrong story. (2) Scenes 2–3 stand on the cancelled Justinian workspace regime and the "this sprint: status backflow" build premise, both retired; the clarity halt (G2 unsigned) blocks any new build for scene 3. (3) The week-1 build sequence is superseded by the dev halt. The Jul 18 freeze (G3) and Jul 24 deadline remain live. Successor decision: `2026-07-11-yc-demo-plan-amendment-template.md` (founder chooses the demo shape there; register row X1 governs submit-vs-defer).
+
 **Date:** 2026-07-03
 **Hard deadline:** YC application due **2026-07-24** (21 days).
 **Builds on:** `2026-07-03-pitch-narrative-layered-story.md` (the story the demo must prove), `2026-07-03-fractal-context-layering.md`, the skeleton-architecture loop diagram (`echo_loop_across_domains_fable.png`, founder's desktop, 2026-07-03).

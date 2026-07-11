@@ -30,9 +30,9 @@ Reachable git history contains live-capture content flagged for removal — the 
 4. **Rewrite.** Run `filter-repo` against the enumerated targets (lead list, `ab95c519`, `1ba3580a`, `7bc368b5`, plus anything the WS2 scans added).
 5. **Fresh clone.** Re-clone from the rewritten remote; do not reuse an old working copy (old copies still carry the pre-rewrite objects).
 6. **Rescan.** Re-run the secret + semantic-content scanners on the fresh clone to confirm the targets are gone from reachable history.
-7. **Re-pin.** Update every SHA-pinned reference (decision docs, freeze manifest, move logs, task-state pointers) to post-rewrite SHAs.
+7. **Map, don't rewrite, the evidence records.** Produce an **old-SHA → rewritten-SHA mapping artifact** (filter-repo's commit-map output, committed as `raw/internal/decisions/<date>-filter-repo-sha-map.md` or a sidecar file) covering every SHA cited by immutable evidence. **The G3 freeze record and other sealed evidence documents are NOT edited** — their old SHAs stay exactly as written (they are part of what was sealed), and the mapping artifact is how a reader resolves them against rewritten history. Only *live operational pointers* (task-state pointers, in-flight move logs, tooling configs that must dereference commits) get re-pinned to post-rewrite SHAs, each noting the mapping artifact it used.
 
-Do not begin step 4 until steps 1–3 are all true. Sequencing, not urgency, is what makes this safe.
+Do not begin step 4 until steps 1–3 are all true. Sequencing, not urgency, is what makes this safe. If G3 has already sealed a freeze record by rewrite time, the rewrite invalidates none of it: the record + the SHA map together remain verifiable; a freeze record that gets edited after sealing is no longer evidence.
 
 ---
 
