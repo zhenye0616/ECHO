@@ -40,7 +40,7 @@ All 29 findings confirmed real; several are the same defect found from different
 - Interrupt/append-failure orphan signals (atoms appended before manifest, non-atomic :750-776) visible forever to brief-now's raw query. Guard: transaction or manifest-first write + current-run filter.
 
 **Delivery**
-- No sensitivity guard between generation and send: argv-less pick sits adjacent to "EchoBrain Legal"/equity-negotiation notes in the live DB; human paste is the only gate. Guard (today): "REVIEW BEFORE SENDING — meeting: <title>" banner + owner-only output dir; (any auto-send future): note-identity ack + freshness gate + recipient⊆attendees check are hard prerequisites.
+- No sensitivity guard between generation and send: argv-less pick sits adjacent to sensitive legal/negotiation notes in the live DB (titles redacted 2026-07-11); human paste is the only gate. Guard (today): "REVIEW BEFORE SENDING — meeting: <title>" banner + owner-only output dir; (any auto-send future): note-identity ack + freshness gate + recipient⊆attendees check are hard prerequisites.
 - UTC-day date render: any meeting after 5pm PDT gets tomorrow's date (~15% of real meetings, verified in prod). Guard: `toLocaleDateString('en-CA', {timeZone})` + Invalid-Date fallback.
 
 ## 3. Guard allocation
