@@ -92,13 +92,15 @@ echoctl init
 
 ## Full Removal
 
-This removes adapter config, the launchd job, the package, and optionally all local ECHO state:
+This removes adapter config, the launchd job, the package, and optionally all local ECHO state. Note the capture database does NOT live under `~/.echo` — removing only `~/.echo` leaves all captured data on disk:
 
 ```bash
 echoctl uninstall --yes
-echoctl daemon uninstall
+echoctl daemon uninstall          # stop the daemon BEFORE deleting data (WAL checkpointing)
 npm uninstall -g echoctl
-rm -rf ~/.echo
+rm -rf ~/.echo                                            # state sidecars + config
+rm -rf ~/Library/Application\ Support/ECHO                # echo.db + echo.db-wal + echo.db-shm
+rm -rf ~/Library/Logs/echo                                # daemon/worker logs
 ```
 
-The final `rm -rf ~/.echo` deletes local state, including the user's ECHO home. Use it only for a complete removal.
+If the install used a custom `--db-path` / `ECHO_DB_PATH` or `--data-dir` / `ECHO_DATA_DIR`, delete that location instead of the default Application Support path. Manual copies/backups of `echo.db` are not touched by any of this — chase them separately. Use only for a complete removal.

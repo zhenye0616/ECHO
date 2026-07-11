@@ -22,14 +22,22 @@ The storage backend is **INSERT-only**. The `Storage` contract is three operatio
 
 Under the current B3 lab arrangement, **the founder holds the accounts** used in the lab workspaces (Granola key, brain-vendor auth, any Slack/Linear credentials). The data captured into the lab store therefore sits under founder custody on the founder's (or a founder-controlled) machine. After a client is onboarded onto their own machine, that machine becomes the client's loop-of-record and custody shifts — but that endpoint is **not installable today** (see `docs/install-contracts.md`).
 
-## Network egress (exactly two endpoints)
+## Network egress (complete conditional inventory — the full lab, not just the brief loop)
 
-The meeting→brief loop makes outbound calls to exactly two external services:
+Contract A boots the full lab, so the honest inventory is every endpoint the lab *can* reach, each with the condition that arms it. There are **six conditional vendor endpoints**; every one is credential/flag-gated and fails closed when unconfigured. Code-verified 2026-07-11 (file:line evidence in the fixup commit); no telemetry, update checks, analytics, or runtime package installs exist anywhere in the runtime.
 
-1. **Granola API** — `https://public-api.granola.ai/v1`, to pull meeting notes/transcripts.
-2. **The brain vendor** — today via a local CLI subprocess (`codex` / `claude`), which itself calls the vendor's API; the future path is a direct `ANTHROPIC_API_KEY` call.
+| # | Endpoint | Fires when | What leaves the machine |
+|---|---|---|---|
+| 1 | Granola API (`public-api.granola.ai/v1`) | `GRANOLA_API_KEY` (or `~/.echo/state/granola.json`) present; **default-on** in the daemon | Only the Bearer key; meeting notes/transcripts flow IN |
+| 2 | OpenAI, via the `codex` CLI subprocess | Any brain worker runs and the `codex` binary is present — **codex is the unconfigured default brain**, no enable flag | The extraction prompt: meeting signals + retrieved ECHO context — substantive content OUT |
+| 3 | Anthropic, via the `claude` CLI subprocess | Only when a brain is explicitly set to `claude` (`ECHO_*_BRAIN`) | Same prompt content OUT |
+| 4 | Anthropic API in-process (`api.anthropic.com`, Agent SDK) | `ECHO_INTAKE_AGENT_PROVIDER=claude` **and** `ANTHROPIC_API_KEY`; default provider is deterministic/no-network | Intake/meeting text OUT (budget-capped) |
+| 5 | Slack (Web API + persistent Socket Mode WSS) | Responder process needs `ECHO_SLACK_APP_TOKEN`+`ECHO_SLACK_BOT_TOKEN`; daemon intake/drift workers need `ECHO_SLACK_BOT_TOKEN` plus their own enable flags (`ECHO_GRANOLA_INTAKE_ENABLED`, `ECHO_DRIFT_SWEEP_ENABLED`, both OFF by default) | Decision/brief/drift cards, intake seeds — decision content, contradicting quotes, meeting titles/URLs OUT; replies IN |
+| 6 | Linear (`api.linear.app/graphql`) | `ECHO_LINEAR_INTAKE_ENABLED` or the full six-variable `LINEAR_*` set; OFF by default | Issue creation with meeting-derived fields OUT; issue id/url IN |
 
-Nothing else leaves the machine for the brief loop. Note: nothing in the code reads `HTTP_PROXY`/`HTTPS_PROXY`, so a corporate proxy or TLS-interception layer on a managed machine is an untested/likely-breaking regime for both endpoints.
+**The meeting→brief wedge path uses only #1 + one brain (#2 by default — i.e., the default lab brief path sends meeting content to OpenAI via codex, not Anthropic).** Brief generation itself makes zero network calls; it composes from local state. Endpoints #4–#6 belong to the CEO Slack responder (a separate, manually-started process — the daemon does not boot it) and the two off-by-default daemon workers.
+
+Note: nothing in the code reads `HTTP_PROXY`/`HTTPS_PROXY`, so a corporate proxy or TLS-interception layer on a managed machine is an untested/likely-breaking regime for all six endpoints.
 
 ## Local MCP surface
 
@@ -37,7 +45,14 @@ The daemon serves MCP on **`127.0.0.1:38478`** (loopback only, overridable via `
 
 ## Deletion story (honest)
 
-There is **no selective delete** today. Because storage is append-only with no delete operation, the only way to remove captured data is to **delete the whole store** — `rm -rf ~/.echo` and the `echo.db` file (the documented "Full Removal" path). You cannot remove one meeting, one participant, or one note; it is all-or-nothing. Per-record forgetting (tombstone + audit) is a future item, not a current capability. Say this to the lab before capture, not after a deletion request.
+There is **no selective delete** today. Because storage is append-only with no delete operation, the only way to remove captured data is to delete **every** location that holds it — and the set is larger than one directory:
+
+1. **The database, including WAL/SHM siblings.** Default `~/Library/Application Support/ECHO/echo.db` plus `echo.db-wal` and `echo.db-shm` (WAL mode means recent captures can live in the `-wal` file, not yet in the main db). If the install used a custom location (`ECHO_DB_PATH` / `--db-path`, or `ECHO_DATA_DIR` / `--data-dir`), delete that location instead — check the launchd plist / env before assuming the default.
+2. **State sidecars:** `~/.echo/` (poller checkpoints, high-water marks, the Granola key fallback, decision/changeset drafts, plus skills/roles/workflows/adapters config).
+3. **Logs:** `~/Library/Logs/echo/` (default `--log-dir`) — daemon/worker logs can quote captured content in error paths.
+4. **Any manual backups.** There is no automated backup today (register T9 open), but any operator-made copy of `echo.db` holds everything the original did; deletion must chase copies too.
+
+Stop the daemon first (`echoctl daemon uninstall`), or WAL checkpointing can recreate files mid-delete. You cannot remove one meeting, one participant, or one note; it is all-or-nothing. Per-record forgetting (tombstone + audit) is a future item, not a current capability. Say this to the lab before capture, not after a deletion request. (The install doc's "Full Removal" section mirrors this list.)
 
 ## Residual public-repo exposure
 
