@@ -90,6 +90,27 @@ for canonical in "$SKILLS_DIR"/*.md; do
   fi
 done
 
+# --- Orphan-adapter check (project dir only): every .claude/commands/*.md must
+# have a canonical skills/ counterpart, or --check passes falsely while the
+# canonical protocol is missing a skill (office-hours was exactly this case).
+# Global ~/.claude/commands is exempt by design: user-home files with no
+# canonical counterpart are left untouched per the sync policy above.
+# Deliberate Claude-only adapters go in ORPHAN_EXEMPT, one basename per entry.
+ORPHAN_EXEMPT=""
+if [ "$MODE" = "--check" ]; then
+  for adapter in "$CLAUDE_DIR"/*.md; do
+    [ -e "$adapter" ] || continue
+    name="$(basename "$adapter")"
+    if [ ! -f "$SKILLS_DIR/$name" ]; then
+      case " $ORPHAN_EXEMPT " in
+        *" $name "*) continue ;;
+      esac
+      echo "DRIFT: orphan adapter $adapter has no canonical $SKILLS_DIR/$name" >&2
+      drift=1
+    fi
+  done
+fi
+
 if [ "$MODE" = "--check" ]; then
   if [ "$drift" -eq 0 ]; then
     if [ "$sync_global" -eq 1 ]; then
