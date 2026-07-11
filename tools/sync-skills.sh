@@ -24,7 +24,14 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# SYNC_SKILLS_ROOT: test-only fixture-root override. When set, the script
+# operates on <root>/skills + <root>/.claude/commands and SKIPS the global
+# ~/.claude/commands entirely, so tests never touch the real repo or user home.
+if [ -n "${SYNC_SKILLS_ROOT:-}" ]; then
+  REPO_ROOT="$SYNC_SKILLS_ROOT"
+else
+  REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+fi
 SKILLS_DIR="$REPO_ROOT/skills"
 CLAUDE_DIR="$REPO_ROOT/.claude/commands"
 
@@ -42,6 +49,7 @@ CLAUDE_DIR="$REPO_ROOT/.claude/commands"
 GLOBAL_DIR="$HOME/.claude/commands"
 sync_global=0
 [ -d "$GLOBAL_DIR" ] && sync_global=1
+[ -n "${SYNC_SKILLS_ROOT:-}" ] && sync_global=0
 
 MODE="${1:-sync}"
 
@@ -53,6 +61,7 @@ fi
 mkdir -p "$CLAUDE_DIR"
 
 drift=0
+content_drift=0
 synced_claude=0
 synced_global_count=0
 
@@ -67,17 +76,21 @@ for canonical in "$SKILLS_DIR"/*.md; do
     if [ ! -f "$adapter" ]; then
       echo "DRIFT: missing adapter at $adapter (canonical: $canonical)" >&2
       drift=1
+      content_drift=1
     elif ! cmp -s "$canonical" "$adapter"; then
       echo "DRIFT: $adapter differs from canonical $canonical" >&2
       drift=1
+      content_drift=1
     fi
     if [ "$sync_global" -eq 1 ]; then
       if [ ! -f "$global_adapter" ]; then
         echo "DRIFT: missing global copy at $global_adapter (canonical: $canonical)" >&2
         drift=1
+        content_drift=1
       elif ! cmp -s "$canonical" "$global_adapter"; then
         echo "DRIFT: $global_adapter differs from canonical $canonical" >&2
         drift=1
+        content_drift=1
       fi
     fi
   else
@@ -97,6 +110,7 @@ done
 # canonical counterpart are left untouched per the sync policy above.
 # Deliberate Claude-only adapters go in ORPHAN_EXEMPT, one basename per entry.
 ORPHAN_EXEMPT=""
+orphan_drift=0
 if [ "$MODE" = "--check" ]; then
   for adapter in "$CLAUDE_DIR"/*.md; do
     [ -e "$adapter" ] || continue
@@ -107,6 +121,7 @@ if [ "$MODE" = "--check" ]; then
       esac
       echo "DRIFT: orphan adapter $adapter has no canonical $SKILLS_DIR/$name" >&2
       drift=1
+      orphan_drift=1
     fi
   done
 fi
@@ -121,7 +136,14 @@ if [ "$MODE" = "--check" ]; then
     exit 0
   fi
   echo "" >&2
-  echo "Fix: run tools/sync-skills.sh (without --check) and re-commit." >&2
+  if [ "$orphan_drift" -eq 1 ]; then
+    echo "Fix for orphan adapters: running the sync does NOT fix these (sync only copies canonical -> adapter)." >&2
+    echo "Either promote the adapter to a canonical skill (copy it to skills/<name>.md, then run tools/sync-skills.sh)," >&2
+    echo "delete the adapter if it is dead, or add the basename to ORPHAN_EXEMPT in this script with a justification." >&2
+  fi
+  if [ "$content_drift" -eq 1 ]; then
+    echo "Fix for content drift: run tools/sync-skills.sh (without --check) and re-commit." >&2
+  fi
   exit 1
 fi
 

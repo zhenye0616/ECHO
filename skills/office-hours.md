@@ -42,6 +42,19 @@ exact tokens) before proceeding from memory.
 
 ---
 
+## Locked decisions — not re-litigable here (2026-07-11)
+
+Office-hours stress-tests bets; it does not reopen founder-locked ones. The
+2026-07-11 commercial-focus decision locks: the **Team decision product** as
+ECHO's only commercial product, **meeting→brief** as the first saleable
+wedge, and its **pain/demand as proven**. An interrogation may pressure-test
+pricing, buyer, offer language, onboarding, delivery, and sequencing — the
+*mechanics* of selling and shipping the locked product — but must not
+function as a demand-validation gate or a product-selection reopener. If the
+founder wants the product choice itself back on the table, that is an
+explicit founder reversal recorded as its own decision doc first, not an
+office-hours outcome.
+
 ## Phase 1 — Pick the mode
 
 - **Startup mode** (default for vision / moat / demand / strategy bets):

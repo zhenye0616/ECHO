@@ -61,10 +61,12 @@ backlog/
 └── archive/             # archived full spec bodies + stubs (see archive/README.md)
 ```
 
-The first six entries are the kanban pipeline; `tools/blocked.py` and the claim
-flow see only those. The last four are supporting state documented in
-"Non-Kanban State" below — they are real, load-bearing directories that were
-previously undocumented here.
+The **five stage directories** (`proposed/`, `ready/`, `claimed/`,
+`pending_review/`, `complete/`) are the kanban pipeline; `tools/blocked.py`
+and the claim flow see only those. `README.md` and `_followups.md` are
+documentation and the followup queue. The last four directories are
+supporting state documented in "Non-Kanban State" below — real, load-bearing
+directories that were previously undocumented here.
 
 ## Item Lifecycle
 
