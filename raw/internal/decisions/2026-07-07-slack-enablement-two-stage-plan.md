@@ -2,7 +2,7 @@
 
 Context: 65+ intake cards validated in the terminal store; Slack posting is the
 built-but-disabled next step. The backfill deck contains sensitive negotiation
-content (Parth equity/IP cards, bottom-line numbers) and the COUNTERPARTY OF
+content (advisor equity/IP cards, bottom-line numbers; name redacted 2026-07-11) and the COUNTERPARTY OF
 THOSE CARDS IS IN THE REAL WORKSPACE — channel-level privacy is one
 misconfigured channel-id away from disaster, so isolation must be structural,
 not config-level (same argument as capture-gate-in-code-not-policy).
