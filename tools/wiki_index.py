@@ -75,11 +75,38 @@ def render_index(manifest: dict) -> tuple[str, int]:
             sys.exit(2)
         by_folder[folder].append((path, entry))
 
+    for path, entry in entries.items():
+        status = entry.get("status", "shipped")
+        if status not in ("shipped", "planned"):
+            print(
+                f"invalid status '{status}' for {path}: expected shipped|planned"
+                " (lifecycle is the separate axis)",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        lifecycle = entry.get("lifecycle", "active")
+        if lifecycle not in ("active", "deferred", "retired"):
+            print(
+                f"invalid lifecycle '{lifecycle}' for {path}:"
+                " expected active|deferred|retired",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        if lifecycle == "retired" and not entry.get("superseded_by"):
+            print(
+                f"lifecycle: retired without superseded_by for {path}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
     total = len(entries)
     shipped = sum(1 for _, e in entries.items() if e.get("status") == "shipped")
     planned = sum(1 for _, e in entries.items() if e.get("status") == "planned")
     retired = sum(
         1 for _, e in entries.items() if e.get("lifecycle") == "retired"
+    )
+    deferred = sum(
+        1 for _, e in entries.items() if e.get("lifecycle") == "deferred"
     )
 
     lines: list[str] = []
@@ -91,6 +118,8 @@ def render_index(manifest: dict) -> tuple[str, int]:
     )
     lines.append("")
     status_line = f"**Status:** {total} pages · {shipped} shipped · {planned} planned"
+    if deferred:
+        status_line += f" · {deferred} deferred (parked commitments)"
     if retired:
         status_line += (
             f" · {retired} retired (historical; superseded, not current direction)"
@@ -125,8 +154,11 @@ def render_index(manifest: dict) -> tuple[str, int]:
                 summary = entry.get("summary", "")
                 status = entry.get("status", "shipped")
                 tag = " *(planned)*" if status == "planned" else ""
-                if entry.get("lifecycle") == "retired":
+                lifecycle = entry.get("lifecycle")
+                if lifecycle == "retired":
                     tag = " *(retired — historical)*"
+                elif lifecycle == "deferred":
+                    tag = " *(deferred)*"
                 lines.append(f"- [[{link}|{title}]]{tag} — {summary}")
             lines.append("")
         lines.append("---")

@@ -1,5 +1,7 @@
 ---
-status: retired
+status: shipped
+lifecycle: retired
+superseded_by: backlog/complete/2026-05-29-081-raycast-command-disposition-and-removal.md
 topic: Form Factor
 subtopic: Hotkey Overlay
 aliases:

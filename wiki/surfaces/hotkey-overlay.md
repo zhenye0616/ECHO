@@ -1,5 +1,6 @@
 ---
 status: planned
+lifecycle: deferred
 topic: Form Factor
 subtopic: Hotkey Overlay
 aliases:

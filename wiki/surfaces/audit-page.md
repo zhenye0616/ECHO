@@ -1,5 +1,6 @@
 ---
 status: planned
+lifecycle: deferred
 topic: Architecture
 subtopic: Storage
 aliases:

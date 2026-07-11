@@ -768,6 +768,7 @@
   },
   "surfaces/audit-page.md": {
     "status": "planned",
+    "lifecycle": "deferred",
     "title": "Audit Page",
     "link": "audit-page",
     "summary": "Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.",
@@ -819,6 +820,7 @@
   },
   "surfaces/hotkey-overlay.md": {
     "status": "planned",
+    "lifecycle": "deferred",
     "title": "Hotkey Overlay",
     "link": "hotkey-overlay",
     "summary": "System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.",
@@ -830,7 +832,9 @@
     "subtopic": "Hotkey Overlay"
   },
   "surfaces/hotkey-overlay-raycast.md": {
-    "status": "retired",
+    "status": "shipped",
+    "lifecycle": "retired",
+    "superseded_by": "backlog/complete/2026-05-29-081-raycast-command-disposition-and-removal.md",
     "title": "Hotkey Overlay (Raycast v0, retired)",
     "link": "hotkey-overlay-raycast",
     "summary": "RETIRED 2026-05-31 (item 081). Historical record of the v0 hotkey overlay shipped as a Raycast extension at tools/raycast-echo/ — search-context (060), ask-echo Q&A (062), sessions-as-objects (063), cluster resume singleflight (065), cold-start continuity hero (069). Removed in full once the Tauri desktop overlay became the operator surface; decisions migrated there, echo/recap retired without replacement.",
