@@ -2,7 +2,7 @@
 
 ## Project Mission
 
-ECHO is the cross-platform context layer for AI-era knowledge work. The product makes every AI surface smarter by unifying context across the user's tools, lives invisibly via browser extension + MCP server + hotkey overlay, and never becomes a destination app.
+ECHO's current commercial product is the **Team decision product**: turn meetings and team activity into decisions, follow-through, and useful briefs. Its first saleable wedge is meeting→brief. The broader cross-tool context substrate and multi-agent coordination system remain internal technical assets; they are not parallel products until they prove a standalone customer problem.
 
 **Brand promise:** *"We don't make AI smarter. We make every AI smarter about you."*
 
@@ -10,12 +10,12 @@ ECHO is the cross-platform context layer for AI-era knowledge work. The product 
 
 This is both a **decision archive** (the wiki) and a **build coordination system** (the backlog + agent runs). Two important rules govern how the two halves stay honest:
 
-- **The product wiki (`wiki/`) is lagging documentation of shipped reality, not aspirational spec.** A page exists for X only after X has been built, reviewed, and merged. Until then, X's spec lives inside its backlog item: `backlog/proposed/<id>.md` while under spec-review, then `backlog/ready/<id>.md` once claimable.
+- **The product wiki (`wiki/`) is lagging documentation of shipped or ratified reality, including historical regimes, not aspirational spec.** A page exists for X only after X has been built/reviewed or the decision was ratified. Supersession metadata determines whether it is still current. Until build work is approved, its spec lives inside `backlog/proposed/<id>.md` while under review, then `backlog/ready/<id>.md` once claimable.
 - **Operating-model files** (this file, `docs/AGENT_INSTRUCTIONS.md`, `backlog/README.md`, `.claude/commands/process-backlog.md`) update *immediately* when the operating model changes. They have no shipping milestone and are not product decisions.
 
 ### When making strategic decisions
 
-1. **Search existing wiki + backlog first.** A shipped wiki page (`wiki/product/`, `wiki/principles/`, `wiki/architecture/`, `wiki/capture/`, `wiki/surfaces/`, etc.) or an in-flight backlog item often already captures the principle. Reuse before creating.
+1. **Search existing wiki + backlog first, then check supersession.** A shipped wiki page (`wiki/product/`, `wiki/principles/`, `wiki/architecture/`, `wiki/capture/`, `wiki/surfaces/`, etc.) or an in-flight backlog item often already captures the principle. Some wiki pages describe retired product regimes; their banners and the current commercial-focus decision override older body text.
 2. **Cite cross-project wisdom.** The `yc-wiki` (`~/Desktop/yc/yc-wiki/`) is the authoritative source for startup strategy frameworks. Reference its concept pages by `[[link]]` when applying them.
 3. **Capture new decisions as backlog items, not wiki pages.** The full spec — reasoning, alternatives considered, final call, acceptance criteria — starts inside `backlog/proposed/<id>.md`. The strategist does **not** write to `wiki/` at decision time. Wiki pages are written *after* the item lands in `backlog/complete/`, and only then.
 4. **Background reasoning** that doesn't correspond to an actionable build item lands in `raw/internal/decisions/`.
@@ -39,16 +39,16 @@ The wiki is restructured (2026-05-01) into eight folders that mirror the substra
 
 | Folder | Purpose | Examples |
 |---|---|---|
-| `product/` | Strategic "what" — locked V1 scope, target cohort, brand decisions | v1-spec, bundle-decision, target-cohort-indie-ai-builders |
-| `principles/` | Active commitments + disciplines (design, brand, scope) | felt-not-seen, compose-not-capture, drift-prevention |
+| `product/` | Strategic "what" — current and historical product, cohort, offer, and brand decisions | brand-promise; retired V1 pages are historical evidence |
+| `principles/` | Current and historical commitments + disciplines; check supersession banners | felt-not-seen, compose-not-capture, historical drift-prevention |
 | `architecture/` | The durable middle — substrate components + canonical models | system-architecture, capture-gate, storage, interface-layers |
 | `capture/` | Layer 1 capture surfaces (substrate's left edge) | fs-watcher, cursor-extractor, claude-code-extractor |
 | `capture/per-app/` | Field-level reference for each connected app | cursor-collected-data |
-| `surfaces/` | Layer 3 + Layer 5 — what users + AI clients touch | mcp-server, hotkey-overlay, audit-page, browser-extension |
+| `surfaces/` | What users, operators, and AI clients touch | mcp-server, echoctl-cli, terminal-intake-card, historical UI surfaces |
 | `research/` | Validation work | wedge-vs-thesis-validation, validation-experiments |
 | `operating-model/` | Process meta — wave retros, drift audits | wave-1-2-3-retrospective |
 
-Each page carries a `status: shipped | planned` frontmatter field. `shipped` documents reality that exists; `planned` is a V1 commitment specced but not yet built (today: hotkey-overlay, audit-page).
+The current schema's `status: shipped | planned` field describes delivery state, not whether a page is still strategically current. A supersession banner or `lifecycle: retired` field makes historical authority explicit. Never infer current product direction from `status: shipped` alone.
 
 ## Filename + Link Conventions
 
@@ -73,16 +73,18 @@ For external wiki references that don't exist locally as wikilinks, use markdown
 See [Aravind Srinivas on agentic search](/Users/zhenye/Desktop/yc/yc-wiki/sources/aravind-agentic-search.md).
 ```
 
-## V1 Scope Reminder (Tape Above Desk)
+## Current Commercial Focus (Tape Above Desk — 2026-07-11)
 
-- **Cohort:** Indie AI builders / dev founders
-- **Bundle:** Cursor + Claude Code + GitHub + Slack + web AI extension
-- **Form:** Browser extension + MCP server + hotkey overlay (no destination app)
-- **Pricing:** $25/mo
-- **Layers:** L1 (passive ingestion) + L3 (summoned, Q&A + assembly via clipboard+launch) + minimal L5 (audit)
-- **Cut from V1:** Email, Linear, Notion, meeting transcripts, Zoom, calendar — all V1.5+
-- **Cut layers:** L2 (ambient), L4 (conversational), all autonomous agent action — all V2+
-- **Definition of done:** killer demo works in founder's daily workflow with no hand-staging; ≥3/5 randomly-selected indie AI builders ask "when can I pay?"
+- **Product:** Team decision product. Machine context and Fleet coordination are internal assets, not current offers.
+- **First wedge:** meeting→brief. Pain and demand are founder-locked as proven; do not reopen product selection as a build gate.
+- **Goal:** carve the working experiment from the full ECHO lab, onboard a client, install a versioned package on the client's Mac, and run without the repo, founder's machine, or founder's personal CLI session.
+- **Onboarding:** assisted is acceptable in phase 1. After onboarding, the client's machine is that client's loop-of-record.
+- **Commercial posture:** sell aggressively while pricing, buyer/payment mechanics, and onboarding details are refined.
+- **Client package:** only meeting input/config, signal extraction + API-key brain, human gates, brief generation/delivery, local state/health, and upgrade/rollback/support/data instructions.
+- **Graduation:** `DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE`. The current candidate is formally DEV, with predecessor founder-regime evidence; a versioned, pinned, isolated candidate-package run is the next gate. Qualification permits client acceptance; only useful and repeat client use earns CLIENT LIVE.
+- **Keep out:** unrelated dev-tool capture, agent orchestration, autonomous action, and destination-app work unless the Team product directly requires them.
+- **Current halt:** no build specs or product-code work until the founder signs the clarity-halt lift. Customer outreach, offer design, and onboarding discovery continue; closure work must serve productization, not more demand discovery.
+- **Definition of done:** through assisted onboarding, the product is installed on the client's machine; the client then runs a real meeting, receives a useful brief, and repeats without the founder's machine participating.
 
 ## Naming
 
@@ -96,17 +98,17 @@ This repo coordinates three roles. **Multiple builder agents may run in parallel
 
 1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/proposed/<id>.md` items; does **not** write to `wiki/` until items ship; **may also review and prep merges** for items in `pending_review/` (see "Reviewer independence rule" below)
 2. **Builder agents (autonomous, parallelizable)** — claim items from `backlog/ready/`, work in isolated worktrees, move items through the pipeline; **never review or merge their own work**
-3. **Founder** — gives final approval at the two irreversible moments: (a) signing off on substantive conflict resolutions surfaced by reviewer, (b) `git push origin main`. Also handles review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
+3. **Founder** — gives final approval at the two irreversible repository-merge moments: (a) signing off on substantive conflict resolutions surfaced by reviewer, (b) `git push origin main`. A Team-product artifact release has a separate third approval bound to `source SHA + version + artifact SHA-256`; main-push approval never counts as release approval. The founder also handles review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
 
 ### Cross-tool protocol lives in `skills/` (not `.claude/commands/`)
 
-The slash-command skills that drive ECHO's multi-agent workflow — `process-backlog`, `process-backlog-batch`, `review-pending`, `merge-and-cleanup`, `review-queue-codex`, `review-queue-cursor`, `review-queue-codex-ops`, `review-queue-watch`, `promote-to-product` (the code-graduation gate: lab → `src/product/`, effective once the product carve ships — original 132/133 specs withdrawn 2026-07-10 for the clarity halt) — are **the cross-tool collaboration protocol**, not Claude-Code-specific helpers. They define the grammar by which multiple AI clients (Claude Code as strategist, Cursor's Claude as builder, Codex as headless reviewer, etc.) coordinate as peers.
+The slash-command skills that drive ECHO's multi-agent workflow — `process-backlog`, `process-backlog-batch`, `review-pending`, `merge-and-cleanup`, `review-queue-codex`, `review-queue-cursor`, `review-queue-codex-ops`, `review-queue-watch`, `promote-to-product` (the future four-stage Team qualification/release gate; not executable before G2 and the successor carve) — are **the cross-tool collaboration protocol**, not Claude-Code-specific helpers. They define the grammar by which multiple AI clients coordinate as peers.
 
 - **Canonical source of truth:** `skills/<name>.md` — vendor-neutral, ECHO-namespaced.
 - **Claude Code adapter:** `.claude/commands/<name>.md` — derived real-file copy, maintained by `tools/sync-skills.sh`. **Do not hand-edit `.claude/commands/<name>.md`**; the sync script overwrites it. Edit the canonical `skills/<name>.md` and re-run `tools/sync-skills.sh` (or `tools/sync-skills.sh --check` to verify identity post-edit).
 - **Future client adapters** (Cursor's Claude, Codex, web ChatGPT, etc.): add their own directories alongside `.claude/commands/`. The sync script will extend to copy to each adapter directory. For non-filesystem clients (OpenAI's GPT, web ChatGPT, etc.), a future MCP tool `echo_skill(name)` will return canonical content from `skills/` on demand.
 
-Why this matters: Anthropic structurally can't be vendor-neutral because they ARE a vendor. ECHO's wedge is hosting the *protocol* that lets Claude AND non-Claude tools work as peers. Putting the protocol under `.claude/` would perpetuate the "Claude owns the workflow" framing the wedge is designed to undo. See `raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md` for the full reasoning.
+Why this matters internally: the Fleet coordination system must stay vendor-neutral so Claude and non-Claude tools can build the Team product as peers. This is an operating-system property, not ECHO's current commercial wedge. See `raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md` for the original reasoning.
 
 ### Reviewer independence rule
 
@@ -131,7 +133,8 @@ backlog/proposed/  →  backlog/ready/  →  backlog/claimed/  →  backlog/pend
 
 After any strategic conversation that lands an actionable decision:
 
-1. **Create a `backlog/proposed/<id>.md` item** — full spec lives here until spec-review promotes it to `ready/`. Include an "After Completion (Strategist Notes)" section noting which wiki pages should be created/updated post-shipment.
+0. **Apply the current operating gate first.** While G2 is unsigned, record product decisions in the closure register or `raw/internal/decisions/`; create neither `proposed/` nor `ready/` product specs. Customer outreach and productization discovery may continue.
+1. **After G2, create a `backlog/proposed/<id>.md` item** — full spec lives here until spec-review promotes it to `ready/`. Include an "After Completion (Strategist Notes)" section noting which wiki pages should be created/updated post-shipment.
 2. **Do not hand-edit `docs/BACKLOG.md`.** It is generated from folder state by `tools/backlog_index.py`; regenerate it after merge when acting in strategist/post-shipment mode.
 3. **Do NOT touch `wiki/`.** Wiki edits happen only after items land in `complete/`.
 
@@ -139,7 +142,7 @@ When the founder reports items have moved to `complete/`, the strategist's *next
 
 ### Builder Agent Responsibilities
 
-When a builder agent runs:
+These steps are suspended for product work while G2 is unsigned. After the halt lifts, or for explicitly permitted non-product maintenance, a builder agent runs:
 
 1. **Pull `main`**, then **atomically claim** an item: a single commit on `main` that moves the file `ready/ → claimed/` and sets `claimed_by`, `claimed_at`, `branch` in frontmatter. Push immediately. If push is rejected, another agent won — pick the next ready item.
 2. **Create the worktree** at `~/Desktop/Project_echo--<slug>/` on a fresh `agent/<slug>` branch.
@@ -154,7 +157,7 @@ The agent operates across **two directories**: backlog state changes happen in t
 
 ### Dogfooding journal discipline (every AI client)
 
-**Every ECHO MCP call must be logged to the current month's per-actor shard at `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM-<actor>.md` in the moment** — current shard set: `raw/internal/dogfooding/mcp-interactions-journal-2026-07-{claude,codex,codex-ops,cursor}.md`. Actor slugs are lowercase binding identities matching `^[a-z][a-z0-9-]*$`: Claude Code / strategist / watcher use `claude`; Codex uses `codex`; codex-ops uses `codex-ops`; Cursor's Claude uses `cursor`. Do not append to the frozen pre-shard shared file (`raw/internal/dogfooding/mcp-interactions-journal-2026-06.md`) or the historical archive (`raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md`). This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool and cross-item; per-actor monthly shards are the canonical write targets, and `tools/dogfooding/journal-cat.sh YYYY-MM` is the canonical read target. It is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
+**Every ECHO MCP call must be logged to the current month's per-actor shard at `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM-<actor>.md` in the moment** — current shard set: `raw/internal/dogfooding/mcp-interactions-journal-2026-07-{claude,codex,codex-ops,cursor}.md`. Actor slugs are lowercase binding identities matching `^[a-z][a-z0-9-]*$`: Claude Code / strategist / watcher use `claude`; Codex uses `codex`; codex-ops uses `codex-ops`; Cursor's Claude uses `cursor`. Do not append to the frozen pre-shard shared file (`raw/internal/dogfooding/mcp-interactions-journal-2026-06.md`) or the historical archive (`raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md`). This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool and cross-item; per-actor monthly shards are the canonical write targets, and `tools/dogfooding/journal-cat.sh YYYY-MM` is the canonical read target. It informs Team-product productization and internal reliability work subject to the current gate; it does not independently reopen Machine/Fleet roadmaps. Aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
 
 **What counts:** any `mcp__echo__*` or `mcp__echo-memory__*` invocation — `get_recent_work_context`, `search_memories`, `echo_ping`, `memory_*`, etc. Log even 0-match / error responses; those are the highest-signal entries.
 

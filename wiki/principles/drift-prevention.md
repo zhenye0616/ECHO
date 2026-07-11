@@ -1,5 +1,7 @@
 ---
 status: shipped
+lifecycle: retired
+superseded_by: raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md
 topic: V1 Scope
 subtopic: Non-Goals
 aliases:
@@ -8,6 +10,8 @@ aliases:
 ---
 
 # Drift Prevention
+
+> **Superseded for product scope on 2026-07-11.** The general discipline of avoiding unapproved scope remains useful, but the locked Machine-context V1, five-tool bundle, layer bans, and indie-builder cohort below are historical. Current scope authority is the Team-product commercial-focus decision and the G2 clarity gate.
 
 ## Definition
 

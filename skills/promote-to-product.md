@@ -1,51 +1,121 @@
 ---
-description: Graduation gate for client-facing code — the checklist and mechanical steps for moving a validated capability from the dev/lab tree into src/product/, mirroring the loop's own propose→confirm discipline at the repo level. One capability per graduation; each graduation is its own small backlog item through the review queue.
+description: Four-stage qualification and release gate for Team-product code — DEV to FOUNDER LIVE to QUALIFIED to CLIENT LIVE. One capability per graduation, build once, controlled release matrix, exact-artifact client acceptance.
 ---
 
-# Promote to Product — the code graduation gate
+# Promote to Product — qualify and release the Team wedge
 
-`src/product/` is the repo's ratified ledger: code there is client-facing, ships in the deploy tarball's active surface, and is protected by the product boundary fence. Everything outside it is the lab — valuable, live-tested by the founder's own loop, but *candidate*, not ratified. This skill is the confirm-leg between the two, applying the same philosophy as the decision loop's stage 3 (nothing enters the record unratified) to the codebase itself.
+Canonical decision: `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`.
 
-**Effective once the product carve ships** (the fence, composition roots, and closure tests this gate relies on). The original carve specs (items 132/133, 2026-07-10) were review-converged then WITHDRAWN by the founder the same day in favor of a full dev halt until the fresh-machine unknowns map reaches max clarity; the carve will be re-specced post-halt, inheriting the register's standing decisions (naming = `product`, kernel/fence boundary, retrieval-less brain mode, tarball deploys). Until then this file is the spec of the mechanism, not an executable protocol.
+This skill governs the only path from ECHO's lab into the client-facing Team product:
 
-## The two levers (do not conflate them)
+> **DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE**
 
-1. **Repo graduation (this skill):** code moves under `src/product/` — it becomes part of the product's trusted surface, subject to the fence, shipped active in the tarball.
-2. **Deployment enablement (config, not code):** what actually runs on a given box is decided by credentials/config — the client profile (e.g. Granola-only) keeps graduated-but-founder-side capabilities (intake bridge, decision responder) fail-closed OFF. Graduating code does NOT auto-enable it for clients.
+It is **not executable yet**. `src/product/`, `tests/product/`, the product composition root, runtime isolation, and the qualification runner do not exist. The original 132/133 carve specs were withdrawn, and G2 still blocks product specs/code. Until the founder signs G2 and the successor carve lands, this file is the operating contract for the future mechanism.
 
-A capability rolls out in that order: lab → graduated (founder profile exercises it on the box) → client-enabled (config flips for a client deployment). Rollback at each level is the inverse lever: config off, or `git mv` back out.
+## Vocabulary — do not overload promotion
 
-## Graduation criteria — ALL must hold
+- **Advance a spec:** `proposed/ -> ready/` through the review watcher.
+- **Document shipped work:** update the wiki after merge.
+- **Qualify code:** move one live-proven capability into the product boundary and pass the release matrix.
+- **Release/accept:** install the exact qualified artifact on a client machine, then close acceptance through real and repeat use.
 
-1. **Validated in anger.** The capability ran in the founder's live loop (real meetings, real decisions — not fixtures) enough times that its failure modes are known and written down. Cite the evidence (journal entries, agent-run logs, live-fire notes) in the graduation item.
-2. **Fence-clean.** With the files moved, the product import-closure test passes: imports only kernel dirs + product + declared deps; nothing from `capture/extractors/`, `mcp/`, `coord/`, `trace/`, `reasoning/`, `daemon/index.ts`.
-3. **Fail-closed without config.** Absent credentials/env, the capability is silently OFF (the intake-bridge pattern) — a client profile can never accidentally run it. Fail-closed behavior has a test.
-4. **Fail-honest at the contract edge.** Stage-contract invariants hold: never fabricate from empty input; failures are self-explaining (name the missing manual step or credential, per the 131/target-miss discipline). Vendor quirks are handled at the binding edge, never leaked into stage contracts or typed artifacts.
-5. **Typed artifacts only between stages.** Anything the capability passes to or receives from another stage is a versioned typed object (the canonical brief JSON pattern); no vendor nouns in the core types.
-6. **Persisted-semantics reviewed.** Any new `derived:*` source string, dedupe_key format, or sidecar file is added to the product source allowlist / sidecar classification (instance-local vs loop-state) in the same item — no unregistered persistence.
-7. **Tests graduate with the code**, hermetic (no live creds/network/wall-clock), mirrored under `tests/product/`.
-8. **Packaging is deliberate.** Packed-manifest snapshot updated; packaged-boot still resolves the CLI surface; the manifest diff is quoted in the item's notes.
-9. **Register swept.** Check `raw/internal/decisions/2026-07-10-product-carve-unknowns-register.md` (and successors): does this graduation touch an open unknown (A2 cold-db, A3 brain binding, T-series)? If yes, the item must say how — or why it can proceed anyway.
+Moving code under `src/product/` makes it a **qualification candidate**, not automatically client-live. Packaging it, merging it, or demonstrating it on the founder's Mac also does not release it.
 
-## Mechanical steps (per graduation)
+## Four stages
 
-1. **Spec a small backlog item** (`backlog/proposed/`, normal queue review): what moves (exact `git mv` list, old→new paths), the evidence for criterion 1, and the criteria-9 sweep. Graduations are deliberately small — one capability, one item, one reviewable diff. Never batch unrelated capabilities.
-2. Builder executes: `git mv` + import rewrites + composition-root wiring (product daemon/CLI if the capability gains an entry point) + fence/lint updates + test move + packaging update. Pure-move discipline where possible; behavior changes belong in a prior lab item, not the graduation diff.
-3. Review verifies the criteria (the fence closure test and fail-closed test are the mechanical teeth; criterion 1's evidence is the judgment call).
-4. Post-merge: version-bump, `npm pack`, deploy the new tarball to the box (deploy protocol: tagged tarballs only, no git on the box, rollback = previous tarball). The founder profile exercises the graduated capability live before any client profile enables it.
-
-## De-graduation (rollback)
-
-If a graduated capability proves not-ready: config-off first (instant, per-deployment). If the code itself must leave the product surface, reverse the `git mv` in a small item with the same review path. The fence makes both directions mechanical.
-
-## Current stage map (2026-07-10 baseline)
-
-Per the canonical five-stage loop (`raw/internal/decisions/2026-07-09-decision-loop-canonical-model.md`):
-
-| Stage | Capability | Status |
+| Stage | Meaning | Gate evidence |
 |---|---|---|
-| 1 Extract | Granola binding → poller/signals/brief | graduates in the founding carve (re-spec pending post-halt) |
-| 2 Triage | reconcile-vs-ledger classifier | lab — missing its core (zero-retrieval today); farthest from graduation |
-| 3 Validate | propose→confirm gate (station 4) | code graduates with the carve; founder-side profile only (Slack-bound) |
-| 4 Dispatch | Linear issue creation w/ provenance | code graduates with the carve; founder-side profile only |
-| 5 Backflow | done-vs-decided composition | lab/concierge — pre-meeting brief + polish-capture status atoms are its path in |
+| DEV | Lab code in a branch/worktree, scratch state, fixtures, behavior still changing | Typed contract, focused hermetic tests, review-ready change, live-test plan |
+| FOUNDER LIVE | Versioned candidate package built from a pinned SHA runs in an isolated founder-live environment on real meetings | Predeclared run count/regime, verdicts, failure inventory, recovery evidence |
+| QUALIFIED | Product-boundary change and build-once artifact pass every required release-matrix cell | Matrix report, independent review, manifest, source SHA, artifact checksum, exact-artifact staging smoke |
+| CLIENT LIVE | The same QUALIFIED bytes run on the client's Mac with client-local state/credentials | Assisted-install record, healthy client runtime, real meeting, useful brief, repeat use, rollback/support proof |
+
+Operating mode (`automated | concierge`), repo state (`merged | packaged`), lifecycle (`active | deferred | retired`), and evidence grade are separate attributes. Do not use them as substitutes for the four-stage maturity axis.
+
+## Separation invariants
+
+1. Dev, founder-live, qualification, and client-live use distinct home, db, port, launchd label, logs, credentials, and checkpoints.
+2. Dev may boot the lab. QUALIFIED and CLIENT LIVE boot only the Team composition root and explicit dependencies.
+3. `customer | dogfood` remains the legacy install-audience profile. It does not select runtime workers and cannot represent product isolation.
+4. Qualification builds once. Every check, release, and client install uses the exact artifact identified by SHA-256.
+5. FOUNDER LIVE, QUALIFIED, and CLIENT LIVE use versioned packages and never require a repo checkout. CLIENT LIVE never requires founder-machine state, founder CLI auth, or founder credentials.
+6. Evidence advances; mutable live data never enters the artifact.
+7. No demo, test, or deadline skips a stage.
+
+## DEV -> FOUNDER LIVE gate
+
+Before live data is touched, the candidate must have:
+
+- a versioned candidate package built from a pinned SHA;
+- an isolated founder-live configuration that cannot read/write dev or client state;
+- a predeclared live-test plan and output rubric;
+- a rollback/disable command;
+- focused tests and no known state-corruption risk.
+
+A checkout or uncommitted working-tree code running against live state does not count as FOUNDER LIVE evidence.
+
+## FOUNDER LIVE -> QUALIFIED gate
+
+One capability graduates at a time. The founder-live record must cite real workflows, output verdicts, observed failures, and recovery. The post-G2 graduation proposal then verifies:
+
+1. **Boundary-clean.** The capability imports only approved product/kernel dependencies; no lab daemon, dev extractors, MCP/Fleet orchestration, trace/reasoning surface, or founder path.
+2. **Fail-closed.** Missing configuration cannot accidentally run or act.
+3. **Fail-honest.** Empty input, expired auth, vendor errors, and missing manual steps are explicit and bounded.
+4. **Typed/versioned contracts.** No vendor nouns leak into core stage artifacts.
+5. **Persisted semantics registered.** Sources, identities, sidecars, migrations, backup, and rollback are classified.
+6. **Hermetic product tests.** Tests move under `tests/product/`; no live credentials, network, founder db, or wall clock.
+7. **Packaging deliberate.** Product manifest, import closure, entry point, and active worker list are pinned.
+8. **Unknowns swept.** Relevant A/B/T/C/X closure rows are resolved or explicitly accepted/deferred by the governing decision.
+9. **Behavior already stable.** Graduation is primarily a move/wiring change; behavior changes happen and return to FOUNDER LIVE before qualification.
+
+## Release qualification matrix — every required row green
+
+- product source/import fence;
+- product-only composition root and active-worker allowlist;
+- hermetic `tests/product/` plus packaged meeting-to-brief end-to-end fixture;
+- client-scoped API-key auth and bounded failure behavior;
+- declared macOS version/architecture/Node runtime matrix;
+- clean no-repo install plus the real launchd start, doctor, restart, and uninstall path;
+- cold/fresh db plus populated-db migration and sidecar classification;
+- upgrade from and rollback to the previous qualified artifact without client-state loss;
+- product-only package manifest, runtime import closure, and reproducible dependency lock/SBOM;
+- secret/content/dependency/data-contract checks;
+- health, recovery, alert/support ownership;
+- reviewed-main ancestry, FOUNDER LIVE evidence, aggregate required check, zero unexpected skips, monotonic version/changelog, build-once SHA-256, authenticated distribution channel, and founder release authorization.
+
+This matrix is not a score. A red or missing cell blocks release. Source boundary, product tests, product-only boot, runtime isolation, wedge behavior, auth/failure honesty, at least one declared platform/runtime cell, clean install, fresh/populated state, packaging, security/data, operations, provenance/authority, and distribution can never be `not-applicable`.
+
+For the first release only, upgrade-from-a-previous-qualified-artifact may be `not-applicable`; backup, state preservation, disable/uninstall recovery, and healthy restoration remain required. Any later `not-applicable` result must be allowed by the versioned matrix schema and approved with rationale by both the founder and independent release reviewer.
+
+## Mechanical flow after G2
+
+1. Stabilize behavior in DEV through an ordinary reviewed lab item.
+2. Build a versioned candidate package from the pinned SHA, run it in the isolated FOUNDER LIVE lane, and commit the redacted evidence record.
+3. Create one `backlog/proposed/` graduation item naming the exact move, boundary, live evidence, matrix rows, and rollback.
+4. Builder moves/wires the capability into `src/product/`, moves/adds hermetic tests under `tests/product/`, and updates the product manifest/composition root. No unrelated capabilities or behavior changes.
+5. After reviewed code reaches `main`, CI builds the package once, runs every machine-executable matrix cell against those bytes, and emits an immutable qualification report plus checksum. Human-review and release-authorization cells remain explicitly pending.
+6. An independent release reviewer verifies the report and completes the evidence-review cells, and the exact artifact passes founder staging. Seal a fully green QUALIFIED release record only after a separate founder authorization bound to `source SHA + version + artifact SHA-256`; enforce it through the protected tag/release mechanism. Approval to push `main` is not release approval.
+7. Assisted onboarding installs the same artifact on the client Mac, verifies its checksum, and enables only the client runtime. Its maturity remains QUALIFIED while acceptance is pending.
+8. Append client acceptance evidence for health, a real meeting, a useful brief, repeat use, and recovery/rollback ownership. Mark CLIENT LIVE only when all are present.
+
+The three records are separate: CI qualification report, sealed QUALIFIED release record, and append-only client acceptance record. Store only configuration schema/version, nonsecret values, redacted secret references, enabled composition root, and a canonical configuration hash; never store credentials or raw meeting content.
+
+## Rollback and de-graduation
+
+- **FOUNDER LIVE:** disable the candidate and restore the prior pinned founder-live version.
+- **QUALIFIED:** a red matrix blocks release; nothing reaches a client.
+- **CLIENT LIVE:** config-off or reinstall the previous qualified artifact first, preserving client-local data under the written rollback contract.
+- **Repo de-graduation:** if code must leave `src/product/`, reverse the move in a separate reviewed item. Do not make a client incident wait on that code move.
+
+## Current wedge state (2026-07-11)
+
+| Capability | Maturity | Honest status |
+|---|---|---|
+| Granola meeting -> signal -> brief core | DEV; predecessor has founder-regime evidence | Current candidate package has not completed a versioned, pinned, isolated run; full-lab/CLI-auth regime is not the founder-live lane |
+| Client API-key brain | No candidate | Direction decided; meeting extraction binding unbuilt |
+| Client meeting/delivery adapters | No candidate | Zoom/Mattermost access and code absent |
+| Product boundary/composition root | No candidate | `src/product/` absent; successor carve waits for G2 |
+| Release qualification mechanism | No candidate | Contract defined; runner/reports and product-only gates unbuilt |
+| Client installation | No candidate | Generic package install evidence is diagnostic, not CLIENT LIVE evidence |
+
+`No candidate` is not a fifth maturity stage. It means there is nothing to place on the four-stage axis yet.

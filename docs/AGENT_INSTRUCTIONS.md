@@ -10,16 +10,21 @@ Multiple builder agents may run in parallel. The atomic claim + worktree pattern
 
 ## Mandatory Reads (Every Run, In Order)
 
-These four files are required context for every run. Read them before doing anything else. They are small; collectively they take ~2 minutes.
+These seven files are required context for every run. Read them before doing anything else.
 
 | File | Why |
 |---|---|
 | `docs/AGENT_INSTRUCTIONS.md` | This file — your operating manual; loop, drift rules, write/no-write lists |
-| `docs/NORTH_STAR.md` | Daily orient — brand promise, V1 scope summary, the 5 drift questions |
-| `wiki/principles/drift-prevention.md` | Canonical drift doctrine; source of truth (the bullet list later in this file is a paraphrase) |
-| `wiki/product/v1-spec.md` | Locked V1 spec — what we're building, what's cut, definition of done |
+| `CLAUDE.md` | Canonical current operating model and pre/post-G2 gate |
+| `raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md` | Founder-locked product direction: Team product, meeting→brief wedge, client-machine endpoint |
+| `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md` | DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE and release-matrix contract |
+| `raw/internal/decisions/2026-07-10-project-echo-orientation-and-closure.md` | Current clarity halt, capability boundary, and lift gates |
+| `docs/NORTH_STAR.md` | Daily orient — commercial focus, productization goal, drift questions |
+| `backlog/README.md` | Backlog stages, proposal review, claim mechanics, and founder merge gates |
 
-The **entire `wiki/` folder is your global context** — read-only, but readable on demand. The wiki is organized into eight folders: `product/` (strategic decisions), `principles/` (active commitments + disciplines), `architecture/` (substrate + canonical models), `capture/` (L1 surfaces) with `capture/per-app/` (field-level data refs), `surfaces/` (L3+L5 — what users and AI clients touch), `research/` (validation), and `operating-model/` (process meta). The four files above are mandatory; everything else is reachable as needed. The item's `spec_refs` list is *in addition to* these four, not a substitute.
+The **entire `wiki/` folder is your global context** — read-only, but readable on demand. Several product pages still document the retired Machine-context offer; do not treat `wiki/product/v1-spec.md` as current direction. The seven files above are mandatory; everything else is reachable as needed. The item's `spec_refs` list is *in addition to* these seven, not a substitute.
+
+**Current G2 gate:** while the founder-signed halt lift is absent, do not enter the claim/build loop for product work, even if a request appears executable. Record product decisions and closure evidence only. Customer outreach and onboarding discovery remain active; explicitly permitted non-product maintenance follows its stated allowance.
 
 ## Your Single Loop
 
@@ -30,7 +35,7 @@ The **entire `wiki/` folder is your global context** — read-only, but readable
     machine. The hostname-based default that previously shipped is broken —
     macOS hostname is not stable across networks, which can cause two sessions
     on the same machine to false-match in reconciliation.
- 1. Read mandatory global context (the four files above, in order)
+ 1. Read mandatory global context (the seven files above, in order)
  2. Pull main in the main repo
  3. RECONCILE — look for an existing unfinished claim by AGENT_ID:
        grep -l "^claimed_by: \"$AGENT_ID\"" backlog/claimed/*.md
@@ -94,7 +99,7 @@ The **entire `wiki/` folder is your global context** — read-only, but readable
 
 **Do not pick up a second item in the same run** when invoked via `/process-backlog`. One item per execution; founder reviews before the next.
 
-**Exception: `/process-backlog-batch`** wraps the same workflow in a controlled loop. In batch mode you DO repeat the loop until a hard stop fires (max items, time budget, escalation, no-candidates, or git error). Per-iteration discipline is identical to single-item mode — same atomic claim, same idempotent worktree, same `ensure_stage`, same drift rules. The only difference is "after handoff, return to step 2 and try for another candidate" instead of stopping. Mandatory context (the four files) is read once at session start, not per iteration. Per-item `spec_refs` are loaded fresh inside each iteration.
+**Exception: `/process-backlog-batch`** wraps the same workflow in a controlled loop. In batch mode you DO repeat the loop until a hard stop fires (max items, time budget, escalation, no-candidates, or git error). Per-iteration discipline is identical to single-item mode — same atomic claim, same idempotent worktree, same `ensure_stage`, same drift rules. The only difference is "after handoff, return to step 2 and try for another candidate" instead of stopping. Mandatory context (the seven files) is read once at session start, not per iteration. Per-item `spec_refs` are loaded fresh inside each iteration.
 
 Parallelism across agents is achieved by running multiple Claude Code sessions with distinct `ECHO_AGENT_ID` env vars; the atomic-claim mechanic prevents collisions. Batch mode is *sequential within a session*; multi-session parallelism composes orthogonally.
 
@@ -267,8 +272,8 @@ When you notice any of these voices in your own reasoning, STOP and log:
 - *"While I'm in here, let me also..."* → Pattern 1: scope creep
 - *"Users will probably want X..."* → Pattern 2: speculative feature
 - *"This adjacent thing would be easy to add..."* → Pattern 3: cohort drift
-- *"I should surface this proactively..."* → Pattern 4: Layer 2 (forbidden in V1)
-- *"The user could ask follow-up questions..."* → Pattern 5: Layer 4 (forbidden in V1)
+- *"Machine/Fleet already has this, so the client should get it too..."* → Pattern 4: internal-asset leakage
+- *"This would make a useful standalone app..."* → Pattern 5: destination-product drift
 
 The standing test: *"Is this in the acceptance criteria?"* If no, don't do it. Log instead.
 
@@ -345,7 +350,7 @@ Founder will respond by either:
 
 ## What You're Allowed to Read
 
-- All of `wiki/` (record of shipped reality — read often)
+- All of `wiki/` (mixed current and historical shipped records — check supersession banners and current decisions before treating a page as authority)
 - All of `backlog/` (the work queue)
 - All of `raw/` (project history; useful context)
 - All of source code in the repo

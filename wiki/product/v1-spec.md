@@ -1,5 +1,7 @@
 ---
 status: shipped
+lifecycle: retired
+superseded_by: raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md
 topic: V1 Scope
 subtopic: Bundle Decision
 aliases:
@@ -7,9 +9,11 @@ aliases:
   - V1 Scope
 ---
 
-# V1 Spec (Locked)
+# Historical V1 Spec (Superseded)
 
-**Status:** Locked 2026-04-30. Treat as source of truth; everything else gets deferred.
+> **Superseded 2026-07-11.** This page is a historical record of the retired Machine-context offer, not current product direction. The founder-locked commercial product is the Team decision product, starting with the meeting→brief wedge and a client-machine carve. Current source: `raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md`.
+
+**Historical status:** Locked 2026-04-30; superseded 2026-07-11.
 
 ## Mission / Brand Promise
 

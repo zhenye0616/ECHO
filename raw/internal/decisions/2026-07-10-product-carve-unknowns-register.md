@@ -1,6 +1,8 @@
 # Product carve-out unknowns register (2026-07-10)
 
-Strategist-compiled register of unknowns surrounding the `src/product/` carve (items 132/133) and the phased wedge rollout. Requested by founder ("list all the unknowns that i am not aware and the unknowns that i might be aware but not specify"), folded into the specs by reference per founder instruction. Items marked **[gates 132 promotion]** or **[folded into spec text]** are live spec constraints; the rest are pre-pilot decisions or standing risks that must NOT silently vanish.
+**Current status (2026-07-11):** read Part 5 first. The Team product and meeting→brief wedge are locked, demand is considered proven, and the client machine supersedes the founder-controlled box as the commercial endpoint. Parts 1-4 preserve the reasoning around the withdrawn 132/133 specs; their old promotion labels and pilot language are historical, not current instructions.
+
+Strategist-compiled register of unknowns surrounding the `src/product/` carve (withdrawn items 132/133) and phased rollout. Requested by founder ("list all the unknowns that i am not aware and the unknowns that i might be aware but not specify"). Remaining productization risks must not silently vanish, but Part 5 governs their current disposition.
 
 ## A. Unknowns the founder was likely not aware of
 
@@ -32,7 +34,7 @@ Pre-freeze demo work keeps mutating exactly the files 132 moves. Every merge bet
 - **B3 — Credentials custody.** Whose Granola/Slack/Linear credentials run the pilot — customer's handed over, or founder's pointed at their workspace? The plist-wipe failure mode lives here; most fragile part of concierge setup.
 - **B4 — Windows.** First beta tester is on Windows; product daemon inherits macOS assumptions. Is the wedge rollout macOS-only for now? Silently decides who can be customer #2/#3.
 - **B5 — Pricing + name.** $25/mo was priced for the dev-bundle persona; the meeting→decision loop sells to a lab PI / team lead. The ECHO hard-rename deadline now implicitly covers a module name customers will see.
-- **B6 — Definition of done for phase 1.** V1 had "≥3/5 ask when can I pay?". The wedge rollout has no equivalent; recap-pilot decision requires burned-buyer + WTP screens before adapter build. Left unspecified, the carve becomes the goal instead of the customer.
+- **B6 — Definition of done for phase 1.** V1 had "≥3/5 ask when can I pay?". **Updated by Part 5:** pain/demand and product choice are closed; phase-1 done now means an onboarded client installs, runs a real meeting, receives a useful brief, and repeats on their machine without the founder's machine.
 
 ## Disposition
 
@@ -51,7 +53,7 @@ Pre-freeze demo work keeps mutating exactly the files 132 moves. Every merge bet
 
 ## Part 2 addenda — client scope pin + deployment topology (founder session, 2026-07-10 afternoon)
 
-- **Client-facing scope PINNED: meeting→brief loop only.** No dev-tool capture surfaces (claude/codex/cursor extractors) and no client-side Slack/Linear legs for now. Implementation: NOT a code change — the intake bridge is off-by-default/fail-closed and the responder is credential-gated, so a Granola-only config yields exactly poller→signals→brief. "Client profile" = product daemon + Granola key, nothing else enabled. Intake/decision legs remain founder-side product inside src/product/.
+- **Client-facing scope PINNED: meeting→brief loop only.** No dev-tool capture surfaces (claude/codex/cursor extractors) and no client-side Slack/Linear legs for now. Historical implementation assumption: the intake bridge is off-by-default/fail-closed and the responder is credential-gated, so a Granola-only config yields poller→signals→brief. Part 5 plus the graduation decision replace the overloaded "client profile" term with an isolated client runtime: product composition root + explicit dependencies only.
 - **Deploy shape RESOLVED (T4): tagged tarballs, never a git checkout on the box.** npm pack → versioned echoctl tgz → install + restart; rollback = previous tarball; data (db, ECHO_HOME state) untouched by redeploys; no hot-fixes on the box, all fixes flow monorepo→pack→deploy. Repo separation REJECTED (kernel dual-maintenance + loss of orchestration-loop leverage); org repo stays the phase-2 clean-split target; optional one-way filtered mirror only if a pilot asks for source.
 - **Product brain binding via Anthropic API key — new high-leverage item (resolves A3 + day-one killer #1).** Extraction currently spawns founder-logged-in claude/codex CLIs; client machines must not need them. @anthropic-ai/claude-agent-sdk already a dependency. Minimal client deployment becomes: node + tarball + GRANOLA_API_KEY + ANTHROPIC_API_KEY + launchd unit. Founder's own box can keep CLI auth short-term.
 - **Must-verifies before box day:** (1) first-run backfill bound — is signals extraction cutoff-bounded like intake (item 128) or does a fresh box brain-blast the entire Granola history? (2) brain behavior when auth expires unattended (headless child hang vs fail-loud).
@@ -65,7 +67,7 @@ Full audit: [2026-07-10-client-machine-trap-map.md](./2026-07-10-client-machine-
 
 Items **2026-07-10-132-product-module-carve-out** and **2026-07-10-133-product-ports-extraction** — both review-converged (r3 proceed/proceed, zero findings) — are WITHDRAWN and deleted from the working tree at founder instruction; the numbers 132/133 are freed for reuse. Full text and review arcs remain recoverable in git history (specs landed 95a6b581; convergence at 18f72f89/71647084).
 
-**Phase declaration: FULL HALT ON DEV until the unknowns map is filled with max clarity.** No new build specs, no carve, no box until the founder judges the map complete. What survives the withdrawal as standing decisions (they were made in conversation and recorded here, independent of the spec files): the `product` name and lab/product boundary concept; shared single-schema db with source-filtered instances; retrieval-less product brain mode (A1); dedicated founder-run Mac box (B2); founder accounts in client workspaces (B3); macOS-only phase 1 (B4); tarball deploys, no repo on the box (T4); org repo reserved for phase-2 clean split; client scope = meeting→brief only; promote-to-product graduation mechanism (skill retained, dormant).
+**Phase declaration: FULL HALT ON DEV until the unknowns map is filled with max clarity.** No new build specs or carve until the founder judges the map complete. Standing decisions at this point included the `product` boundary, shared schema, retrieval-less mode (A1), founder-run box (historical B2), founder-assisted workspace access (B3), macOS phase 1 (B4), packaged deploy/no repo checkout (T4), meeting→brief scope, and promote-to-product mechanism. **Part 5 supersedes B2 as the commercial endpoint:** client machine after assisted onboarding; founder box only demo/staging.
 
 **The map-filling agenda (what "max clarity" must close):**
 - Trap-map must-verifies: first-run backfill bound behavior (confirmed absent — needs a decision, currently the top unmitigated trap), brain-auth expiry behavior unattended.
@@ -75,3 +77,14 @@ Items **2026-07-10-132-product-module-carve-out** and **2026-07-10-133-product-p
 - B1 rollout calendar (lab expectations); B5 pricing + customer-visible name; B6 phase-1 definition of done.
 - T-series residue: T1 product source allowlist, T2 sidecar classification, T5 remote-write path, T7 cross-instance row identity, T8 embeddings-on-prod, T9 backup rule, T10 migration ordering, T11 Granola quota check.
 - Trap map §3 classes 8/9 client-reality checks: lab's Granola transcript settings, meeting language/length distribution, internal-vs-external meeting mix.
+
+## Part 5 — commercial focus and client-machine endpoint (founder, 2026-07-11)
+
+Canonical decision: `2026-07-11-commercial-focus-team-product-carve.md`.
+
+- **Product choice is closed.** ECHO is going all in on the Team decision product; meeting→brief is the first saleable wedge. Pain and demand are considered proven. Burned-buyer/WTP work may refine price, buyer, and offer, but no longer gates the carve or adapters.
+- **Machine and Fleet are internal assets.** Cross-tool context and agent orchestration remain useful implementation/operating leverage, but neither is a current commercial roadmap or a validated standalone customer problem.
+- **B2 is SUPERSEDED as the commercial endpoint.** A founder-controlled Mac may remain demo/staging, but after assisted onboarding the product is installed and used on the client's machine. That client machine is the client's loop-of-record and must not depend on the founder's machine or personal CLI session.
+- **T4 survives with a new destination.** Deliver a versioned package; never put a repo checkout on the client machine. Install, upgrade, and rollback operate on the package while client data/state remain local.
+- **Graduation is four-stage.** `DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE`. The current meeting→brief candidate is DEV, with useful `E3` evidence from its predecessor; a versioned, pinned, isolated founder run is the next gate. A product-boundary candidate must pass the release qualification matrix, and the exact build-once checksum is what enters client acceptance. Canonical contract: `2026-07-11-team-product-graduation-pipeline.md`.
+- **Halt scope narrows to productization clarity.** Remaining work closes carve, onboarding, install, client operation, data/support, and sales-execution questions. It must not reopen whether the Team product is worth pursuing absent an explicit founder reversal.

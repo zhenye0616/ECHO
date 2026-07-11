@@ -6,7 +6,7 @@ Kanban-style work coordination across strategic conversations, one or more auton
 
 1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/proposed/` items. Does **not** write to `wiki/` until an item is shipped. **May also review and prep merges** for items in `pending_review/` — see the Reviewer Independence Rule below.
 2. **Builder agent (autonomous, parallelizable)** — claims items from `backlog/ready/`, works in an isolated git worktree, moves items through the pipeline. Multiple agents may run in parallel. **Never reviews or merges its own work** (and never merges any work — see `docs/AGENT_INSTRUCTIONS.md`).
-3. **Founder** — gives final approval at the two irreversible moments: (a) substantive conflict-resolution sign-off, (b) `git push origin main`. Also handles end-to-end review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
+3. **Founder** — gives final approval at the two irreversible repository-merge moments: (a) substantive conflict-resolution sign-off, (b) `git push origin main`. A Team-product artifact release has a separate checksum-bound approval under `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`; main-push approval never counts as release approval. The founder also handles end-to-end review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
 
 ### Reviewer Independence Rule
 
