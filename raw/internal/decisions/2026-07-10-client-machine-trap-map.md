@@ -83,3 +83,7 @@ Documented manual steps a client (or the box, unattended) would not know: the vi
 3. **`--wait` flag** (already prescribed by the stress-test follow-ups; §8 latency).
 4. **Client onboarding doc** distilled from §8/§10: workspace habit, key coverage test poll, internalDomains config, transcript requirement.
 5. Box checklist inherits: local-disk db (§3 WAL), TZ set to meeting-owner TZ (§11), plaintext-key handling (§2).
+
+## 13. Third-party PII & recording consent (class added 2026-07-11 per docs/committed-content-policy.md)
+
+Meeting transcripts are recordings of identifiable people, captured under a platform's consent regime, not the repo's. Any artifact derived from a real meeting — transcript, brief, extracted signal, test fixture built from one — inherits that consent scope. Traps: committing identifying derivatives to the public tree (see the enumerated 2026-07-11 redactions); ingesting meetings whose participants never consented to ECHO processing (university IRB may apply); no selective-delete path if a participant revokes (append-only store, whole-store removal only). Demanded follow-ups: consent line in the client agreement, the deletion-drill/offboarding runbook, and the committed-content policy's client-participant naming rule applied to every future artifact.
