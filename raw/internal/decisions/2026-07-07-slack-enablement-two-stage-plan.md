@@ -1,5 +1,7 @@
 # Slack enablement: two-stage plan (founder-agreed 2026-07-06, unexecuted)
 
+> **SUPERSEDED / DEFERRED (2026-07-11).** Stage B targets the retired Justinian workspace regime (customer cancelled 2026-07-09; current commercial target is Zoom + self-hosted Mattermost). Stage A's structural-isolation shape survives as prior art for the YC demo scenes 2–3 decision (`2026-07-11-yc-demo-plan-amendment-template.md`, Option A). Slack enablement for a real client returns only through post-G2 scope if the Team product requires it.
+
 Context: 65+ intake cards validated in the terminal store; Slack posting is the
 built-but-disabled next step. The backfill deck contains sensitive negotiation
 content (advisor equity/IP cards, bottom-line numbers; name redacted 2026-07-11) and the COUNTERPARTY OF
