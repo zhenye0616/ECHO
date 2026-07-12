@@ -1,6 +1,6 @@
 # Phase 2 halt-closure inventory
 
-**Baseline:** `f77ba415` plus Phase 2 security evidence through `8e0e591f`
+**Baseline:** `f77ba415` plus Phase 2 security evidence through `10c578fd`
 **Canonical register:** `2026-07-10-project-echo-orientation-and-closure.md`
 **Current tally:** 27 rows total; 1 resolved; 26 pending
 **Readiness:** preparing founder decision session; G1 and G2 remain open
