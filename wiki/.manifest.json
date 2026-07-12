@@ -769,6 +769,8 @@
   "surfaces/audit-page.md": {
     "status": "planned",
     "lifecycle": "deferred",
+    "deferred_owner": "founder",
+    "deferred_trigger": "explicit founder decision reopening a Machine-context surface roadmap (reversal of the 2026-07-11 commercial-focus decision)",
     "title": "Audit Page",
     "link": "audit-page",
     "summary": "Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.",
@@ -821,6 +823,8 @@
   "surfaces/hotkey-overlay.md": {
     "status": "planned",
     "lifecycle": "deferred",
+    "deferred_owner": "founder",
+    "deferred_trigger": "explicit founder decision reopening a Machine-context surface roadmap (reversal of the 2026-07-11 commercial-focus decision)",
     "title": "Hotkey Overlay",
     "link": "hotkey-overlay",
     "summary": "System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.",

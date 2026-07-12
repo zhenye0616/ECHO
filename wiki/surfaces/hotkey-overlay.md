@@ -1,6 +1,8 @@
 ---
 status: planned
 lifecycle: deferred
+deferred_owner: founder
+deferred_trigger: explicit founder decision reopening a Machine-context surface roadmap (reversal of the 2026-07-11 commercial-focus decision)
 topic: Form Factor
 subtopic: Hotkey Overlay
 aliases:

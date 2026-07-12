@@ -98,6 +98,15 @@ def render_index(manifest: dict) -> tuple[str, int]:
                 file=sys.stderr,
             )
             sys.exit(2)
+        if lifecycle == "deferred" and not (
+            entry.get("deferred_owner") and entry.get("deferred_trigger")
+        ):
+            print(
+                f"lifecycle: deferred without both deferred_owner and"
+                f" deferred_trigger for {path}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
 
     total = len(entries)
     shipped = sum(1 for _, e in entries.items() if e.get("status") == "shipped")
