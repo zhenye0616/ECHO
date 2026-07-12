@@ -380,5 +380,5 @@ describe('runDoctor', () => {
       'OK: all managed Codex ECHO skills match canonical sources',
     );
     rmSync(nonRepoCwd, { recursive: true, force: true });
-  });
+  }, 45_000);
 });

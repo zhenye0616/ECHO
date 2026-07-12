@@ -22,7 +22,7 @@ The only product maturity vocabulary remains `DEV -> FOUNDER LIVE -> QUALIFIED -
 - The filter-repo rewrite is deliberately deferred with a founder-owned G4 trigger.
 - The GitHub settings audit is complete but VERIFIED RED.
 - The canonical closure register remains 1 resolved / 26 pending.
-- The last independently reviewed Phase 2 tip is `c8ddd38b`. The five later commits through `19c5fc01` contain the checkpoint, founder filter-repo decision, GitHub audit, and first remote workflow evidence; that range still needs independent current-tip review before landing.
+- A different binding reviewed `c8ddd38b..a2c53cb9` and returned READY with no medium-or-higher findings. The final remediation delta still needs independent review at its exact candidate tip before landing.
 
 ## Non-negotiable boundaries
 
@@ -53,6 +53,8 @@ For the verified-red GitHub controls, the founder must choose one of two paths:
 The recommended remediation order remains: native secret scanning/push protection; vulnerability alerts and fixes; main/tag rules; immutable action pins plus enforced SHA pinning; protected production environment; immutable future releases.
 
 **Ready when:** every red control has an authorized remediation path or terminal risk disposition. Evidence, not authorization alone, closes the control.
+
+**Status 2026-07-12:** authorized and in progress. The founder instructed Codex to proceed with Phase 3. Native scanning, push protection, dependency controls, CodeQL, branch/tag rulesets, a protected production environment, immutable releases, and private vulnerability reporting were enabled. The branch prepares immutable action pins, workflow-token permissions, release-environment routing, and dependency fixes. Exact evidence and residuals are in `2026-07-12-phase3-github-security-remediation.md`. CodeQL also exposed 77 non-workflow source findings that require terminal security dispositions; no source fix is authorized during the halt.
 
 ### R3 — Land the Phase 2 evidence branch
 
@@ -86,6 +88,6 @@ The first post-lift proposal remains the graduation foundation: product composit
 
 ## Current stop line
 
-The first action requiring new authority is R2: remediation versus explicit risk disposition for the verified-red GitHub controls. Until the founder answers that question, safe work is limited to current-tip review preparation, decision-session preparation, and non-mutating verification.
+R2 remediation authority was granted by the founder's instruction to proceed with Phase 3. The next irreversible action requiring new authority is the R3 update of `main`. Before that checkpoint, the executor may finish branch-local remediation, verification, exact-tip independent review, branch push, and remote branch checks.
 
-No Phase 3 readiness work may silently convert “recommended” choices in the founder packet into decisions.
+No Phase 3 readiness work may update `main`, fix product/source findings across the clarity halt, or silently convert “recommended” choices in the founder packet into decisions.

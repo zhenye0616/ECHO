@@ -39,7 +39,7 @@ Commits `5bd7b0cd` through `10c578fd` add:
 - `tools/secret-scan.sh`, which fails closed unless Gitleaks is exactly `8.30.1`, runs the redacted `--all` text-patch scan, and then requires the binary-history pass;
 - `tools/binary-history-scan.mjs`, which enumerates every unique path Git classified as binary across `--all`, extracts every unique reachable blob version, runs archive traversal, extracts printable ASCII plus ASCII-range UTF-16LE/UTF-16BE strings at both byte alignments, and sends those strings through redacted Gitleaks stdin;
 - `tools/semantic-history-scan.mjs`, which commits the semantic detector regexes/exclusions and emits only sanitized counts;
-- `.github/workflows/secret-scan.yml`, which runs on every push and pull request without docs/raw path exclusions, pins Node 22 through immutable `actions/setup-node` SHA `49933ea5288caeca8642d1e84afbd3f7d6820020`, downloads the official Linux x64 Gitleaks `8.30.1` release, verifies SHA-256 `551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb`, fetches reachable branches/tags, and invokes the repo-owned wrapper;
+- `.github/workflows/secret-scan.yml`, which runs on every push and pull request without docs/raw path exclusions, pins `actions/checkout` v7.0.0 at `9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`, pins Node 22 through `actions/setup-node` v6.4.0 at `48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`, downloads the official Linux x64 Gitleaks `8.30.1` release, verifies SHA-256 `551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb`, fetches reachable branches/tags, and invokes the repo-owned wrapper;
 - `tools/install-pre-push-hook.sh`, a manual, idempotent local hook installer; it does not modify git configuration or install itself automatically, preserves different existing hook content by default, and requires explicit `--force` to replace it;
 - focused tests for version pinning, redaction flags, text/binary failure propagation, semantic-count privacy, hook path resolution, idempotency, refusal-by-default, explicit force, and mode repair (13/13 green).
 
@@ -84,6 +84,8 @@ This sweep is not named-entity recognition and cannot prove that every personal 
 
 ## GitHub and release settings
 
+> **Historical audit boundary:** The paragraph below records the pre-remediation read-only audit. The founder later authorized Phase 3 remediation; current controls and the newly exposed CodeQL gate are recorded in `2026-07-12-phase3-github-security-remediation.md`.
+
 Authentication was restored on 2026-07-12 and a read-only audit was recorded in `2026-07-12-github-security-readonly-audit.md`. The evidence is **VERIFIED RED**: GitHub secret scanning and push protection are disabled; `main` has no branch protection or ruleset; Actions allows all actions without enforced SHA pinning; vulnerability alerts/updates/fixes are disabled; the production environment is unprotected; and the existing release is mutable. The current beta asset and checksum do match exactly. No setting was changed. The Phase 2 secret-scan workflow passed on branch push at exact head `10d01db4`; it cannot be claimed active on `main` until it lands and a `main` run succeeds.
 
 ## Adjacent dependency observation
@@ -97,3 +99,4 @@ Authentication was restored on 2026-07-12 and a read-only audit was recorded in 
 - Prospective CI and pre-push protection: **IMPLEMENTED and proven by a green Phase 2 branch run at `10d01db4`**; not active on `main` until merge and a green `main` run.
 - Job C, filter-repo execute-or-defer: **DEFERRED-WITH-OWNER-AND-TRIGGER on 2026-07-12**; known history exposure is explicitly accepted until the recorded trigger.
 - G1 overall: **OPEN** until the verified-red GitHub controls are remediated or explicitly accepted/deferred with owner and trigger, and the first landed workflow run is green.
+- Phase 3 remediation: **IN PROGRESS**. Most repository settings are now active and branch-local workflow/dependency changes are under verification. G1 remains open for landing evidence, post-landing enforcement/readback, and terminal disposition of the CodeQL findings.

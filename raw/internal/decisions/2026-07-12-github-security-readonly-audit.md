@@ -8,6 +8,8 @@
 **Mode:** read-only; no repository setting, ref, release, workflow, or asset was changed
 **Verdict:** VERIFIED RED - evidence is complete, remediation or explicit risk disposition is not
 
+> **Point-in-time audit:** This document preserves the 13:05 PDT pre-remediation state. The founder subsequently authorized Phase 3 remediation. Current controls, residuals, and newly exposed CodeQL findings are recorded in `2026-07-12-phase3-github-security-remediation.md`; do not use this audit alone as the current settings readback.
+
 ## Plain-English result
 
 GitHub authentication works and the repository settings are now observable. The result is not green. GitHub's native secret scanning and secret push protection are disabled; `main` has no branch protection or ruleset; repository Actions permit any action without enforced SHA pinning; vulnerability alerts and automated fixes are disabled; the production environment has no protection rules; and the existing release is mutable.
