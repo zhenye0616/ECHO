@@ -34,7 +34,7 @@ describe('tools/semantic-history-scan.mjs', () => {
     const privateEmail = ['person', '@company.invalid'].join('');
     writeFileSync(
       join(repo, 'evidence.txt'),
-      `${historicalId}\n/Users/alice/private/file.txt\n${privateEmail}\ntest@example.com\n`,
+      `${historicalId}\n${['', 'Users', 'alice', 'private', 'file.txt'].join('/')}\n${privateEmail}\ntest@example.com\n`,
     );
     git(['add', 'evidence.txt']);
     git(['commit', '-q', '-m', 'historical']);
@@ -42,10 +42,12 @@ describe('tools/semantic-history-scan.mjs', () => {
     git(['add', 'evidence.txt']);
     git(['commit', '-q', '-m', 'tracked']);
 
-    const result = spawnSync('node', [SCRIPT], { cwd: repo, encoding: 'utf8' });
+    const result = spawnSync('node', [SCRIPT, '--ref', 'HEAD'], { cwd: repo, encoding: 'utf8' });
 
     expect(result.status, result.stderr).toBe(0);
     const report = JSON.parse(result.stdout) as {
+      input_sha: string;
+      path_exclusions: string[];
       detectors: {
         live_looking_note_ids: {
           history_distinct: number;
@@ -66,6 +68,8 @@ describe('tools/semantic-history-scan.mjs', () => {
     expect(report.detectors.absolute_user_paths.history_distinct).toBe(1);
     expect(report.detectors.non_example_emails.history_distinct).toBe(1);
     expect(report.detectors.non_example_emails.exclusions).toContain('example\\.com');
+    expect(report.input_sha).toMatch(/^[a-f0-9]{40}$/);
+    expect(report.path_exclusions).toContain('tests/tools/semantic-history-scan.test.ts');
     expect(result.stdout).not.toContain(historicalId);
     expect(result.stdout).not.toContain(trackedId);
     expect(result.stdout).not.toContain(privateEmail);

@@ -58,9 +58,22 @@ afterEach(() => {
 describe('tools/binary-history-scan.mjs', () => {
   it('enumerates binary history and sends printable strings through Gitleaks', () => {
     const canary = ['AKIA', 'QWERTYUIOPASDFGH'].join('');
+    const utf16LeCanary = ['UTF16LE', '_SECRET_SAMPLE'].join('');
+    const utf16BeCanary = ['UTF16BE', '_SECRET_SAMPLE'].join('');
+    const utf16Be = Buffer.from(utf16BeCanary, 'utf16le');
+    for (let index = 0; index < utf16Be.length; index += 2) {
+      [utf16Be[index], utf16Be[index + 1]] = [utf16Be[index + 1], utf16Be[index]];
+    }
     writeFileSync(
       join(repo, 'payload.bin'),
-      Buffer.concat([Buffer.from([0]), Buffer.from(canary)]),
+      Buffer.concat([
+        Buffer.from([0]),
+        Buffer.from(canary),
+        Buffer.from([0xff]),
+        Buffer.from(utf16LeCanary, 'utf16le'),
+        Buffer.from([0xff]),
+        utf16Be,
+      ]),
     );
     git(['add', 'payload.bin']);
     git(['commit', '-q', '-m', 'binary']);
@@ -77,6 +90,8 @@ describe('tools/binary-history-scan.mjs', () => {
     expect(summary.unique_binary_blobs).toBe(1);
     expect(summary.printable_string_scan).toBe('clean');
     expect(readFileSync(stdinCapture, 'utf8')).toContain(canary);
+    expect(readFileSync(stdinCapture, 'utf8')).toContain(utf16LeCanary);
+    expect(readFileSync(stdinCapture, 'utf8')).toContain(utf16BeCanary);
     expect(`${result.stdout}${result.stderr}`).not.toContain(canary);
     expect(readFileSync(invocationLog, 'utf8')).toContain('dir ');
     expect(readFileSync(invocationLog, 'utf8')).toContain('stdin --redact=100');

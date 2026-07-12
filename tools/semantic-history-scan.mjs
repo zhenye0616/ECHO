@@ -13,6 +13,17 @@ const EMAIL_EXCLUSIONS = [
   /users\.noreply\.github\.com/i,
   /noreply@anthropic\.com/i,
 ];
+const PATH_EXCLUSIONS = new Set(['tests/tools/semantic-history-scan.test.ts']);
+
+const argv = process.argv.slice(2);
+let refScope = '--all';
+if (argv.length > 0) {
+  if (argv.length !== 2 || argv[0] !== '--ref' || argv[1].trim() === '') {
+    process.stderr.write('usage: tools/semantic-history-scan.mjs [--ref <git-revision>]\n');
+    process.exit(2);
+  }
+  refScope = argv[1];
+}
 
 function git(args) {
   const result = spawnSync('git', args, {
@@ -30,13 +41,27 @@ function distinctMatches(text, regex) {
   return new Set(text.match(regex) ?? []);
 }
 
-const history = git(['log', '--all', '-p', '--no-color', '--format='])
+const historyArgs = [
+  'log',
+  ...(refScope === '--all' ? ['--all'] : [refScope]),
+  '-p',
+  '--no-color',
+  '--format=',
+];
+let currentPath = '';
+const history = git(historyArgs)
   .split(/\r?\n/)
-  .filter((line) => /^[+-]/.test(line) && !/^\+\+\+|^---/.test(line))
+  .flatMap((line) => {
+    const diffHeader = line.match(/^diff --git a\/(.+) b\/(.+)$/);
+    if (diffHeader !== null) currentPath = diffHeader[2];
+    if (!/^[+-]/.test(line) || /^\+\+\+|^---/.test(line)) return [];
+    if (PATH_EXCLUSIONS.has(currentPath)) return [];
+    return [line];
+  })
   .join('\n');
 const trackedResult = spawnSync(
   'git',
-  ['grep', '-I', '-h', '-E', 'not_[A-Za-z0-9]{8,}', 'HEAD', '--'],
+  ['grep', '-I', '-h', '-E', 'not_[A-Za-z0-9]{8,}', refScope === '--all' ? 'HEAD' : refScope, '--'],
   { encoding: 'utf8', maxBuffer: MAX_BUFFER },
 );
 if (trackedResult.status !== 0 && trackedResult.status !== 1) {
@@ -50,12 +75,14 @@ const absolutePaths = distinctMatches(history, ABSOLUTE_USER_PATH_RE);
 const emails = [...distinctMatches(history, EMAIL_RE)].filter(
   (value) => !EMAIL_EXCLUSIONS.some((pattern) => pattern.test(value)),
 );
+const inputSha = refScope === '--all' ? null : git(['rev-parse', `${refScope}^{commit}`]).trim();
 
 process.stdout.write(
   `${JSON.stringify(
     {
       schema_version: 1,
-      ref_scope: '--all',
+      ref_scope: refScope,
+      input_sha: inputSha,
       input: 'added/deleted textual diff-content lines from git log -p',
       diff_content_bytes: Buffer.byteLength(history),
       detectors: {
@@ -75,6 +102,7 @@ process.stdout.write(
           history_distinct: emails.length,
         },
       },
+      path_exclusions: [...PATH_EXCLUSIONS],
       privacy: 'counts and detector definitions only; matched values are never emitted',
     },
     null,

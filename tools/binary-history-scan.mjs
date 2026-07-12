@@ -40,6 +40,27 @@ function printableStrings(buffer, minimumLength = 4) {
   return strings;
 }
 
+function utf16AsciiStrings(buffer, littleEndian, startOffset, minimumLength = 4) {
+  const strings = [];
+  let current = '';
+  const flush = () => {
+    if (current.length >= minimumLength) strings.push(current);
+    current = '';
+  };
+  for (let index = startOffset; index + 1 < buffer.length; index += 2) {
+    const codePoint = littleEndian
+      ? buffer[index] | (buffer[index + 1] << 8)
+      : (buffer[index] << 8) | buffer[index + 1];
+    if ((codePoint >= 0x20 && codePoint <= 0x7e) || codePoint === 0x09) {
+      current += String.fromCharCode(codePoint);
+    } else {
+      flush();
+    }
+  }
+  flush();
+  return strings;
+}
+
 const rootResult = requireSuccess(run('git', ['rev-parse', '--show-toplevel']), 'repo lookup');
 const repoRoot = rootResult.stdout.trim();
 const numstat = requireSuccess(
@@ -81,7 +102,13 @@ try {
         `blob extraction for ${path}@${commit}`,
       ).stdout;
       totalBlobBytes += blob.length;
-      printable.push(...printableStrings(blob));
+      printable.push(
+        ...printableStrings(blob),
+        ...utf16AsciiStrings(blob, true, 0),
+        ...utf16AsciiStrings(blob, true, 1),
+        ...utf16AsciiStrings(blob, false, 0),
+        ...utf16AsciiStrings(blob, false, 1),
+      );
 
       const suffix = extname(path);
       const safeName = `${oid}-${basename(path, suffix).replace(/[^A-Za-z0-9._-]/g, '_')}${suffix}`;
@@ -120,6 +147,7 @@ try {
       unique_binary_blobs: seenBlobOids.size,
       binary_bytes: totalBlobBytes,
       printable_bytes: Buffer.byteLength(stringPayload),
+      printable_encodings: ['ASCII', 'UTF-16LE', 'UTF-16BE'],
       archive_scan: 'clean',
       printable_string_scan: 'clean',
     })}\n`,
