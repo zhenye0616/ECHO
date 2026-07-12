@@ -51,7 +51,9 @@ The successful initial default-setup run produced 79 open alerts on the unchange
 | medium | `actions/missing-workflow-permissions` | 2 | Remediated on this branch; verify at the landed SHA |
 | medium | `js/unnecessary-use-of-cat` | 1 | Non-blocking hygiene finding; disposition with the batch |
 
-The three critical alerts are at `src/mcp/tools/coord-invoke.ts`, `src/echo-home/wizard/probe.ts`, and `src/echo-home/adapters/claude-code-mcp.ts`. The SQL alert is at `src/storage/migrate.ts`. Counts are scanner findings, not confirmed vulnerabilities; each needs reachable-input and trust-boundary review. Dismissing or fixing them without that review would weaken the evidence. Because source changes are outside the current halt boundary, the alerts remain an explicit G1 blocker unless the founder records a terminal accepted-risk or deferred-with-owner-and-trigger disposition.
+The three critical alerts are at `src/mcp/tools/coord-invoke.ts`, `src/echo-home/wizard/probe.ts`, and `src/echo-home/adapters/claude-code-mcp.ts`. The SQL alert is at `src/storage/migrate.ts`. Counts are scanner findings, not confirmed vulnerabilities; each requires reachable-input and trust-boundary review.
+
+**Superseding readback 2026-07-12:** the founder approved the per-alert terminal table in `2026-07-12-codeql-terminal-disposition-table.md`, including narrow source fixes for alerts `3-8`, `10`, and PR-only `80`. Fix commit `3c69f815` passed [CodeQL run 29213440261](https://github.com/zhenye0616/ECHO/actions/runs/29213440261) with zero open PR-ref alerts. GitHub now records 58 false-positive, 8 test-only, and 4 won't-fix dismissals with boundary-specific comments. Exactly `1-8` and `10` remain open, all on unchanged `main`; they require natural closure in the first post-land analysis. This authorization is specific to the recorded fixes and does not lift G2 or authorize broader product work.
 
 ## Verification completed on the readiness branch
 
@@ -62,6 +64,7 @@ The three critical alerts are at `src/mcp/tools/coord-invoke.ts`, `src/echo-home
 - CodeQL initial setup run: completed successfully for JavaScript/TypeScript and Actions at `f77ba415`.
 - Root typecheck, lint, CLI build, package dry-run, skill-sync check, YAML parse, and diff check passed.
 - Independent review at `91e8c31b` returned READY with no unresolved medium-or-higher findings.
+- Founder-approved CodeQL fix tip `3c69f815`: 7 focused files / 57 tests; root typecheck and lint; product 1,888 passed; orchestration 269 passed; full-history secret scan clean across 4,517 commits, including binary and printable-string scans.
 
 ## First remote PR run
 
@@ -80,6 +83,8 @@ The test-only follow-up at `6751c5f8` cleared both Ubuntu quality jobs. One macO
 
 The serialized remote rerun cleared Ubuntu Node 24 quality. Ubuntu Node 22 completed all packaged-daemon assertions but teardown raced the daemon's final filesystem-handle release and raised `ENOTEMPTY` while removing its temporary `echo-data` directory. The final test-only cleanup follow-up adds bounded `rmSync` retries to that fixture; two consecutive focused local packaged-boot runs passed. Durable cleanup failures still surface.
 
+The later founder-approved CodeQL fix head `3c69f815` triggered a new PR analysis. Both CodeQL jobs passed and the exact PR ref has zero open alerts. Alert `80` is fixed. The nine fixed baseline alerts remain visible only because `main` is still `f77ba415`; no dismissal was used to hide them.
+
 ## Remaining ordered gates
 
 1. Finish local verification and independent review at the exact candidate tip.
@@ -88,7 +93,7 @@ The serialized remote rerun cleared Ubuntu Node 24 quality. Ubuntu Node 22 compl
 4. At the landed SHA, require the first green `main` secret-scan run and CodeQL run; verify the two workflow-permission alerts close.
 5. Enable repository SHA-pin enforcement and, if the required GitHub-owned actions are compatible, restrict allowed actions. Then rerun the settings audit.
 6. Add required status-check contexts to ruleset `18842228` from the stable landed check names.
-7. Triage all 77 non-workflow CodeQL alerts into `resolved`, `accepted-risk`, or `deferred-with-owner-and-trigger`; do not silently treat scanner output as either vulnerability proof or false positive.
+7. **Completed pre-land:** all 77 non-workflow alerts have founder-approved terminal dispositions; verify the nine fix-designated baseline alerts close naturally after landing and retain the 70 evidence comments.
 
 Any future action-pin upgrade must repeat the official-repository tag-ref dereference and record the resulting commit SHA before changing a workflow.
 

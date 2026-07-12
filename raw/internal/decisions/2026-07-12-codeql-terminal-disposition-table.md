@@ -3,10 +3,11 @@
 **Prepared:** 2026-07-12 16:01 PDT
 **Repository:** `zhenye0616/ECHO`
 **PR:** `#8` - Phase 3 security and landing readiness
-**Exact PR head:** `5df97a26932f971b52e4a5f2d4c23ac4ae07b05e`
+**Disposition input head:** `5df97a26932f971b52e4a5f2d4c23ac4ae07b05e`
+**Current implementation head:** `3c69f8154cb1344585d0c51fb619c3ef706f3c6a`
 **Base:** `main` at `f77ba415fd6848fbb52586dc0ca4ada522097bac`
-**Status:** founder approved on 2026-07-12; fix execution in progress
-**Mode:** the founder approved the terminal table before implementation; alert dismissals remain gated on a clean PR-ref CodeQL analysis
+**Status:** founder-approved dispositions executed; post-merge fixed-alert closure remains pending
+**Mode:** PR-ref CodeQL is clean; `main` and G1 remain unchanged/open until founder-approved landing and post-land verification
 
 ## Plain-English result
 
@@ -111,7 +112,16 @@ Pre-push verification on 2026-07-12:
 | `tools/secret-scan.sh history` | 4,517 commits; no leaks; archive and printable-string scans clean |
 | `git diff --check` | clean |
 
-GitHub CodeQL and alert dismissals remain pending until this implementation is committed and pushed to PR #8.
+## Post-push CodeQL and disposition readback
+
+- Fix commit: `3c69f8154cb1344585d0c51fb619c3ef706f3c6a`, pushed to PR #8.
+- Exact-tip CodeQL run: [29213440261](https://github.com/zhenye0616/ECHO/actions/runs/29213440261); Actions and JavaScript/TypeScript passed.
+- Open alerts on `refs/pull/8/head`: **0**. PR-only alert `80` now has instance state `fixed`.
+- Baseline alerts dismissed with founder-approved evidence: **70** total: 58 false positive, 8 used in tests, 4 won't fix.
+- Alerts still open: exactly `1-8` and `10`, all on unchanged `refs/heads/main`. They are the nine approved fixes and must close naturally in a post-land `main` analysis; they were not dismissed.
+- No product boundary, product spec, maturity stage, G2 state, or `main` ref changed.
+
+Execution-order steps 1-5 are complete. Steps 6-8 remain gated on founder merge approval and the first post-land `main` runs.
 
 ## Required execution order
 

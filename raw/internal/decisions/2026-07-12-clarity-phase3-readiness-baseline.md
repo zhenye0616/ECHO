@@ -35,6 +35,8 @@ The only product maturity vocabulary remains `DEV -> FOUNDER LIVE -> QUALIFIED -
 - A green branch workflow is not the first landed `main` workflow required by G1.
 - A completed register is not itself the G2 lift; the lift is a separate founder decision naming an approved main SHA after independent mechanical verification.
 
+**Narrow supersession 2026-07-12:** the founder later approved the exact CodeQL terminal table, including fixes to the specifically enumerated source alerts. That approval supersedes the earlier no-source-fix line only for alerts `3-8`, `10`, and PR-only `80`; every other halt boundary remains in force.
+
 ## Phase 3 readiness sequence
 
 ### R1 — Current-tip independent review
@@ -54,7 +56,7 @@ The recommended remediation order remains: native secret scanning/push protectio
 
 **Ready when:** every red control has an authorized remediation path or terminal risk disposition. Evidence, not authorization alone, closes the control.
 
-**Status 2026-07-12:** authorized and in progress. The founder instructed Codex to proceed with Phase 3. Native scanning, push protection, dependency controls, CodeQL, branch/tag rulesets, a protected production environment, immutable releases, and private vulnerability reporting were enabled. The branch prepares immutable action pins, workflow-token permissions, release-environment routing, and dependency fixes. Exact evidence and residuals are in `2026-07-12-phase3-github-security-remediation.md`. CodeQL also exposed 77 non-workflow source findings that require terminal security dispositions; no source fix is authorized during the halt.
+**Status 2026-07-12:** authorized and executed pre-land. Native scanning, push protection, dependency controls, CodeQL, branch/tag rulesets, a protected production environment, immutable releases, and private vulnerability reporting are enabled. The founder separately approved the exact CodeQL terminal table. At PR head `3c69f815`, CodeQL has zero open PR-ref alerts; 70 baseline alerts have evidence-specific dismissals and the nine fix-designated baseline alerts await post-land natural closure. Exact evidence and residuals are in `2026-07-12-phase3-github-security-remediation.md` and `2026-07-12-codeql-terminal-disposition-table.md`.
 
 ### R3 — Land the Phase 2 evidence branch
 
@@ -92,4 +94,4 @@ R2 remediation authority was granted by the founder's instruction to proceed wit
 
 The first remote PR run exposed inherited onboarding/release failures that require product/runtime or package work across the halt. The executor may complete the test-only Git timestamp/cleanup portability fix and rerun the branch. After that, founder direction is required on whether the inherited red checks block the security-only landing or receive a deferred-with-owner-and-trigger disposition. Exact run evidence is in `2026-07-12-phase3-github-security-remediation.md`.
 
-No Phase 3 readiness work may update `main`, fix product/source findings across the clarity halt, or silently convert “recommended” choices in the founder packet into decisions.
+No Phase 3 readiness work may update `main`, fix additional product/source findings beyond the founder-approved CodeQL table, or silently convert “recommended” choices in the founder packet into decisions.
