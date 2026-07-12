@@ -96,7 +96,7 @@ describe('packaged daemon boot from the real tarball', () => {
           `packaged daemon could not resolve the propose-decision import closure (module_not_found swallowed):\n${boot.stdout}`,
         ).toBe(false);
       } finally {
-        boot.kill();
+        await boot.stop();
       }
     },
     180_000,
@@ -108,7 +108,7 @@ interface BootResult {
   importError: boolean;
   stdout: string;
   stderr: string;
-  kill: () => void;
+  stop: () => Promise<void>;
 }
 
 // Launch the packaged daemon and resolve once it either logs the lifecycle
@@ -121,16 +121,29 @@ function bootDaemon(entry: string, env: NodeJS.ProcessEnv, cwd: string): Promise
     let stdout = '';
     let stderr = '';
     let settled = false;
+    let resolveClosed: () => void;
+    const closed = new Promise<void>((resolve) => {
+      resolveClosed = resolve;
+    });
 
-    const kill = (): void => {
-      if (!child.killed) child.kill('SIGTERM');
+    const stop = async (): Promise<void> => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+
+      const exitedGracefully = await Promise.race([
+        closed.then(() => true),
+        new Promise<false>((resolve) => setTimeout(() => resolve(false), 5_000)),
+      ]);
+      if (!exitedGracefully && child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGKILL');
+        await closed;
+      }
     };
 
     const finish = (started: boolean, importError: boolean): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolvePromise({ started, importError, stdout, stderr, kill });
+      resolvePromise({ started, importError, stdout, stderr, stop });
     };
 
     const importError = (): boolean =>
@@ -157,7 +170,10 @@ function bootDaemon(entry: string, env: NodeJS.ProcessEnv, cwd: string): Promise
       stderr += chunk.toString('utf8');
     });
     child.on('error', () => finish(false, importError()));
-    child.on('close', () => finish(false, importError()));
+    child.on('close', () => {
+      resolveClosed();
+      finish(false, importError());
+    });
 
     const timer = setTimeout(() => finish(sawStarted(), importError()), 60_000);
   });
