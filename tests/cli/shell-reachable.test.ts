@@ -63,8 +63,10 @@ describe('echoctl shell reachability', () => {
         ]),
       );
       expect(tarEntries.some((entry) => entry.startsWith('package/backlog/'))).toBe(false);
-      expect(tarEntries.filter((entry) => entry.startsWith('package/docs/'))).toEqual([
+      expect(tarEntries.filter((entry) => entry.startsWith('package/docs/')).sort()).toEqual([
         'package/docs/echoctl-install.md',
+        'package/docs/install-contracts.md',
+        'package/docs/lab-data-handling.md',
       ]);
       expect(tarEntries.some((entry) => entry.startsWith('package/raw/'))).toBe(false);
       expect(tarEntries.some((entry) => entry.startsWith('package/wiki/'))).toBe(false);
