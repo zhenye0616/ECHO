@@ -69,7 +69,7 @@ This checkpoint file is the only change after the independently reviewed tip.
 | Diff whitespace check | passed |
 | Independent rereview at `c8ddd38b` | no medium-or-higher blockers; READY FOR FOUNDER DECISION SESSION |
 
-The first GitHub workflow run is not evidence yet because this branch has not been pushed or merged. GitHub push protection, repository settings, and authenticated release-asset policy also remain unverified because local `gh` authentication is invalid.
+The first GitHub workflow run is not evidence yet because this branch has not been pushed or merged. A subsequent authenticated read-only audit on 2026-07-12 verified the GitHub controls red; see `2026-07-12-github-security-readonly-audit.md`. No setting was changed.
 
 ## Scope audit
 
@@ -89,7 +89,7 @@ The first GitHub workflow run is not evidence yet because this branch has not be
 
 Job B is complete on the Phase 2 branch and independently rerun. G1 remains open until:
 
-1. GitHub push protection/settings/release policy are verified after reauthentication or explicitly deferred with owner and trigger; and
+1. verified-red GitHub controls are remediated or explicitly accepted/deferred with owner and trigger; and
 2. after landing, the first GitHub secret-scan workflow run is green.
 
 Prior public clones, forks, and caches cannot be recalled. A clean credential scan does not clear names, quotes, meeting information, or other semantic content. The production dependency audit also has one separately tracked transitive high advisory (`hono@4.12.23` through `@modelcontextprotocol/sdk@1.29.0`) that must be dispositioned before qualification.
@@ -102,11 +102,11 @@ A later G2 lift will authorize reviewed spec conversion. It will not declare the
 
 ## Founder decisions now required
 
-1. GitHub security evidence: reauthenticate and verify the settings now, or explicitly defer with owner and trigger.
+1. GitHub security disposition: authorize remediation of the verified-red controls, or explicitly accept/defer them with owner and trigger.
 2. Demo: choose the Jul 18 demo shape and YC submit/defer posture so G3 can freeze a real artifact. The packet recommends meeting-to-brief only and cutting the old Machine-centered scene.
 3. Close or defer the remaining commercial, vendor/key, client/legal, operational, and technical-boundary questions in the founder packet.
 4. Approve named operators and safe inputs for any empirical rubrics that should run before G2.
 
 ## Exact next action
 
-Continue the founder decision session from `2026-07-11-phase2-founder-decision-packet.md` with GitHub security evidence, the remaining G1 blocker under founder control. Do not merge this branch, lift G2, or create product specs as part of that decision unless the separate review and approval gates are satisfied.
+Continue the founder decision session from `2026-07-11-phase2-founder-decision-packet.md` with remediation versus explicit risk disposition for the verified-red GitHub controls. Do not merge this branch, lift G2, or create product specs as part of that decision unless the separate review and approval gates are satisfied.

@@ -84,7 +84,7 @@ This sweep is not named-entity recognition and cannot prove that every personal 
 
 ## GitHub and release settings
 
-The local `gh` account token is invalid, so GitHub push protection, repository security settings, and authenticated release-asset policy were **not verified**. This is an explicit open item, not a green result. The committed workflow is reviewable locally but cannot be claimed active until it lands on `main` and a GitHub run succeeds.
+Authentication was restored on 2026-07-12 and a read-only audit was recorded in `2026-07-12-github-security-readonly-audit.md`. The evidence is **VERIFIED RED**: GitHub secret scanning and push protection are disabled; `main` has no branch protection or ruleset; Actions allows all actions without enforced SHA pinning; vulnerability alerts/updates/fixes are disabled; the production environment is unprotected; and the existing release is mutable. The current beta asset and checksum do match exactly. No setting was changed. The Phase 2 secret-scan workflow cannot be claimed active until it lands on `main` and a GitHub run succeeds.
 
 ## Adjacent dependency observation
 
@@ -96,4 +96,4 @@ The local `gh` account token is invalid, so GitHub push protection, repository s
 - Reachable-history semantic assessment: **DONE for the declared detectors**, with the limitation above.
 - Prospective CI and pre-push protection: **IMPLEMENTED on the Phase 2 branch**, not yet proven by a GitHub run.
 - Job C, filter-repo execute-or-defer: **DEFERRED-WITH-OWNER-AND-TRIGGER on 2026-07-12**; known history exposure is explicitly accepted until the recorded trigger.
-- G1 overall: **OPEN** until the remaining GitHub-settings evidence is either verified or explicitly deferred with owner and trigger, and the first landed workflow run is green.
+- G1 overall: **OPEN** until the verified-red GitHub controls are remediated or explicitly accepted/deferred with owner and trigger, and the first landed workflow run is green.

@@ -21,7 +21,9 @@ Decision context:
 
 **Recommendation:** deliberately neutral because the choice is irreversible and the existing template promises neutrality.
 
-**Remaining G1 settings answer needed:** either (a) re-authenticate `gh` and authorize the security executor to verify GitHub push protection, repository security settings, and release-asset policy before G1 closes, or (b) defer that read-only audit with a named owner and objective trigger. Recommendation: verify before G2 rather than defer. The current local `gh` token is invalid, so no setting is assumed green.
+**GitHub audit result:** completed read-only on 2026-07-12 and recorded in `2026-07-12-github-security-readonly-audit.md`. It is VERIFIED RED: native secret scanning/push protection, branch/ruleset protection, vulnerability alerts/fixes, enforced action pinning, protected release environment, and immutable releases are not enabled. The existing release asset checksum is valid. No setting was changed.
+
+**Remaining founder answer needed:** authorize remediation of the red controls, or explicitly accept/defer them with owner and objective trigger. Recommendation: remediate before G2; the Phase 2 custom secret gate is useful defense in depth but is not a substitute for repository-native push protection and protected delivery controls.
 
 ## 2. YC and demo - X1 / G3
 
