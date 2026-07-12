@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const MAX_BUFFER = 256 * 1024 * 1024;
 const NOTE_ID_RE = /\bnot_[A-Za-z0-9]{8,}\b/g;
@@ -85,6 +86,7 @@ process.stdout.write(
       input_sha: inputSha,
       input: 'added/deleted textual diff-content lines from git log -p',
       diff_content_bytes: Buffer.byteLength(history),
+      diff_content_sha256: createHash('sha256').update(history).digest('hex'),
       detectors: {
         live_looking_note_ids: {
           regex: NOTE_ID_RE.source,

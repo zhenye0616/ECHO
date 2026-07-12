@@ -47,6 +47,7 @@ describe('tools/semantic-history-scan.mjs', () => {
     expect(result.status, result.stderr).toBe(0);
     const report = JSON.parse(result.stdout) as {
       input_sha: string;
+      diff_content_sha256: string;
       path_exclusions: string[];
       detectors: {
         live_looking_note_ids: {
@@ -69,6 +70,7 @@ describe('tools/semantic-history-scan.mjs', () => {
     expect(report.detectors.non_example_emails.history_distinct).toBe(1);
     expect(report.detectors.non_example_emails.exclusions).toContain('example\\.com');
     expect(report.input_sha).toMatch(/^[a-f0-9]{40}$/);
+    expect(report.diff_content_sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(report.path_exclusions).toContain('tests/tools/semantic-history-scan.test.ts');
     expect(result.stdout).not.toContain(historicalId);
     expect(result.stdout).not.toContain(trackedId);
