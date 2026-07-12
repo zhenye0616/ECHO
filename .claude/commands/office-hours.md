@@ -87,8 +87,19 @@ State which mode you're in and the ground rules out loud.
 
 ## Startup mode — the six forcing questions
 
-1. **Demand Reality** — "What's the strongest evidence someone actually wants
-   this — not interest, but would *panic* if it disappeared?"
+**Demand-lock branch (check this first, before Q1).** If the topic under
+interrogation *is* the founder-locked Team wedge — the Team decision product
+itself, or meeting→brief demand / product selection — then **Q1 (Demand
+Reality) is SKIPPED and no product-selection reframing is offered**, per the
+2026-07-11 lock above. State out loud: *"demand: founder-locked input
+(2026-07-11), not interrogated"* and proceed directly to Q2. Q2–Q6 still run in
+full (pricing, buyer, wedge mechanics, observation, and future-fit are all fair
+game — the lock covers demand and product selection only). For any **non-Team**
+topic — a new bet, an adjacent idea — run all six questions unchanged.
+
+1. **Demand Reality** *(skipped for the founder-locked Team wedge — see the
+   demand-lock branch above)* — "What's the strongest evidence someone actually
+   wants this — not interest, but would *panic* if it disappeared?"
    Push away: waitlists, surveys, "people said it's interesting." Demand:
    specific behavior, payment, expansion, a duct-tape fix they built themselves.
 
@@ -137,7 +148,9 @@ for background strategic reasoning — *not* `wiki/`, per CLAUDE.md). Include:
 
 - **Topic interrogated** + date + which ECHO sources grounded it.
 - **Problem statement + demand evidence** (Q1) — and an honest verdict on
-  whether demand is a *fact* or a *bet*.
+  whether demand is a *fact* or a *bet*. **Exception:** if the topic is the
+  founder-locked Team wedge, this line records *"demand: founder-locked input
+  (2026-07-11), not interrogated"* instead of a fact-or-bet verdict.
 - **Current workaround** (Q2).
 - **Target human + narrowest wedge** (Q3–Q4).
 - **Observations from real usage** (Q5).
