@@ -63,4 +63,4 @@ Contract B requires the product composition root, runtime isolation, `tests/prod
 
 ## Retired install docs
 
-The three retired install docs (docs/SEND-TO-TESTER.md, docs/echo-init.customer.example.json via docs/echo-init.customer.example.README.md, and the scope banner on docs/echoctl-install.md) carry dated supersession banners pointing here, so the dead Machine-context product cannot be handed to a client by accident.
+Two retired install docs — docs/SEND-TO-TESTER.md and docs/echo-init.customer.example.json (via docs/echo-init.customer.example.README.md) — carry dated supersession banners pointing here, so the dead Machine-context product cannot be handed to a client by accident. docs/echoctl-install.md is **not** retired: it is the current Contract A runbook (the full-lab / diagnostic install), carrying only a scope banner marking it founder/lab-use and clean-machine rehearsal, not client delivery.

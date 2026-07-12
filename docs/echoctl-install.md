@@ -28,7 +28,7 @@ codex login      # and/or the login command for whichever agents you selected
 echoctl doctor   # should now report healthy
 ```
 
-This is the one thing a brand-new install cannot self-heal — ECHO's own install + wiring + daemon formation complete without it; only cross-tool capture from that agent waits on its login.
+This is the one thing a brand-new install cannot self-heal — ECHO's own install + wiring + daemon formation complete without it. It gates more than cross-tool capture: the Granola signals brain extracts meeting signals by spawning the `codex` (or `claude`) CLI as a subprocess, so until that CLI is authenticated there is **no signal extraction and therefore no brief**. Vendor login gates both cross-tool capture from that agent *and* the meeting→brief path.
 
 ## Daily Use
 
@@ -92,15 +92,34 @@ echoctl init
 
 ## Full Removal
 
-This removes adapter config, the launchd job, the package, and optionally all local ECHO state. Note the capture database does NOT live under `~/.echo` — removing only `~/.echo` leaves all captured data on disk:
+This removes adapter config, the launchd job, the package, and optionally all local ECHO state. Note the capture database does NOT live under `~/.echo` — removing only `~/.echo` leaves all captured data on disk.
+
+First enumerate **every** loaded ECHO launchd job and boot each one out before deleting any data — a machine may carry more than the default daemon (a secondary or `com.echo.selftest.*` daemon has its own label, ECHO_HOME, database, and logs, and can still be running). Stopping first is mandatory or WAL checkpointing recreates files mid-delete:
+
+```bash
+launchctl list | grep -i echo          # every loaded job whose label matches echo
+# for EACH label found, stop it (default label shown; repeat per custom --label):
+echoctl daemon uninstall --label com.echo.daemon
+# for a label echoctl does not manage, boot it out directly:
+launchctl bootout gui/$(id -u)/<label>
+```
+
+Then remove config, package, and state (default paths shown):
 
 ```bash
 echoctl uninstall --yes
-echoctl daemon uninstall          # stop the daemon BEFORE deleting data (WAL checkpointing)
 npm uninstall -g echoctl
-rm -rf ~/.echo                                            # state sidecars + config
+rm -rf ~/.echo                                            # state sidecars + config (or the custom ECHO_HOME / --home if one was set)
 rm -rf ~/Library/Application\ Support/ECHO                # echo.db + echo.db-wal + echo.db-shm
-rm -rf ~/Library/Logs/echo                                # daemon/worker logs
+rm -rf ~/Library/Logs/echo                                # daemon/worker logs (echo-daemon.out.log / .err.log)
 ```
 
-If the install used a custom `--db-path` / `ECHO_DB_PATH` or `--data-dir` / `ECHO_DATA_DIR`, delete that location instead of the default Application Support path. Manual copies/backups of `echo.db` are not touched by any of this — chase them separately. Use only for a complete removal.
+Delete the locations **actually in use**, not the defaults, wherever the install customized them:
+
+- **Database:** a custom `--db-path` / `ECHO_DB_PATH` or `--data-dir` / `ECHO_DATA_DIR` moves `echo.db` (+ `-wal` / `-shm`) — delete that location instead of the Application Support path.
+- **ECHO_HOME:** a custom `--home` / `ECHO_HOME` moves the state sidecars out of `~/.echo` — delete that path instead.
+- **Logs / plist / label:** a custom `--log-dir` moves the daemon logs; a custom `--plist-path` / `--label` moves the launchd plist (default `~/Library/LaunchAgents/<label>.plist`). Check the label, plist path, and log dir actually passed at install time and delete those, not the defaults.
+- **Generated briefs:** `echoctl brief` writes `brief-<note_id>.json` and `brief-<note_id>.md` into its `--out-dir`, which defaults to the directory the command was run from — there is no single canonical brief location. Delete every directory where briefs were generated; the operator must track those.
+- **Manual copies/backups** of `echo.db` are not touched by any of this — chase them separately.
+
+Use only for a complete removal.

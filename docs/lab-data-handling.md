@@ -22,9 +22,9 @@ The storage backend is **INSERT-only**. The `Storage` contract is three operatio
 
 Under the current B3 lab arrangement, **the founder holds the accounts** used in the lab workspaces (Granola key, brain-vendor auth, any Slack/Linear credentials). The data captured into the lab store therefore sits under founder custody on the founder's (or a founder-controlled) machine. After a client is onboarded onto their own machine, that machine becomes the client's loop-of-record and custody shifts — but that endpoint is **not installable today** (see `docs/install-contracts.md`).
 
-## Network egress (complete conditional inventory — the full lab, not just the brief loop)
+## Network egress (complete over ECHO-owned code — the full lab, not just the brief loop)
 
-Contract A boots the full lab, so the honest inventory is every endpoint the lab *can* reach, each with the condition that arms it. There are **six conditional vendor endpoints**; every one is credential/flag-gated and fails closed when unconfigured. Code-verified 2026-07-11 (file:line evidence in the fixup commit); no telemetry, update checks, analytics, or runtime package installs exist anywhere in the runtime.
+Contract A boots the full lab, so the honest inventory is every network boundary the lab's **own** code can reach, each with the condition that arms it. There are **six ECHO-owned integration classes**; every one is credential/flag-gated and fails closed when unconfigured. Code-verified 2026-07-11 (file:line evidence in the fixup commit). The inventory is **complete over ECHO-owned code — not over the vendor binaries ECHO launches** (see the note below the table). Within ECHO's own runtime, no telemetry, update checks, analytics, or runtime package installs exist.
 
 | # | Endpoint | Fires when | What leaves the machine |
 |---|---|---|---|
@@ -34,6 +34,8 @@ Contract A boots the full lab, so the honest inventory is every endpoint the lab
 | 4 | Anthropic API in-process (`api.anthropic.com`, Agent SDK) | `ECHO_INTAKE_AGENT_PROVIDER=claude` **and** `ANTHROPIC_API_KEY`; default provider is deterministic/no-network | Intake/meeting text OUT (budget-capped) |
 | 5 | Slack (Web API + persistent Socket Mode WSS) | Responder process needs `ECHO_SLACK_APP_TOKEN`+`ECHO_SLACK_BOT_TOKEN`; daemon intake/drift workers need `ECHO_SLACK_BOT_TOKEN` plus their own enable flags (`ECHO_GRANOLA_INTAKE_ENABLED`, `ECHO_DRIFT_SWEEP_ENABLED`, both OFF by default) | Decision/brief/drift cards, intake seeds — decision content, contradicting quotes, meeting titles/URLs OUT; replies IN |
 | 6 | Linear (`api.linear.app/graphql`) | `ECHO_LINEAR_INTAKE_ENABLED` or the full six-variable `LINEAR_*` set; OFF by default | Issue creation with meeting-derived fields OUT; issue id/url IN |
+
+**Rows 2–3 are handoffs to externally controlled vendor CLIs.** ECHO spawns the `codex` and `claude` binaries as subprocesses; it does not own, ship, or sandbox them. ECHO can verify only what **it** writes to the subprocess's stdin — the extraction prompt named in the table. Everything past that boundary is the vendor's: the CLI's own network endpoints, proxy handling, telemetry, auto-update behavior, and any tool-use it performs are opaque to ECHO and cannot be bounded or verified here. The no-telemetry / no-update-check assurance above is scoped to ECHO's own code **only** and does not extend to those vendor binaries. (Row 4, the Agent SDK call, runs in-process inside ECHO's own runtime, so it *is* covered by the ECHO-owned assurance; rows 1, 5, and 6 are ECHO's own HTTP/WebSocket clients.)
 
 **The meeting→brief wedge path uses only #1 + one brain (#2 by default — i.e., the default lab brief path sends meeting content to OpenAI via codex, not Anthropic).** Brief generation itself makes zero network calls; it composes from local state. Endpoints #4–#6 belong to the CEO Slack responder (a separate, manually-started process — the daemon does not boot it) and the two off-by-default daemon workers.
 
@@ -45,14 +47,19 @@ The daemon serves MCP on **`127.0.0.1:38478`** (loopback only, overridable via `
 
 ## Deletion story (honest)
 
-There is **no selective delete** today. Because storage is append-only with no delete operation, the only way to remove captured data is to delete **every** location that holds it — and the set is larger than one directory:
+There is **no selective delete** today. Because storage is append-only with no delete operation, the only way to remove captured data is to delete **every** location that holds it — and the set is larger than one directory.
+
+First **enumerate every loaded ECHO launchd job and boot each out** before deleting anything (`launchctl list | grep -i echo`, then `echoctl daemon uninstall --label <label>` or `launchctl bootout gui/$(id -u)/<label>` per label). A machine may run more than the default `com.echo.daemon` — secondary or `com.echo.selftest.*` daemons each carry their own label, ECHO_HOME, database, and logs, and each must be stopped, or WAL checkpointing recreates files mid-delete.
+
+Then delete every location that holds data:
 
 1. **The database, including WAL/SHM siblings.** Default `~/Library/Application Support/ECHO/echo.db` plus `echo.db-wal` and `echo.db-shm` (WAL mode means recent captures can live in the `-wal` file, not yet in the main db). If the install used a custom location (`ECHO_DB_PATH` / `--db-path`, or `ECHO_DATA_DIR` / `--data-dir`), delete that location instead — check the launchd plist / env before assuming the default.
-2. **State sidecars:** `~/.echo/` (poller checkpoints, high-water marks, the Granola key fallback, decision/changeset drafts, plus skills/roles/workflows/adapters config).
-3. **Logs:** `~/Library/Logs/echo/` (default `--log-dir`) — daemon/worker logs can quote captured content in error paths.
-4. **Any manual backups.** There is no automated backup today (register T9 open), but any operator-made copy of `echo.db` holds everything the original did; deletion must chase copies too.
+2. **State sidecars:** `~/.echo/` — or the custom `ECHO_HOME` / `--home` if one was set — (poller checkpoints, high-water marks, the Granola key fallback, decision/changeset drafts, plus skills/roles/workflows/adapters config).
+3. **Logs, plist, label:** `~/Library/Logs/echo/` (default `--log-dir`, files `echo-daemon.out.log` / `.err.log`) — daemon/worker logs can quote captured content in error paths. A custom `--log-dir` moves the logs; a custom `--plist-path` / `--label` moves the launchd plist (default `~/Library/LaunchAgents/<label>.plist`). Delete the label, plist path, and log dir **actually in use**, not the defaults.
+4. **Generated briefs:** `echoctl brief` writes `brief-<note_id>.json` and `brief-<note_id>.md` into its `--out-dir`, which defaults to the directory the command was run from — there is no single canonical brief location, so deletion must chase every directory where briefs were generated.
+5. **Any manual backups.** There is no automated backup today (register T9 open), but any operator-made copy of `echo.db` holds everything the original did; deletion must chase copies too.
 
-Stop the daemon first (`echoctl daemon uninstall`), or WAL checkpointing can recreate files mid-delete. You cannot remove one meeting, one participant, or one note; it is all-or-nothing. Per-record forgetting (tombstone + audit) is a future item, not a current capability. Say this to the lab before capture, not after a deletion request. (The install doc's "Full Removal" section mirrors this list.)
+You cannot remove one meeting, one participant, or one note; it is all-or-nothing. Per-record forgetting (tombstone + audit) is a future item, not a current capability. Say this to the lab before capture, not after a deletion request. (The install doc's "Full Removal" section mirrors this list.)
 
 ## Residual public-repo exposure
 
