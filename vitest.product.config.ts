@@ -6,6 +6,10 @@ export default defineConfig({
     // Security-patched Vitest/Vite startup plus process-spawning integration
     // fixtures can exceed the upstream 5s default on macOS and CI runners.
     testTimeout: 15_000,
+    // Several product-suite fixtures synchronously pack, install, or spawn the
+    // real CLI. Run files one at a time under Vitest 3 so those integration
+    // processes do not starve each other on hosted macOS runners.
+    fileParallelism: false,
     exclude: [
       'tests/review-queue/**',
       'tests/backlog/backlog-index.test.ts',

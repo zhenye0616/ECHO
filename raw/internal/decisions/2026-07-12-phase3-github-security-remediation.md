@@ -76,6 +76,8 @@ Draft PR [#8](https://github.com/zhenye0616/ECHO/pull/8) ran at exact head `91e8
 
 The non-quality failures are product runtime/package behavior, not action-pin transport failures. Comparable `ci` and `release` runs were already failing on the unchanged `main` history, including `ci` run `29177757205` at exact baseline SHA `f77ba415` and multiple pre-Phase-3 release runs. The clarity halt forbids repairing those source/package defects here. They require a founder disposition: either keep R3 blocked until post-G2 product work fixes them, or explicitly classify the inherited red checks as deferred-with-owner-and-trigger for this security-only landing. Do not make that choice implicitly.
 
+The test-only follow-up at `6751c5f8` cleared both Ubuntu quality jobs. One macOS quality job still failed because the 30-45 second real-doctor fixture produced empty output while the full product suite ran other process-heavy files concurrently; the repaired Git fixture itself passed. The final test-runner follow-up sets `fileParallelism: false` only in `vitest.product.config.ts`. The full local product suite then passed 181 files / 1,867 tests in 328 seconds, including the real doctor test in 29 seconds. This trades CI duration for deterministic resource isolation and does not change application source or runtime behavior.
+
 ## Remaining ordered gates
 
 1. Finish local verification and independent review at the exact candidate tip.
