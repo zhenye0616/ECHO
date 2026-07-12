@@ -10,7 +10,7 @@ Answer one group at a time. A checked option in an older template is not valid u
 
 Canonical neutral template: `2026-07-11-filter-repo-decision-template.md`.
 
-**Founder decision recorded 2026-07-12:** `DEFER`, owned by the founder, triggered by the first G4 exclusive maintenance window after holdout-131 evidence and branch/worktree closure, or any external report of the flagged content, whichever occurs first. Decision input SHA: `afe26cdcdb8edbad8f6c9fb1d022b8057bcc069e`.
+**Founder decision recorded 2026-07-12:** `DEFER`, owned by the founder, triggered by the first G4 exclusive maintenance window after holdout-131 evidence and branch/worktree closure, or any external report of the flagged content, whichever occurs first. Decision input SHA: `afe26cdcdb8edbad8f6c9fb1d022b8057bcc069e`. Decision record commit: `47ae3c031f9c77ed29c4bb37c93117e15b083b7b`.
 
 Decision context:
 

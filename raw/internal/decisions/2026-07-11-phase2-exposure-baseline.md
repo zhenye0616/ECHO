@@ -92,7 +92,7 @@ The local `gh` account token is invalid, so GitHub push protection, repository s
 
 ## Gate status
 
-- Job B, real reachable-history secret scan: **DONE on the Phase 2 branch**, including the separately enumerated binary/archive history, pending merge and independent rerun.
+- Job B, real reachable-history secret scan: **DONE and independently rerun on the Phase 2 branch**, including the separately enumerated binary/archive history; pending merge.
 - Reachable-history semantic assessment: **DONE for the declared detectors**, with the limitation above.
 - Prospective CI and pre-push protection: **IMPLEMENTED on the Phase 2 branch**, not yet proven by a GitHub run.
 - Job C, filter-repo execute-or-defer: **DEFERRED-WITH-OWNER-AND-TRIGGER on 2026-07-12**; known history exposure is explicitly accepted until the recorded trigger.

@@ -19,6 +19,7 @@ Reachable git history contains live-capture content flagged for removal — the 
 > Decided by: Founder
 > Date: 2026-07-12 PDT
 > Decision input SHA: `afe26cdcdb8edbad8f6c9fb1d022b8057bcc069e`
+> Decision record commit: `47ae3c031f9c77ed29c4bb37c93117e15b083b7b`
 > Owner: Founder
 > Trigger: the first G4 exclusive maintenance window after holdout-131 evidence is preserved and its branch/worktree are closed, or any external report of the flagged content, whichever occurs first.
 
