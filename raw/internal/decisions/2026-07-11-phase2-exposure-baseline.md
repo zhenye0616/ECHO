@@ -1,8 +1,8 @@
 # Phase 2 exposure baseline - real scanner and reachable-history content sweep
 
-**Date:** 2026-07-11 PDT  
-**Phase 1 baseline:** `f77ba415fd6848fbb52586dc0ca4ada522097bac`  
-**Security-gate commit:** `5bd7b0cd` on `maint/clarity-phase2`  
+**Date:** 2026-07-11 PDT
+**Phase 1 baseline:** `f77ba415fd6848fbb52586dc0ca4ada522097bac`
+**Security-gate commits:** `5bd7b0cd`, `47c171b1`, and `8e0e591f` on `maint/clarity-phase2`
 **Scope:** read-only secret scanning, sanitized semantic-history assessment, and prospective guardrails. No history rewrite.
 
 ## Result in plain English
@@ -18,7 +18,7 @@ The real secret scanner found no credentials in reachable git history. This clos
 | Configuration | Gitleaks `8.30.1` compiled default rules; no repo allowlist or suppression file |
 | Command | `gitleaks git . --log-opts=--all --redact=100 --no-banner --no-color --report-format=json --report-path=<operator-temp>` |
 | Ref scope | Local and remote branch refs plus tags reachable from the Phase 1 checkout; `git rev-list --all --count` reported 4,670 reachable commits at the baseline |
-| Scanner accounting | 4,493 commits / about 28.51 MB at `f77ba415`; 4,494 commits / about 28.52 MB after `5bd7b0cd` |
+| Scanner accounting | 4,493 commits / about 28.51 MB at `f77ba415`; 4,497 commits / about 28.56 MB after the Phase 2 scan commits |
 | Findings | 0 |
 | Redacted JSON report | Empty array (`jq length` = 0); operator-temporary only, because an empty machine report adds no durable evidence beyond this command/result record |
 
@@ -32,12 +32,14 @@ A temporary repository outside Project ECHO was created with a fake AWS-shaped c
 
 ## Prospective gate
 
-Commit `5bd7b0cd` adds:
+Commits `5bd7b0cd`, `47c171b1`, and `8e0e591f` add:
 
-- `tools/secret-scan.sh`, which fails closed unless Gitleaks is exactly `8.30.1` and then runs the redacted `--all` scan;
+- `tools/secret-scan.sh`, which fails closed unless Gitleaks is exactly `8.30.1`, runs the redacted `--all` text-patch scan, and then requires the binary-history pass;
+- `tools/binary-history-scan.mjs`, which enumerates every unique path Git classified as binary across `--all`, extracts every unique reachable blob version, runs archive traversal, extracts printable strings, and sends those strings through redacted Gitleaks stdin;
+- `tools/semantic-history-scan.mjs`, which commits the semantic detector regexes/exclusions and emits only sanitized counts;
 - `.github/workflows/secret-scan.yml`, which runs on every push and pull request without docs/raw path exclusions, downloads the official Linux x64 `8.30.1` release, verifies SHA-256 `551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb`, fetches reachable branches/tags, and invokes the repo-owned wrapper;
-- `tools/install-pre-push-hook.sh`, a manual, idempotent local hook installer; it does not modify git configuration or install itself automatically;
-- focused tests for version pinning, redaction flags, failure propagation, hook path resolution, idempotency, and mode repair (9/9 green).
+- `tools/install-pre-push-hook.sh`, a manual, idempotent local hook installer; it does not modify git configuration or install itself automatically, preserves different existing hook content by default, and requires explicit `--force` to replace it;
+- focused tests for version pinning, redaction flags, text/binary failure propagation, semantic-count privacy, hook path resolution, idempotency, refusal-by-default, explicit force, and mode repair (13/13 green).
 
 The official release checksum file was also downloaded out of tree and matched the pinned Linux asset checksum. The checksum-file SHA-256 was `061476c21adaf5441516f96f185c1a4706a83cd6329b9b38762271b3d4a52fae`.
 
@@ -47,12 +49,31 @@ This is separate from Gitleaks. A sanitized scan read all added/deleted diff-con
 
 | Detector | Reachable-history result | Comparison |
 |---|---:|---|
-| Diff content read | 36,857,911 bytes | Coverage measurement only |
+| Diff content read | 36,913,085 bytes at the reproducible-script rerun | Coverage measurement only |
 | Live-looking Granola note IDs | 10 distinct | Current tracked tree also has 10; history-only delta is 0 |
 | Absolute `/Users/...` path literals | 470 distinct | Expected broad low-severity historical class; not removed |
 | Non-example email-shaped literals | 19 distinct | Count only; not treated as proof of identity or sensitivity without manual classification |
 
 The redaction commits `001d7fe3` and `849c0b3c` are descendants of the exposed content, so the removed names, meeting title, quote, and sensitive note titles remain reachable in pre-redaction history. The already-known content anchors `ab95c519`, `1ba3580a`, and `7bc368b5` also remain reachable. No new note-ID class appeared beyond the tracked-tree inventory.
+
+Exact reproducible command: `tools/semantic-history-scan.mjs`. Its JSON output records the `--all` ref scope, textual-diff input contract, regexes, email exclusions, counts, and the rule that matched values are never emitted.
+
+## Reachable binary/archive pass
+
+Gitleaks git mode reads textual patches and does not cover NUL-classified binary diffs. The repo-owned second pass therefore enumerated the full binary history separately:
+
+| Field | Result |
+|---|---:|
+| Unique binary-diff paths | 7 |
+| Unique reachable blob versions across those paths | 8 |
+| Raw binary bytes extracted | 2,765,149 |
+| Printable bytes sent through Gitleaks stdin | 228,124 |
+| Archive traversal (`max-archive-depth=3`) | clean |
+| Printable-string scan | clean |
+
+The seven path classes were one architecture PNG, one historical NUL-containing TypeScript path, two historical Python bytecode paths, and three application icon PNGs. The scan emits only counts and redacted Gitleaks output. It is run automatically by `tools/secret-scan.sh history`, including in CI and the installed pre-push hook.
+
+This closes the observed binary bypass for plain/encoded credential strings and supported nested archives. It is not a steganography claim: secrets deliberately hidden in image pixels or an unsupported encrypted archive are outside this detector and remain an accepted scanner limitation, not an assertion that arbitrary binary content is semantically safe.
 
 ### Semantic-scan limitation
 
@@ -68,7 +89,7 @@ The local `gh` account token is invalid, so GitHub push protection, repository s
 
 ## Gate status
 
-- Job B, real reachable-history secret scan: **DONE on the Phase 2 branch**, pending merge and independent rerun.
+- Job B, real reachable-history secret scan: **DONE on the Phase 2 branch**, including the separately enumerated binary/archive history, pending merge and independent rerun.
 - Reachable-history semantic assessment: **DONE for the declared detectors**, with the limitation above.
 - Prospective CI and pre-push protection: **IMPLEMENTED on the Phase 2 branch**, not yet proven by a GitHub run.
 - Job C, filter-repo execute-or-defer: **PENDING founder decision**.

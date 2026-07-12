@@ -1,7 +1,7 @@
 # Phase 2 founder decision packet
 
-**Status:** awaiting founder session  
-**Purpose:** collect the decisions required to close G1/G2 without reopening product demand  
+**Status:** awaiting founder session
+**Purpose:** collect the decisions required to close G1/G2 without reopening product demand
 **Locked input:** Team decision product, meeting-to-brief wedge, aggressive selling, and client-machine endpoint remain decided
 
 Answer one group at a time. A checked option in an older template is not valid until the decision, owner, date, and commit SHA are recorded. Client/account identities belong in a private operating file; the public repo records roles, counts, and sanitized references only.
@@ -20,6 +20,8 @@ Canonical neutral template: `2026-07-11-filter-repo-decision-template.md`.
 **Recommendation:** deliberately neutral because the choice is irreversible and the existing template promises neutrality.
 
 **Founder answer needed:** `EXECUTE` or `DEFER`; if defer, owner and trigger; if execute, confirmation that no rewrite begins before holdout closure and the G4 exclusive window.
+
+**Separate G1 settings answer needed:** either (a) re-authenticate `gh` and authorize the security executor to verify GitHub push protection, repository security settings, and release-asset policy before G1 closes, or (b) defer that read-only audit with a named owner and objective trigger. Recommendation: verify before G2 rather than defer. The current local `gh` token is invalid, so no setting is assumed green.
 
 ## 2. YC and demo - X1 / G3
 
@@ -48,6 +50,12 @@ Canonical options: `2026-07-11-yc-demo-plan-amendment-template.md`.
 **Recommendation:** paid design-partner engagement. Keep **ECHO** as the client-visible working name for the pilot; preserve the existing hard rename deadline before public Show HN rather than blocking the first client on naming.
 
 **Founder answer needed:** buyer role, exact offer, exact price/currency, who pays, invoicing/payment route, pilot duration, paid-conversion term, and keep/replace ECHO for the first engagement.
+
+### Rollout calendar and dependencies
+
+**Recommendation:** schedule by evidence gate, not optimistic feature date: access discovery -> isolated founder-live candidate run -> qualification -> assisted client install -> second real meeting/acceptance. Record the lab's available windows and every external dependency (policy approval, Zoom/Mattermost admin access, vendor account/key, contracting/payment) against those milestones.
+
+**Founder answer needed:** target date/window for each milestone, lab counterpart for each external dependency, and the latest acceptable first-client enablement date. If the lab cannot yet commit, defer B1 with the founder as owner and the trigger `lab counterpart confirms access-discovery and first-meeting windows`.
 
 ### Operational definition of done
 

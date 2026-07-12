@@ -1,7 +1,7 @@
 # G3 demo freeze record - template
 
-**Status:** unsealed template; not evidence  
-**Freeze deadline:** 2026-07-18 PDT  
+**Status:** unsealed template; not evidence
+**Freeze deadline:** 2026-07-18 PDT
 **Rule:** do not fill or seal until the founder chooses the demo shape
 
 ## Demo decision
@@ -76,10 +76,11 @@
 - Support contact/availability window:
 - Sealed by:
 - Sealed timestamp:
-- Seal commit SHA:
+- Prepared-against main SHA:
+- Companion seal-record path (created only after this record is committed):
 - Non-author completeness verdict:
 
-After this block is sealed, do not edit it. Record emergency changes as dated addenda.
+To seal without a circular self-SHA: fill and commit this freeze record once (commit `F`), then create a separate companion seal record that names `F`, its tree/blob hash, the founder authorization, and the non-author verdict. Do not edit commit `F` after the companion record lands. Record emergency changes as dated addenda that reference both records.
 
 ## Emergency addendum template
 

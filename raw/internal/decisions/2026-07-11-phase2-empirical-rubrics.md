@@ -1,7 +1,7 @@
 # Phase 2 predeclared empirical rubrics
 
-**Date:** 2026-07-11  
-**Status:** rubrics only; no live probe is authorized by this document  
+**Date:** 2026-07-11
+**Status:** rubrics only; no live probe is authorized by this document
 **Purpose:** close A2/V2 and prepare deployment evidence without changing product code or mutating founder/client state
 
 ## Shared rules

@@ -1,8 +1,8 @@
 # Phase 2 halt-closure inventory
 
-**Baseline:** `f77ba415` plus Phase 2 security evidence through `6bb66ad9`  
-**Canonical register:** `2026-07-10-project-echo-orientation-and-closure.md`  
-**Current tally:** 27 rows total; 1 resolved; 26 pending  
+**Baseline:** `f77ba415` plus Phase 2 security evidence through `8e0e591f`
+**Canonical register:** `2026-07-10-project-echo-orientation-and-closure.md`
+**Current tally:** 27 rows total; 1 resolved; 26 pending
 **Readiness:** preparing founder decision session; G1 and G2 remain open
 
 This inventory does not replace the canonical register. It prevents a template, recommendation, or rubric from being mistaken for closure. Only `resolved`, `accepted-risk`, or `deferred-with-owner-and-trigger` are terminal states.
@@ -39,9 +39,9 @@ This inventory does not replace the canonical register. It prevents a template, 
 
 ## Objective work completed in Phase 2 so far
 
-- Gitleaks 8.30.1 full-history scan, zero findings, redacted report empty.
-- Sanitized reachable-history semantic detectors run; known content/history caveat preserved.
-- Pinned all-path CI workflow and manual pre-push installer implemented with focused tests.
+- Gitleaks 8.30.1 textual-history scan plus separately enumerated binary/archive scan, zero findings.
+- Reproducible sanitized semantic-history detectors run; known content/history caveat preserved.
+- Pinned all-path CI workflow and manual fail-closed pre-push installer implemented with focused tests.
 - Empirical rubrics, G3 template, and lab access checklist prepared without running live probes.
 
 ## Work that cannot be closed by an executor alone

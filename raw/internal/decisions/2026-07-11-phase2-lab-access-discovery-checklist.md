@@ -1,7 +1,7 @@
 # Phase 2 lab access and onboarding discovery checklist
 
-**Status:** questions only; no client answers recorded  
-**Rows served:** B1, C1-C3, T11, X2-X4  
+**Status:** questions only; no client answers recorded
+**Rows served:** B1, C1-C3, T11, X2-X4
 **Privacy:** record answers by role and capability. Do not commit client names, workspace names, meeting titles, participant names, credentials, URLs, or raw policy documents.
 
 ## Rollout and accountable people
