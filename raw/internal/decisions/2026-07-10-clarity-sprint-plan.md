@@ -160,7 +160,7 @@ The current-contract rehearsal is diagnostic input only and cannot close G5. G5 
 
 | Target | Change | Rationale |
 |---|---|---|
-| backlog/inbox/2026-05-29-081-raycast-command-disposition-and-removal.md | Delete (or move to backlog/archive/) with a one-line commit citing complete/081 at 9bf44cea as authoritative | Zombie duplicate of a shipped item reading as open work; with 132/133 withdrawn it is now the ONLY inbox file, so removal leaves inbox empty and honest. |
+| backlog/inbox/2026-05-29-081-raycast-command-disposition-and-removal.md | **DONE 2026-07-11 (`b6fc242a`)** — deleted with a one-line commit citing complete/081 at 9bf44cea as authoritative | Zombie duplicate of a shipped item reading as open work; with 132/133 withdrawn it was the ONLY inbox file, so removal left inbox empty and honest. |
 | backlog/reviews/ (dirs of complete/archived items) | Move to backlog/archive/reviews/<YYYY-MM>/; keep only in-flight items' rounds live; extend the archive policy README | 1617 files / 6.9M of pure history — the largest mass in the repo; nothing in flight references closed rounds. |
 | backlog/complete/ (wiki-promoted items) | Batch-run the documented stub-and-archive reduction to backlog/archive/shipped/ (after WS4's promotion pass closes each item's After-Completion debt) | Only 5 of 130 completed item specs have archive counterparts; do NOT bulk-normalize stale status: frontmatter — README forbids it. |
 | backlog/task-state/ (pointers for completed items) | Archive to backlog/archive/task-state/ alongside each item's stub | 51+ dead pointers are active cold-start misdirection for role-typed actors; only live-item pointers stay. |
