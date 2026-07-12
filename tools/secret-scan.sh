@@ -24,11 +24,12 @@ fi
 
 case "$MODE" in
   history)
-    exec gitleaks git "$REPO_ROOT" \
+    gitleaks git "$REPO_ROOT" \
       --log-opts=--all \
       --redact=100 \
       --no-banner \
       --no-color
+    exec node "$REPO_ROOT/tools/binary-history-scan.mjs"
     ;;
   *)
     echo "ERROR: unsupported secret-scan mode: ${MODE}" >&2

@@ -93,7 +93,7 @@ describe('tools/install-pre-push-hook.sh', () => {
     expect(isExecutable(hook)).toBe(true);
   });
 
-  it('warns before replacing different existing hook content', () => {
+  it('refuses to replace different existing hook content by default', () => {
     const repo = join(workdir, 'repo');
     mkdirSync(repo);
     gitInit(repo);
@@ -102,9 +102,24 @@ describe('tools/install-pre-push-hook.sh', () => {
 
     const result = sh(repo, INSTALLER, []);
 
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('refusing to overwrite existing pre-push hook');
+    expect(readFileSync(hook, 'utf8')).toContain('echo custom');
+  });
+
+  it('replaces different existing hook content only with --force', () => {
+    const repo = join(workdir, 'repo');
+    mkdirSync(repo);
+    gitInit(repo);
+    const hook = join(repo, '.git/hooks/pre-push');
+    writeFileSync(hook, '#!/usr/bin/env bash\necho custom\n');
+
+    const result = sh(repo, INSTALLER, ['--force']);
+
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('was overwritten');
+    expect(result.stdout).toContain('because --force was supplied');
     expect(readFileSync(hook, 'utf8')).not.toContain('echo custom');
+    expect(readFileSync(hook, 'utf8')).toContain('tools/secret-scan.sh history');
   });
 
   it('resolves linked-worktree hooks into the main repository', () => {

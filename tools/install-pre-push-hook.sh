@@ -3,6 +3,21 @@
 
 set -euo pipefail
 
+FORCE=0
+case "${1:-}" in
+  '') ;;
+  --force) FORCE=1 ;;
+  -h|--help)
+    echo "usage: tools/install-pre-push-hook.sh [--force]"
+    exit 0
+    ;;
+  *)
+    echo "ERROR: unknown argument: $1" >&2
+    echo "usage: tools/install-pre-push-hook.sh [--force]" >&2
+    exit 2
+    ;;
+esac
+
 if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
   echo "ERROR: not inside a git working tree" >&2
   exit 1
@@ -54,11 +69,20 @@ if [ -f "$HOOK_PATH" ] && cmp -s "$TMP_HOOK" "$HOOK_PATH"; then
 fi
 
 HAD_PRIOR=0
-[ -f "$HOOK_PATH" ] && HAD_PRIOR=1
+if [ -f "$HOOK_PATH" ]; then
+  HAD_PRIOR=1
+  if [ "$FORCE" -ne 1 ]; then
+    rm -f "$TMP_HOOK"
+    trap - EXIT
+    echo "ERROR: refusing to overwrite existing pre-push hook at $HOOK_PATH" >&2
+    echo "Review and combine it manually, or rerun with --force to replace it." >&2
+    exit 1
+  fi
+fi
 mv "$TMP_HOOK" "$HOOK_PATH"
 trap - EXIT
 chmod u+x "$HOOK_PATH"
 echo "pre-push hook installed at $HOOK_PATH"
 if [ "$HAD_PRIOR" -eq 1 ]; then
-  echo "NOTE: existing pre-push hook was overwritten. Restore or combine custom hook behavior manually."
+  echo "NOTE: existing pre-push hook was replaced because --force was supplied."
 fi

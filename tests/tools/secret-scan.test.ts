@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -42,6 +50,14 @@ beforeEach(() => {
   mkdirSync(repo);
   mkdirSync(binDir);
   spawnSync('git', ['init', '-q'], { cwd: repo });
+  spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: repo });
+  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: repo });
+  mkdirSync(join(repo, 'tools'));
+  copyFileSync(join(REPO, 'tools/binary-history-scan.mjs'), join(repo, 'tools/binary-history-scan.mjs'));
+  writeFileSync(join(repo, 'seed'), 'seed\n');
+  spawnSync('git', ['add', 'tools/binary-history-scan.mjs'], { cwd: repo });
+  spawnSync('git', ['add', 'seed'], { cwd: repo });
+  spawnSync('git', ['commit', '-q', '-m', 'seed'], { cwd: repo });
 });
 
 afterEach(() => {
