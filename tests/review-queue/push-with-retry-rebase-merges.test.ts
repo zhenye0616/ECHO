@@ -32,6 +32,7 @@ import {
   mkdtempSync,
   realpathSync,
   rmSync,
+  readFileSync,
   writeFileSync,
   cpSync,
 } from 'node:fs';
@@ -124,11 +125,10 @@ describe('051 AC1 — push-with-retry.sh preserves merge commits via --rebase=me
 
     // 3. Invoke push-with-retry.sh from the local clone. This exercises
     //    the AC1 codepath: pull --rebase=merges origin main && push.
-    const r = spawnSync(
-      'bash',
-      ['tools/review-queue/push-with-retry.sh', '051-ac1-test'],
-      { cwd: fx.local, encoding: 'utf-8' },
-    );
+    const r = spawnSync('bash', ['tools/review-queue/push-with-retry.sh', '051-ac1-test'], {
+      cwd: fx.local,
+      encoding: 'utf-8',
+    });
     expect(r.status, `push-with-retry stderr: ${r.stderr}\nstdout: ${r.stdout}`).toBe(0);
 
     // 4. The load-bearing assertion: origin/main HEAD is a merge commit
@@ -144,9 +144,7 @@ describe('051 AC1 — push-with-retry.sh preserves merge commits via --rebase=me
     //    the rebase-and-push succeeded on first attempt.
     const qe = join(fx.local, 'raw/internal/queue-errors.md');
     if (existsSync(qe)) {
-      expect(execFileSync('cat', [qe], { encoding: 'utf-8' })).not.toMatch(
-        /PUSH-RACE-FALLBACK/,
-      );
+      expect(readFileSync(qe, 'utf-8')).not.toMatch(/PUSH-RACE-FALLBACK/);
     }
   });
 });

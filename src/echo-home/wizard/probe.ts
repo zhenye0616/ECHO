@@ -1,7 +1,7 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import type { AgentKind } from './detect-agents.js';
-import { resolveCommand } from '../../util/subprocess.js';
+import { assertSafeCommandArgs, resolveCommand } from '../../util/subprocess.js';
 
 export type ProbeOutcome =
   | { agent: AgentKind; probed: true; latencyMs: number }
@@ -39,11 +39,17 @@ function realSpawn(
   opts?: { timeoutMs: number },
 ): Promise<SpawnResult> {
   return new Promise((resolvePromise, reject) => {
-    const resolved = resolveCommand(cmd, {
+    if (cmd !== 'codex' && cmd !== 'claude') {
+      reject(new Error('Unsupported probe executable'));
+      return;
+    }
+    const executable = cmd === 'codex' ? 'codex' : 'claude';
+    const resolved = resolveCommand(executable, {
       platform: process.platform,
       env: process.env,
       existsSync,
     });
+    assertSafeCommandArgs(resolved, args);
     const child = nodeSpawn(resolved.command, [...(resolved.prependArgs ?? []), ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -121,6 +127,9 @@ async function probeOne(
   timeoutMs: number,
 ): Promise<ProbeOutcome> {
   if (agent === 'cursor') return { agent, probed: false, reason: 'manual-only' };
+  if (agent !== 'codex' && agent !== 'claude-code') {
+    return { agent, probed: false, reason: 'unexpected-output', detail: 'Unsupported agent kind' };
+  }
 
   const start = Date.now();
   const cmd = agent === 'codex' ? 'codex' : 'claude';

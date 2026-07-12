@@ -4,6 +4,7 @@ import {
   copyFileSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -71,7 +72,7 @@ describe('tools/secret-scan.sh', () => {
     const result = run();
 
     expect(result.status).toBe(0);
-    const invocation = spawnSync('cat', [invocationLog], { encoding: 'utf8' }).stdout;
+    const invocation = readFileSync(invocationLog, 'utf8');
     expect(invocation).toContain(`git ${realpathSync(repo)}`);
     expect(invocation).toContain('--log-opts=--all');
     expect(invocation).toContain('--redact=100');

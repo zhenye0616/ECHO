@@ -6,9 +6,9 @@
 // hand-scores each row (TP / FP / TN / FN); this script does NOT auto-score.
 //
 // Usage:
-//   npx vite-node tools/validate-resolution.ts
-//   npx vite-node tools/validate-resolution.ts --days 14
-//   npx vite-node tools/validate-resolution.ts --out /tmp/score.md
+//   npx vite-node --script tools/validate-resolution.ts
+//   npx vite-node --script tools/validate-resolution.ts --days 14
+//   npx vite-node --script tools/validate-resolution.ts --out /tmp/score.md
 //
 // Storage path resolution mirrors the daemon (src/daemon/index.ts):
 //   ECHO_DB_PATH > ECHO_DATA_DIR/echo.db > ~/Library/Application Support/ECHO/echo.db
@@ -16,6 +16,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { getRecentWorkContext } from '../src/mcp/tools/recent-work-context.js';
 import { SqliteStorage } from '../src/storage/sqlite.js';
@@ -66,9 +67,13 @@ function resolveDbPath(): string {
   return join(homedir(), 'Library', 'Application Support', 'ECHO', 'echo.db');
 }
 
-function escapeCell(s: string | undefined): string {
+export function escapeMarkdownTableCell(s: string | undefined): string {
   if (s === undefined) return '';
-  return s.replace(/\|/g, '\\|').replace(/\n/g, ' ⏎ ').slice(0, 240);
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r\n?|\n/g, ' ⏎ ')
+    .slice(0, 240);
 }
 
 interface Row {
@@ -126,14 +131,14 @@ Total rows: ${rows.length} (${rows.filter((r) => r.resolved).length} resolved, $
 `;
   const body = rows
     .map((r, i) => {
-      const hintAtomCell = `\`${r.hint_atom_id}\` · ${r.hint_atom_time} · \`${escapeCell(r.hint_atom_url)}\``;
+      const hintAtomCell = `\`${r.hint_atom_id}\` · ${r.hint_atom_time} · \`${r.hint_atom_url}\``;
       const resolverCell =
         r.resolved_by_atom_id !== undefined
           ? `\`${r.resolved_by_atom_id}\` · ${r.resolved_by_atom_time ?? ''}`
           : '';
-      return `| ${i + 1} | ${r.kind} | ${r.resolved ? '✅' : '❌'} | ${escapeCell(
+      return `| ${i + 1} | ${r.kind} | ${r.resolved ? '✅' : '❌'} | ${escapeMarkdownTableCell(
         hintAtomCell,
-      )} | ${escapeCell(resolverCell)} | ${escapeCell(r.text)} |  |`;
+      )} | ${escapeMarkdownTableCell(resolverCell)} | ${escapeMarkdownTableCell(r.text)} |  |`;
     })
     .join('\n');
 
@@ -198,7 +203,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err: unknown) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err: unknown) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
