@@ -97,10 +97,13 @@ This removes adapter config, the launchd job, the package, and optionally all lo
 First enumerate **every** loaded ECHO launchd job and boot each one out before deleting any data — a machine may carry more than the default daemon (a secondary or `com.echo.selftest.*` daemon has its own label, ECHO_HOME, database, and logs, and can still be running). Stopping first is mandatory or WAL checkpointing recreates files mid-delete:
 
 ```bash
-launchctl list | grep -i echo          # every loaded job whose label matches echo
-# for EACH label found, stop it (default label shown; repeat per custom --label):
+launchctl list | grep -i echo          # CANDIDATES only — a name match is not ownership
+# for EACH candidate: inspect the label, its plist, and the plist's
+# program/ProgramArguments path; confirm they point at THIS echoctl install
+# before acting. Never boot out a job on a name match alone.
+# then, per CONFIRMED label (default shown; repeat per custom --label):
 echoctl daemon uninstall --label com.echo.daemon
-# for a label echoctl does not manage, boot it out directly:
+# for a confirmed ECHO label echoctl does not manage, boot it out directly:
 launchctl bootout gui/$(id -u)/<label>
 ```
 

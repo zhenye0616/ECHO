@@ -39,7 +39,7 @@ Contract A boots the full lab, so the honest inventory is every network boundary
 
 **The meeting→brief wedge path uses only #1 + one brain (#2 by default — i.e., the default lab brief path sends meeting content to OpenAI via codex, not Anthropic).** Brief generation itself makes zero network calls; it composes from local state. Endpoints #4–#6 belong to the CEO Slack responder (a separate, manually-started process — the daemon does not boot it) and the two off-by-default daemon workers.
 
-Note: nothing in the code reads `HTTP_PROXY`/`HTTPS_PROXY`, so a corporate proxy or TLS-interception layer on a managed machine is an untested/likely-breaking regime for all six endpoints.
+Note: nothing in ECHO's own code reads `HTTP_PROXY`/`HTTPS_PROXY`, so a corporate proxy or TLS-interception layer on a managed machine is an untested/likely-breaking regime for the **ECHO-owned HTTP/WebSocket integrations** (rows 1, 4, 5, 6). The Codex/Claude CLIs' proxy behavior (rows 2–3) is vendor-controlled and unknown — they may honor, ignore, or partially honor proxy env vars; ECHO makes no claim either way.
 
 ## Local MCP surface
 
@@ -49,7 +49,7 @@ The daemon serves MCP on **`127.0.0.1:38478`** (loopback only, overridable via `
 
 There is **no selective delete** today. Because storage is append-only with no delete operation, the only way to remove captured data is to delete **every** location that holds it — and the set is larger than one directory.
 
-First **enumerate every loaded ECHO launchd job and boot each out** before deleting anything (`launchctl list | grep -i echo`, then `echoctl daemon uninstall --label <label>` or `launchctl bootout gui/$(id -u)/<label>` per label). A machine may run more than the default `com.echo.daemon` — secondary or `com.echo.selftest.*` daemons each carry their own label, ECHO_HOME, database, and logs, and each must be stopped, or WAL checkpointing recreates files mid-delete.
+First **enumerate candidate ECHO launchd jobs and stop the confirmed ones** before deleting anything. `launchctl list | grep -i echo` produces **candidates only, not an ownership boundary** — an unrelated product's label can match the string. For EACH candidate, inspect the label, its plist, and the plist's program/`ProgramArguments` path, and confirm they point at this ECHO install (`echoctl`/its dist) before acting; then stop it with `echoctl daemon uninstall --label <label>`, or `launchctl bootout gui/$(id -u)/<label>` for a confirmed ECHO label echoctl does not manage. Never boot out a job on a name match alone. A machine may run more than the default `com.echo.daemon` — secondary or `com.echo.selftest.*` daemons each carry their own label, ECHO_HOME, database, and logs, and each confirmed one must be stopped, or WAL checkpointing recreates files mid-delete.
 
 Then delete every location that holds data:
 
