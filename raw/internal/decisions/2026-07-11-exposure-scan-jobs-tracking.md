@@ -8,7 +8,7 @@ the others. They are tracked separately below.
 |---|---|---|---|---|
 | **A** | **June 2026 db token scan** | Live-DB / config credential values checked | git history; semantic content | ✅ **DONE** — all placeholders, no live creds |
 | **B** | **Git-history secret scan** | Credential *strings* across all reachable textual patches plus separately enumerated binary/archive blob history | semantic content (names/quotes/IDs); existing clones; arbitrary encodings/obfuscation; steganography/encrypted unsupported archives | **DONE on `maint/clarity-phase2` through `10c578fd`, pending merge + independent rerun.** Gitleaks 8.30.1 text scan: 4,501 commits / ~28.59 MB, zero findings. Binary pass: 7 paths / 8 unique blobs / 2,765,149 raw bytes; archive and 228,139-byte ASCII/UTF-16LE/UTF-16BE printable-string scans clean. Exact evidence and limitations: `2026-07-11-phase2-exposure-baseline.md`. |
-| **C** | **filter-repo content rewrite** | Purging sensitive *content* from git *history* | live clones/forks already out there; secret entropy | ❌ **NEVER RUN.** Promised in commit `0ee788a2` ("privacy: untrack interview/outreach notes; ignore raw/internal/interview…"). Untracking removed files from HEAD only — the blobs remain in history. **Founder execute-or-defer decision PENDING.** |
+| **C** | **filter-repo content rewrite** | Purging sensitive *content* from git *history* | live clones/forks already out there; secret entropy | **DEFERRED-WITH-OWNER-AND-TRIGGER on 2026-07-12.** Owner: founder. Trigger: first G4 exclusive window after holdout-131 evidence/branch/worktree closure, or any external report of flagged content, whichever occurs first. The rewrite has never run; known blobs remain in history and the residual is explicitly accepted until the trigger. Decision: `2026-07-11-filter-repo-decision-template.md`. |
 
 ## Job C — known history exposure anchors (content still reachable in history)
 
@@ -38,4 +38,4 @@ with a clone:
 ## Recommended sequencing (not decisions — inputs to the founder session)
 1. Apply the 4 HEAD redactions (`2026-07-11-exposure-semantic-content-inventory.md`) — cheap, reduces new-clone exposure now.
 2. Re-run the pinned repo-owned Gitleaks wrapper after merge and confirm the first GitHub secret-scan workflow run; install the local pre-push hook deliberately where desired.
-3. Founder execute-or-defer session on Job C (filter-repo) — weigh against caveat #2 (existing clones).
+3. At the recorded trigger, execute Job C in the decision's safe order; until then preserve the explicit residual-exposure statement.

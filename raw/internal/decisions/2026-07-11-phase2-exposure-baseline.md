@@ -7,7 +7,7 @@
 
 ## Result in plain English
 
-The real secret scanner found no credentials in reachable git history. This closes scan Job B, which Phase 1 left partial. It does not make the repository content-safe: known names, quotes, meeting pointers, founder paths, and removed private material remain in history until the separate filter-repo decision is made. Prior public clones, forks, and caches cannot be recalled by either scan or rewrite.
+The real secret scanner found no credentials in reachable git history. This closes scan Job B, which Phase 1 left partial. It does not make the repository content-safe: known names, quotes, meeting pointers, founder paths, and removed private material remain in history under the founder's recorded Job C deferral. Prior public clones, forks, and caches cannot be recalled by either scan or rewrite.
 
 ## Job B - Gitleaks full-history scan
 
@@ -95,5 +95,5 @@ The local `gh` account token is invalid, so GitHub push protection, repository s
 - Job B, real reachable-history secret scan: **DONE on the Phase 2 branch**, including the separately enumerated binary/archive history, pending merge and independent rerun.
 - Reachable-history semantic assessment: **DONE for the declared detectors**, with the limitation above.
 - Prospective CI and pre-push protection: **IMPLEMENTED on the Phase 2 branch**, not yet proven by a GitHub run.
-- Job C, filter-repo execute-or-defer: **PENDING founder decision**.
-- G1 overall: **OPEN** until the filter-repo decision is recorded and the remaining GitHub-settings evidence is either verified or explicitly deferred with owner and trigger.
+- Job C, filter-repo execute-or-defer: **DEFERRED-WITH-OWNER-AND-TRIGGER on 2026-07-12**; known history exposure is explicitly accepted until the recorded trigger.
+- G1 overall: **OPEN** until the remaining GitHub-settings evidence is either verified or explicitly deferred with owner and trigger, and the first landed workflow run is green.

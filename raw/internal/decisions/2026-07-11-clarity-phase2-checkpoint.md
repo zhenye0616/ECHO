@@ -24,7 +24,7 @@ The branch is ready for a founder session because the objective security work is
 - Proved failure behavior in temporary repositories, including odd-offset UTF-16LE and independent UTF-16LE/UTF-16BE controls. No canary entered ECHO history.
 - Ran the sanitized semantic sweep across all refs: 10 live-looking note IDs, 470 absolute user paths, and 19 non-example email-shaped literals. The exact 36,941,730-byte detector input is SHA-256 sealed; a commit-bound control reproduced the same counts.
 - Added a pinned all-path push/PR workflow, a pinned repo wrapper, and a manual pre-push installer that preserves existing hooks unless `--force` is explicit.
-- Preserved the boundary between secret scanning, semantic exposure, and the still-pending history-rewrite decision.
+- Preserved the boundary between secret scanning, semantic exposure, and the subsequently deferred history rewrite.
 
 ### Closure preparation
 
@@ -89,9 +89,8 @@ The first GitHub workflow run is not evidence yet because this branch has not be
 
 Job B is complete on the Phase 2 branch and independently rerun. G1 remains open until:
 
-1. the founder records execute or defer for Job C/filter-repo;
-2. GitHub push protection/settings/release policy are verified after reauthentication or explicitly deferred with owner and trigger; and
-3. after landing, the first GitHub secret-scan workflow run is green.
+1. GitHub push protection/settings/release policy are verified after reauthentication or explicitly deferred with owner and trigger; and
+2. after landing, the first GitHub secret-scan workflow run is green.
 
 Prior public clones, forks, and caches cannot be recalled. A clean credential scan does not clear names, quotes, meeting information, or other semantic content. The production dependency audit also has one separately tracked transitive high advisory (`hono@4.12.23` through `@modelcontextprotocol/sdk@1.29.0`) that must be dispositioned before qualification.
 
@@ -103,12 +102,11 @@ A later G2 lift will authorize reviewed spec conversion. It will not declare the
 
 ## Founder decisions now required
 
-1. Job C/filter-repo: execute the history rewrite in the documented safe order, or defer it with named owner, date/trigger, and accepted residual exposure.
-2. GitHub security evidence: reauthenticate and verify the settings now, or explicitly defer with owner and trigger.
-3. Demo: choose the Jul 18 demo shape and YC submit/defer posture so G3 can freeze a real artifact. The packet recommends meeting-to-brief only and cutting the old Machine-centered scene.
-4. Close or defer the remaining commercial, vendor/key, client/legal, operational, and technical-boundary questions in the founder packet.
-5. Approve named operators and safe inputs for any empirical rubrics that should run before G2.
+1. GitHub security evidence: reauthenticate and verify the settings now, or explicitly defer with owner and trigger.
+2. Demo: choose the Jul 18 demo shape and YC submit/defer posture so G3 can freeze a real artifact. The packet recommends meeting-to-brief only and cutting the old Machine-centered scene.
+3. Close or defer the remaining commercial, vendor/key, client/legal, operational, and technical-boundary questions in the founder packet.
+4. Approve named operators and safe inputs for any empirical rubrics that should run before G2.
 
 ## Exact next action
 
-Run the founder decision session from `2026-07-11-phase2-founder-decision-packet.md`, beginning with filter-repo and GitHub security evidence because those are the remaining G1 blockers. Do not merge this branch, lift G2, or create product specs as part of that decision unless the separate review and approval gates are satisfied.
+Continue the founder decision session from `2026-07-11-phase2-founder-decision-packet.md` with GitHub security evidence, the remaining G1 blocker under founder control. Do not merge this branch, lift G2, or create product specs as part of that decision unless the separate review and approval gates are satisfied.

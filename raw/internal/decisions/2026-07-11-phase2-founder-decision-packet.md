@@ -6,11 +6,13 @@
 
 Answer one group at a time. A checked option in an older template is not valid until the decision, owner, date, and commit SHA are recorded. Client/account identities belong in a private operating file; the public repo records roles, counts, and sanitized references only.
 
-## 1. History rewrite - A6 / G1
+## 1. History rewrite - A6 / G1 - DECIDED
 
 Canonical neutral template: `2026-07-11-filter-repo-decision-template.md`.
 
-**Choice required:**
+**Founder decision recorded 2026-07-12:** `DEFER`, owned by the founder, triggered by the first G4 exclusive maintenance window after holdout-131 evidence and branch/worktree closure, or any external report of the flagged content, whichever occurs first. Decision input SHA: `afe26cdcdb8edbad8f6c9fb1d022b8057bcc069e`.
+
+Decision context:
 
 - `EXECUTE`: wait for holdout-131 evidence/branch closure and the exclusive G4 window, then snapshot, stop writers, rewrite, fresh-clone, rescan, and map old SHAs to new SHAs.
 - `DEFER`: name an owner, objective trigger, and explicitly accept that known content remains reachable in canonical history and prior clones.
@@ -19,9 +21,7 @@ Canonical neutral template: `2026-07-11-filter-repo-decision-template.md`.
 
 **Recommendation:** deliberately neutral because the choice is irreversible and the existing template promises neutrality.
 
-**Founder answer needed:** `EXECUTE` or `DEFER`; if defer, owner and trigger; if execute, confirmation that no rewrite begins before holdout closure and the G4 exclusive window.
-
-**Separate G1 settings answer needed:** either (a) re-authenticate `gh` and authorize the security executor to verify GitHub push protection, repository security settings, and release-asset policy before G1 closes, or (b) defer that read-only audit with a named owner and objective trigger. Recommendation: verify before G2 rather than defer. The current local `gh` token is invalid, so no setting is assumed green.
+**Remaining G1 settings answer needed:** either (a) re-authenticate `gh` and authorize the security executor to verify GitHub push protection, repository security settings, and release-asset policy before G1 closes, or (b) defer that read-only audit with a named owner and objective trigger. Recommendation: verify before G2 rather than defer. The current local `gh` token is invalid, so no setting is assumed green.
 
 ## 2. YC and demo - X1 / G3
 
