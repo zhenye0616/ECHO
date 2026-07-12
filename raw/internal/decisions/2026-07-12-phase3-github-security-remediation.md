@@ -61,12 +61,25 @@ The three critical alerts are at `src/mcp/tools/coord-invoke.ts`, `src/echo-home
 - Root and overlay `npm audit`: zero known vulnerabilities after the lockfile updates.
 - CodeQL initial setup run: completed successfully for JavaScript/TypeScript and Actions at `f77ba415`.
 - Root typecheck, lint, CLI build, package dry-run, skill-sync check, YAML parse, and diff check passed.
-- Final independent review and remote branch workflows remain required before the branch is offered for landing.
+- Independent review at `91e8c31b` returned READY with no unresolved medium-or-higher findings.
+
+## First remote PR run
+
+Draft PR [#8](https://github.com/zhenye0616/ECHO/pull/8) ran at exact head `91e8c31bb69e41953dc755e059e5b27153902809`.
+
+- Both branch/PR full-history secret scans passed.
+- CodeQL Actions and JavaScript/TypeScript analysis passed. The workflow-permission remediation is present at the PR head; alert closure still requires landed analysis.
+- The release package built and uploaded/downloaded successfully with the new action majors, so the immutable action pins and artifact transport are remotely exercised.
+- All four quality jobs failed on one cross-Git-version fixture assertion: hosted Git rendered the same UTC `%cI` instant as `Z` while the checked-in baseline spells it `+00:00`; cleanup then hit a short-lived `ENOTEMPTY` race. A test-only follow-up canonicalizes the timestamp instant and adds bounded cleanup retries. No application source changed.
+- Ubuntu onboarding passed on Node 22 and 24. macOS Node 24 passed; macOS Node 22 failed once because selftest's daemon restart saw its own PID lock and timed out. Both Windows onboarding jobs failed in the existing fs-event path.
+- Release validation remained red on Ubuntu/Windows and slow on macOS. The Ubuntu installed-package doctor loop cannot reach exit 0 because the package omits `tools/install-echo-codex-skills.sh`, so doctor reports a Codex-adapter check error even when MCP is reachable. Windows also hit the existing fs-event assertion.
+
+The non-quality failures are product runtime/package behavior, not action-pin transport failures. Comparable `ci` and `release` runs were already failing on the unchanged `main` history, including `ci` run `29177757205` at exact baseline SHA `f77ba415` and multiple pre-Phase-3 release runs. The clarity halt forbids repairing those source/package defects here. They require a founder disposition: either keep R3 blocked until post-G2 product work fixes them, or explicitly classify the inherited red checks as deferred-with-owner-and-trigger for this security-only landing. Do not make that choice implicitly.
 
 ## Remaining ordered gates
 
 1. Finish local verification and independent review at the exact candidate tip.
-2. Push only `maint/clarity-phase2`; require green branch CI, secret scan, and CodeQL readback.
+2. Push only `maint/clarity-phase2`; require green secret scan and CodeQL readback, rerun the quality matrix after the test-only portability fix, and preserve the inherited onboarding/release failures for explicit founder disposition.
 3. Obtain an explicit founder checkpoint before updating `main`.
 4. At the landed SHA, require the first green `main` secret-scan run and CodeQL run; verify the two workflow-permission alerts close.
 5. Enable repository SHA-pin enforcement and, if the required GitHub-owned actions are compatible, restrict allowed actions. Then rerun the settings audit.

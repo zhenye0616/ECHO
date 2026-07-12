@@ -24,6 +24,16 @@ const baseline = JSON.parse(
   readFileSync(new URL('./fixtures/list-task-states-baseline.json', import.meta.url), 'utf-8'),
 ) as ListTaskStatesResult;
 
+function canonicalizeLastUpdated(result: ListTaskStatesResult): ListTaskStatesResult {
+  return {
+    ...result,
+    task_states: result.task_states.map((state) => ({
+      ...state,
+      last_updated: new Date(state.last_updated).toISOString(),
+    })),
+  };
+}
+
 function ledgerRunner(ledger: LedgerEntry[]): GitRunner {
   return (repoRoot: string, args: string[], options: GitRunOptions = {}): GitRunResult => {
     const result = defaultGitRunner(repoRoot, args, options);
@@ -54,7 +64,9 @@ describe('111 — list_task_states batched git reads', () => {
 
     const result = listTaskStates(fixture.repoRoot, {}, { gitRunner: ledgerRunner(ledger) });
 
-    expect(result).toEqual(baseline);
+    // Git 2.54+ may render a UTC %cI timestamp with `Z`, while older Git
+    // renders the equivalent `+00:00`. Compare the instant, not the spelling.
+    expect(canonicalizeLastUpdated(result)).toEqual(canonicalizeLastUpdated(baseline));
     expect(result.ref).toBe(fixture.ref);
     expect(ledger.map((entry) => entry.args)).toEqual([
       ['rev-parse', '--verify', 'HEAD^{commit}'],

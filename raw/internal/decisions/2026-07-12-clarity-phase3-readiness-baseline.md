@@ -90,4 +90,6 @@ The first post-lift proposal remains the graduation foundation: product composit
 
 R2 remediation authority was granted by the founder's instruction to proceed with Phase 3. The next irreversible action requiring new authority is the R3 update of `main`. Before that checkpoint, the executor may finish branch-local remediation, verification, exact-tip independent review, branch push, and remote branch checks.
 
+The first remote PR run exposed inherited onboarding/release failures that require product/runtime or package work across the halt. The executor may complete the test-only Git timestamp/cleanup portability fix and rerun the branch. After that, founder direction is required on whether the inherited red checks block the security-only landing or receive a deferred-with-owner-and-trigger disposition. Exact run evidence is in `2026-07-12-phase3-github-security-remediation.md`.
+
 No Phase 3 readiness work may update `main`, fix product/source findings across the clarity halt, or silently convert “recommended” choices in the founder packet into decisions.
