@@ -88,3 +88,11 @@ The first successful GitHub run of the Phase 2 `secret-scan` workflow also remai
 6. Enable immutable releases for future releases and confirm the policy with a fresh read-only audit.
 
 These are recommendations only. This audit made no changes.
+
+## First Phase 2 branch run
+
+After the audited branch was pushed with explicit founder approval, GitHub ran `secret-scan` at exact head `10d01db44efa33663349bf5adf5bd2dd7084ca46`. [Run 29207214563](https://github.com/zhenye0616/ECHO/actions/runs/29207214563) completed successfully in 17 seconds; checkout, setup-node, full ref fetch, pinned Gitleaks install, and the text-plus-binary history scan all passed.
+
+GitHub emitted one maintenance annotation: the pinned `actions/checkout` v4 and `actions/setup-node` v4 commits target the deprecated Node 20 action runtime, so GitHub forced those action implementations onto Node 24. This did not fail the scan, but the action pins need an explicit version-upgrade review rather than silent drift.
+
+The green branch run proves the workflow executes remotely. It is not yet an active `main` control; a post-merge `main` run remains required.

@@ -69,7 +69,7 @@ This checkpoint file is the only change after the independently reviewed tip.
 | Diff whitespace check | passed |
 | Independent rereview at `c8ddd38b` | no medium-or-higher blockers; READY FOR FOUNDER DECISION SESSION |
 
-The first GitHub workflow run is not evidence yet because this branch has not been pushed or merged. A subsequent authenticated read-only audit on 2026-07-12 verified the GitHub controls red; see `2026-07-12-github-security-readonly-audit.md`. No setting was changed.
+The branch was subsequently pushed with founder approval. `secret-scan` passed on GitHub at exact head `10d01db4`; see run `29207214563`. An authenticated read-only audit on 2026-07-12 verified the repository controls red; see `2026-07-12-github-security-readonly-audit.md`. No setting was changed and `main` remains unmodified.
 
 ## Scope audit
 

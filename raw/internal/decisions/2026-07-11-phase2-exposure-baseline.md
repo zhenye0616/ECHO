@@ -84,7 +84,7 @@ This sweep is not named-entity recognition and cannot prove that every personal 
 
 ## GitHub and release settings
 
-Authentication was restored on 2026-07-12 and a read-only audit was recorded in `2026-07-12-github-security-readonly-audit.md`. The evidence is **VERIFIED RED**: GitHub secret scanning and push protection are disabled; `main` has no branch protection or ruleset; Actions allows all actions without enforced SHA pinning; vulnerability alerts/updates/fixes are disabled; the production environment is unprotected; and the existing release is mutable. The current beta asset and checksum do match exactly. No setting was changed. The Phase 2 secret-scan workflow cannot be claimed active until it lands on `main` and a GitHub run succeeds.
+Authentication was restored on 2026-07-12 and a read-only audit was recorded in `2026-07-12-github-security-readonly-audit.md`. The evidence is **VERIFIED RED**: GitHub secret scanning and push protection are disabled; `main` has no branch protection or ruleset; Actions allows all actions without enforced SHA pinning; vulnerability alerts/updates/fixes are disabled; the production environment is unprotected; and the existing release is mutable. The current beta asset and checksum do match exactly. No setting was changed. The Phase 2 secret-scan workflow passed on branch push at exact head `10d01db4`; it cannot be claimed active on `main` until it lands and a `main` run succeeds.
 
 ## Adjacent dependency observation
 
@@ -94,6 +94,6 @@ Authentication was restored on 2026-07-12 and a read-only audit was recorded in 
 
 - Job B, real reachable-history secret scan: **DONE and independently rerun on the Phase 2 branch**, including the separately enumerated binary/archive history; pending merge.
 - Reachable-history semantic assessment: **DONE for the declared detectors**, with the limitation above.
-- Prospective CI and pre-push protection: **IMPLEMENTED on the Phase 2 branch**, not yet proven by a GitHub run.
+- Prospective CI and pre-push protection: **IMPLEMENTED and proven by a green Phase 2 branch run at `10d01db4`**; not active on `main` until merge and a green `main` run.
 - Job C, filter-repo execute-or-defer: **DEFERRED-WITH-OWNER-AND-TRIGGER on 2026-07-12**; known history exposure is explicitly accepted until the recorded trigger.
 - G1 overall: **OPEN** until the verified-red GitHub controls are remediated or explicitly accepted/deferred with owner and trigger, and the first landed workflow run is green.

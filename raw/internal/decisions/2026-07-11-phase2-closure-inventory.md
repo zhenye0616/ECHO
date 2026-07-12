@@ -15,7 +15,7 @@ This inventory does not replace the canonical register. It prevents a template, 
 | A2 | pending | Cold-db risk and predeclared Phase 2 rubric | One-meeting scratch result + independent grade | Operator/grader after founder approves meeting |
 | A3 | pending | API-key direction and direct-SDK prior art | Economics, terms, payer, custody, topology | Founder decision packet group 4 |
 | A5 | pending | Client-local endpoint locked | Customer-two/multi-instance decision or owned deferral | Founder decision packet group 4 |
-| A6 | pending | HEAD redactions/policies; real scans + independent rerun; CI/hook branch; Job C deferral; GitHub audit verified red | Remediate or explicitly accept/defer red GitHub controls; first landed CI run | Founder authorizes remediation or risk disposition; security executor reruns evidence |
+| A6 | pending | HEAD redactions/policies; real scans + independent rerun; CI/hook branch; green branch CI run; Job C deferral; GitHub audit verified red | Remediate or explicitly accept/defer red GitHub controls; first post-merge `main` run | Founder authorizes remediation or risk disposition; security executor reruns evidence |
 | B1 | pending | Milestone gates exist | Dates/dependencies confirmed with lab | Founder + lab checklist |
 | B5 | pending | Product/wedge locked; working-name deadline exists | Price, buyer/payment, first-client name | Founder decision packet group 3 |
 | B6 | pending | Install/use/repeat floor locked | Repeat count, rollout/rollback/support thresholds | Founder decision packet group 3 |

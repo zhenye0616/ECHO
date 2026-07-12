@@ -21,7 +21,7 @@ Decision context:
 
 **Recommendation:** deliberately neutral because the choice is irreversible and the existing template promises neutrality.
 
-**GitHub audit result:** completed read-only on 2026-07-12 and recorded in `2026-07-12-github-security-readonly-audit.md`. It is VERIFIED RED: native secret scanning/push protection, branch/ruleset protection, vulnerability alerts/fixes, enforced action pinning, protected release environment, and immutable releases are not enabled. The existing release asset checksum is valid. No setting was changed.
+**GitHub audit result:** completed read-only on 2026-07-12 and recorded in `2026-07-12-github-security-readonly-audit.md`. It is VERIFIED RED: native secret scanning/push protection, branch/ruleset protection, vulnerability alerts/fixes, enforced action pinning, protected release environment, and immutable releases are not enabled. The existing release asset checksum is valid. No setting was changed. The custom workflow's first branch run passed at `10d01db4`; a post-merge `main` run is still required.
 
 **Remaining founder answer needed:** authorize remediation of the red controls, or explicitly accept/defer them with owner and objective trigger. Recommendation: remediate before G2; the Phase 2 custom secret gate is useful defense in depth but is not a substitute for repository-native push protection and protected delivery controls.
 
