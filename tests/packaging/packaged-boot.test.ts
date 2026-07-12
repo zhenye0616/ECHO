@@ -17,7 +17,10 @@ describe('packaged daemon boot from the real tarball', () => {
   });
 
   afterEach(() => {
-    rmSync(tmpRoot, { recursive: true, force: true });
+    // The packaged daemon receives SIGTERM in the test's finally block and can
+    // still be releasing SQLite/filesystem handles when teardown begins.
+    // Retry only transient removal failures; durable cleanup errors still fail.
+    rmSync(tmpRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   // This test exercises the ERR_MODULE_NOT_FOUND class for real: it installs the
@@ -77,9 +80,10 @@ describe('packaged daemon boot from the real tarball', () => {
           `packaged daemon crashed on a module resolution error:\n${boot.stderr}\n${boot.stdout}`,
         ).toBe(false);
         // (2) The daemon fully booted.
-        expect(boot.started, `packaged daemon never logged "started":\n${boot.stderr}\n${boot.stdout}`).toBe(
-          true,
-        );
+        expect(
+          boot.started,
+          `packaged daemon never logged "started":\n${boot.stderr}\n${boot.stdout}`,
+        ).toBe(true);
         // (3) The dynamic-import target and its transitive chain were actually
         // present and loaded — no `propose_decision_skipped` swallow. Without
         // this, the test is vacuous on platforms where the optional-module guard
@@ -111,11 +115,7 @@ interface BootResult {
 // `started` event (healthy) or exits (crashed). Health is detected from the
 // structured stdout log line, so no platform-specific service manager (launchd)
 // is involved — the same signal works on macOS, Linux, and Windows CI.
-function bootDaemon(
-  entry: string,
-  env: NodeJS.ProcessEnv,
-  cwd: string,
-): Promise<BootResult> {
+function bootDaemon(entry: string, env: NodeJS.ProcessEnv, cwd: string): Promise<BootResult> {
   return new Promise((resolvePromise) => {
     const child = spawn(process.execPath, [entry], { cwd, env });
     let stdout = '';
@@ -133,7 +133,8 @@ function bootDaemon(
       resolvePromise({ started, importError, stdout, stderr, kill });
     };
 
-    const importError = (): boolean => /ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|Cannot find module/.test(stderr);
+    const importError = (): boolean =>
+      /ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|Cannot find module/.test(stderr);
 
     const sawStarted = (): boolean => {
       for (const line of stdout.split(/\r?\n/)) {

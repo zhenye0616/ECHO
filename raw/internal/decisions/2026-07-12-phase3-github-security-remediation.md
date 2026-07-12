@@ -78,6 +78,8 @@ The non-quality failures are product runtime/package behavior, not action-pin tr
 
 The test-only follow-up at `6751c5f8` cleared both Ubuntu quality jobs. One macOS quality job still failed because the 30-45 second real-doctor fixture produced empty output while the full product suite ran other process-heavy files concurrently; the repaired Git fixture itself passed. The final test-runner follow-up sets `fileParallelism: false` only in `vitest.product.config.ts`. The full local product suite then passed 181 files / 1,867 tests in 328 seconds, including the real doctor test in 29 seconds. This trades CI duration for deterministic resource isolation and does not change application source or runtime behavior.
 
+The serialized remote rerun cleared Ubuntu Node 24 quality. Ubuntu Node 22 completed all packaged-daemon assertions but teardown raced the daemon's final filesystem-handle release and raised `ENOTEMPTY` while removing its temporary `echo-data` directory. The final test-only cleanup follow-up adds bounded `rmSync` retries to that fixture; two consecutive focused local packaged-boot runs passed. Durable cleanup failures still surface.
+
 ## Remaining ordered gates
 
 1. Finish local verification and independent review at the exact candidate tip.
