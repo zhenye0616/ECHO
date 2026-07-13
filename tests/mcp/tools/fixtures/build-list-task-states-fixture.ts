@@ -138,7 +138,11 @@ export function buildListTaskStatesFixture(
     return {
       repoRoot,
       ref,
-      cleanup: () => rmSync(repoRoot, { recursive: true, force: true }),
+      // Antivirus/indexing and Git's final file-handle release can briefly race
+      // recursive removal on hosted runners. Node's bounded retry is only used
+      // for ENOTEMPTY/EBUSY/EPERM and still surfaces a durable cleanup failure.
+      cleanup: () =>
+        rmSync(repoRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }),
     };
   } catch (err) {
     rmSync(repoRoot, { recursive: true, force: true });

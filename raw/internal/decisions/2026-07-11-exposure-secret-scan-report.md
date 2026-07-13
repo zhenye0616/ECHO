@@ -1,5 +1,7 @@
 # Git-history secret scan report — ECHO repo
 
+> **Historical Phase 1 report.** This file preserves the pattern-only baseline exactly. The owed real scanner run was completed on `maint/clarity-phase2` with Gitleaks 8.30.1 and is recorded in `2026-07-11-phase2-exposure-baseline.md`. Do not reinterpret the text below as the current scan status.
+
 **Scope:** all reachable git history (4,643 commits, all branches/blobs), repo `/Users/zhenye/Desktop/Project_echo`.
 **Date:** 2026-07-11. **Mode:** READ-ONLY (no commits, no history rewrite).
 **HEAD at scan:** `3f326407`.

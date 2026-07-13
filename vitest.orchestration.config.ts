@@ -2,6 +2,15 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Security-patched Vitest/Vite startup plus process-spawning integration
+    // fixtures can exceed the upstream 5s default on macOS and CI runners.
+    testTimeout: 30_000,
+    // These integration tests intentionally perform long synchronous child-process
+    // sequences. Vitest 3's worker RPC can time out while a worker is blocked;
+    // one test thread preserves error reporting without ignoring failures.
+    pool: 'threads',
+    fileParallelism: false,
+    poolOptions: { threads: { singleThread: true } },
     include: [
       'tests/review-queue/**/*.test.ts',
       'tests/backlog/backlog-index.test.ts',

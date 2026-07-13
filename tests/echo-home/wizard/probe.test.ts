@@ -163,6 +163,18 @@ describe('probeAgents', () => {
     expect(calls).toBe(0);
   });
 
+  it('rejects an unexpected runtime agent value without spawning', async () => {
+    let calls = 0;
+    const out = await probeAgents(['shell&calc' as never], {
+      spawn: async () => {
+        calls += 1;
+        return ok('{}');
+      },
+    });
+    expect(out[0]).toMatchObject({ probed: false, reason: 'unexpected-output' });
+    expect(calls).toBe(0);
+  });
+
   it('returns mixed-agent results in input order and probes sequentially', async () => {
     const calls: string[] = [];
     const out = await probeAgents(['codex', 'cursor', 'claude-code'], {

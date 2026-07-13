@@ -1,8 +1,8 @@
 # filter-repo execute-or-defer — founder decision template
 
-**Date:** 2026-07-11 · **Status:** template awaiting founder decision · **Decision type:** history rewrite (irreversible sequencing)
+**Prepared:** 2026-07-11 · **Decided:** 2026-07-12 PDT · **Status:** DEFERRED-WITH-OWNER-AND-TRIGGER · **Decision type:** history rewrite (irreversible sequencing)
 
-This is a founder's-call template. It presents the two options and their exact safe-order preconditions. **It makes no recommendation** — the founder chooses execute or defer and records the choice here.
+This began as a neutral founder-call template. The founder chose `DEFER` on 2026-07-12 against the independently reviewed Phase 2 checkpoint. The two options and safe-order preconditions remain below as decision context.
 
 ## What is at stake
 
@@ -12,11 +12,16 @@ Reachable git history contains live-capture content flagged for removal — the 
 
 ## Decision
 
-> **Founder chooses ONE. Record the choice, date, and SHA below.**
+> **Founder decision recorded.**
 >
-> `[ ] EXECUTE`  `[ ] DEFER`
+> `[ ] EXECUTE`  `[x] DEFER`
 >
-> Decided by: ______  Date: ______
+> Decided by: Founder
+> Date: 2026-07-12 PDT
+> Decision input SHA: `afe26cdcdb8edbad8f6c9fb1d022b8057bcc069e`
+> Decision record commit: `47ae3c031f9c77ed29c4bb37c93117e15b083b7b`
+> Owner: Founder
+> Trigger: the first G4 exclusive maintenance window after holdout-131 evidence is preserved and its branch/worktree are closed, or any external report of the flagged content, whichever occurs first.
 
 ---
 
@@ -38,13 +43,13 @@ Do not begin step 4 until steps 1–3 are all true. Sequencing, not urgency, is 
 
 ## Option 2 — DEFER (do not rewrite now)
 
-Legitimate — deferring with an honest residual statement is a valid choice, not a failure. If deferring, record all three:
+Deferring with an honest residual statement is a valid choice, not a failure. The required fields are now recorded:
 
-1. **Named owner.** Who owns executing the rewrite when the trigger fires: ______
-2. **Named trigger.** The condition that moves this from deferred to executed — e.g. "before the first paid client agreement is signed", "if any flagged content is externally reported", "at the next G4 exclusive window": ______
-3. **Honest residual-exposure paragraph** (goes into `docs/lab-data-handling.md`):
+1. **Named owner:** Founder.
+2. **Named trigger:** the first G4 exclusive maintenance window after holdout-131 evidence is preserved and its branch/worktree are closed, or any external report of the flagged content, whichever occurs first.
+3. **Honest residual-exposure paragraph** (also recorded in `docs/lab-data-handling.md`):
 
-> The flagged live-capture content (lead list, coworker notes, ~560K dump, pitch drafts) remains reachable in git history at its original SHAs, and — because the repo has been public since 2026-06-06 — may persist in clones, forks, and caches regardless of any future rewrite. HEAD redactions remove it from the tracked tree only. A history rewrite is deferred as of [date], owned by [owner], triggered by [trigger]. Until then this residual exposure is accepted and stated openly.
+> The flagged live-capture content (lead list, coworker notes, ~560K dump, pitch drafts) remains reachable in git history at its original SHAs, and — because the repo has been public since 2026-06-06 — may persist in clones, forks, and caches regardless of any future rewrite. HEAD redactions remove it from the tracked tree only. A history rewrite is deferred as of 2026-07-12, owned by the founder, triggered by the first G4 exclusive maintenance window after holdout-131 evidence is preserved and its branch/worktree are closed, or any external report of the flagged content, whichever occurs first. Until then this residual exposure is accepted and stated openly.
 
 ---
 

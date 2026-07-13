@@ -1,6 +1,6 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { resolveCommand } from '../../util/subprocess.js';
+import { assertSafeCommandArgs, resolveCommand } from '../../util/subprocess.js';
 
 export interface ClaudeCodeMcpSpawnResult {
   exitCode: number;
@@ -36,8 +36,37 @@ export interface ClaudeCodeMcpRegisterResult {
 export const CLAUDE_CODE_MCP_TIMEOUT_MS = 30_000;
 const DEFAULT_OUTPUT_LIMIT = 4000;
 
+export function validateLocalMcpServerUrl(mcpServerUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(mcpServerUrl);
+  } catch {
+    throw new Error('ECHO MCP URL must be a valid URL');
+  }
+  const host = parsed.hostname.toLowerCase();
+  const port = Number.parseInt(parsed.port, 10);
+  if (
+    parsed.protocol !== 'http:' ||
+    (host !== '127.0.0.1' && host !== 'localhost' && host !== '[::1]') ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65_535 ||
+    parsed.pathname !== '/mcp' ||
+    parsed.username.length > 0 ||
+    parsed.password.length > 0 ||
+    parsed.search.length > 0 ||
+    parsed.hash.length > 0
+  ) {
+    throw new Error(
+      'ECHO MCP URL must be an HTTP loopback URL with an explicit port and /mcp path',
+    );
+  }
+  return `http://${host}:${port}/mcp`;
+}
+
 export function claudeCodeMcpAddArgs(mcpServerUrl: string): string[] {
-  return ['mcp', 'add', '--transport', 'http', '--scope', 'user', 'echo', mcpServerUrl];
+  const validatedUrl = validateLocalMcpServerUrl(mcpServerUrl);
+  return ['mcp', 'add', '--transport', 'http', '--scope', 'user', 'echo', validatedUrl];
 }
 
 export function claudeCodeMcpAddCommand(mcpServerUrl: string): string {
@@ -56,11 +85,16 @@ function realSpawn(
   opts: { timeoutMs: number; outputLimit: number },
 ): Promise<ClaudeCodeMcpSpawnResult> {
   return new Promise((resolvePromise, reject) => {
-    const resolved = resolveCommand(cmd, {
+    if (cmd !== 'claude') {
+      reject(new Error('Unsupported Claude Code registration executable'));
+      return;
+    }
+    const resolved = resolveCommand('claude', {
       platform: process.platform,
       env: process.env,
       existsSync,
     });
+    assertSafeCommandArgs(resolved, args);
     const child = nodeSpawn(resolved.command, [...(resolved.prependArgs ?? []), ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -106,8 +140,17 @@ export async function registerClaudeCodeMcpServer(
   const timeoutMs = deps.timeoutMs ?? CLAUDE_CODE_MCP_TIMEOUT_MS;
   const outputLimit = deps.outputLimit ?? DEFAULT_OUTPUT_LIMIT;
   const spawn = deps.spawn ?? realSpawn;
-  const args = claudeCodeMcpAddArgs(mcpServerUrl);
-  const command = claudeCodeMcpAddCommand(mcpServerUrl);
+  let args: string[];
+  try {
+    args = claudeCodeMcpAddArgs(mcpServerUrl);
+  } catch (err) {
+    return {
+      action: 'error',
+      command: 'claude mcp add --transport http --scope user echo <invalid-url>',
+      detail: (err as Error).message.slice(0, 200),
+    };
+  }
+  const command = `claude ${args.join(' ')}`;
 
   let result: ClaudeCodeMcpSpawnResult;
   try {

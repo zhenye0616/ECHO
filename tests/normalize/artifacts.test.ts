@@ -48,6 +48,20 @@ describe('artifact identity', () => {
       const b = repoArtifact('https://github.com/foo/bar.git', '/tmp/clone-b');
       expect(a.id).toBe(b.id);
     });
+
+    it('classifies only exact provider hosts and their explicit subdomains', () => {
+      expect(repoArtifact('https://github.com/foo/bar', '/repo').provider).toBe('github');
+      expect(repoArtifact('https://git.github.com/foo/bar', '/repo').provider).toBe('github');
+      expect(repoArtifact('https://evilgithub.com/foo/bar', '/repo').provider).toBe('git');
+      expect(repoArtifact('https://github.com.evil.test/foo/bar', '/repo').provider).toBe('git');
+      expect(repoArtifact('https://evilgitlab.com/foo/bar', '/repo').provider).toBe('git');
+      expect(repoArtifact('https://evilbitbucket.org/foo/bar', '/repo').provider).toBe('git');
+    });
+
+    it('uses the parsed hostname rather than credentials or port text', () => {
+      expect(repoArtifact('https://github.com:443/foo/bar', '/repo').provider).toBe('github');
+      expect(repoArtifact('https://github.com@evil.test/foo/bar', '/repo').provider).toBe('git');
+    });
   });
 
   describe('fileArtifact', () => {

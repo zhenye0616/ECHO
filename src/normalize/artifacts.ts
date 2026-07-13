@@ -64,15 +64,18 @@ export function workspaceArtifact(canonicalRoot: string): ArtifactRef {
 function deriveRemoteProvider(normalizedUrl: string): string {
   const host = hostOf(normalizedUrl);
   if (host === null) return 'git';
-  if (host.endsWith('github.com')) return 'github';
-  if (host.endsWith('gitlab.com')) return 'gitlab';
-  if (host.endsWith('bitbucket.org')) return 'bitbucket';
+  if (host === 'github.com' || host.endsWith('.github.com')) return 'github';
+  if (host === 'gitlab.com' || host.endsWith('.gitlab.com')) return 'gitlab';
+  if (host === 'bitbucket.org' || host.endsWith('.bitbucket.org')) return 'bitbucket';
   return 'git';
 }
 
 function hostOf(url: string): string | null {
-  const m = /^[a-z][a-z0-9+\-.]*:\/\/([^/]+)/i.exec(url);
-  return m === null ? null : (m[1] as string).toLowerCase();
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
 }
 
 function deriveRepoLabel(normalizedUrl: string): string {

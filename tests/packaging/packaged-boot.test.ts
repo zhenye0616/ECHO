@@ -17,7 +17,10 @@ describe('packaged daemon boot from the real tarball', () => {
   });
 
   afterEach(() => {
-    rmSync(tmpRoot, { recursive: true, force: true });
+    // The packaged daemon receives SIGTERM in the test's finally block and can
+    // still be releasing SQLite/filesystem handles when teardown begins.
+    // Retry only transient removal failures; durable cleanup errors still fail.
+    rmSync(tmpRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   // This test exercises the ERR_MODULE_NOT_FOUND class for real: it installs the
@@ -77,9 +80,10 @@ describe('packaged daemon boot from the real tarball', () => {
           `packaged daemon crashed on a module resolution error:\n${boot.stderr}\n${boot.stdout}`,
         ).toBe(false);
         // (2) The daemon fully booted.
-        expect(boot.started, `packaged daemon never logged "started":\n${boot.stderr}\n${boot.stdout}`).toBe(
-          true,
-        );
+        expect(
+          boot.started,
+          `packaged daemon never logged "started":\n${boot.stderr}\n${boot.stdout}`,
+        ).toBe(true);
         // (3) The dynamic-import target and its transitive chain were actually
         // present and loaded — no `propose_decision_skipped` swallow. Without
         // this, the test is vacuous on platforms where the optional-module guard
@@ -92,7 +96,7 @@ describe('packaged daemon boot from the real tarball', () => {
           `packaged daemon could not resolve the propose-decision import closure (module_not_found swallowed):\n${boot.stdout}`,
         ).toBe(false);
       } finally {
-        boot.kill();
+        await boot.stop();
       }
     },
     180_000,
@@ -104,36 +108,46 @@ interface BootResult {
   importError: boolean;
   stdout: string;
   stderr: string;
-  kill: () => void;
+  stop: () => Promise<void>;
 }
 
 // Launch the packaged daemon and resolve once it either logs the lifecycle
 // `started` event (healthy) or exits (crashed). Health is detected from the
 // structured stdout log line, so no platform-specific service manager (launchd)
 // is involved — the same signal works on macOS, Linux, and Windows CI.
-function bootDaemon(
-  entry: string,
-  env: NodeJS.ProcessEnv,
-  cwd: string,
-): Promise<BootResult> {
+function bootDaemon(entry: string, env: NodeJS.ProcessEnv, cwd: string): Promise<BootResult> {
   return new Promise((resolvePromise) => {
     const child = spawn(process.execPath, [entry], { cwd, env });
     let stdout = '';
     let stderr = '';
     let settled = false;
+    let resolveClosed: () => void;
+    const closed = new Promise<void>((resolve) => {
+      resolveClosed = resolve;
+    });
 
-    const kill = (): void => {
-      if (!child.killed) child.kill('SIGTERM');
+    const stop = async (): Promise<void> => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+
+      const exitedGracefully = await Promise.race([
+        closed.then(() => true),
+        new Promise<false>((resolve) => setTimeout(() => resolve(false), 5_000)),
+      ]);
+      if (!exitedGracefully && child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGKILL');
+        await closed;
+      }
     };
 
     const finish = (started: boolean, importError: boolean): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolvePromise({ started, importError, stdout, stderr, kill });
+      resolvePromise({ started, importError, stdout, stderr, stop });
     };
 
-    const importError = (): boolean => /ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|Cannot find module/.test(stderr);
+    const importError = (): boolean =>
+      /ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|Cannot find module/.test(stderr);
 
     const sawStarted = (): boolean => {
       for (const line of stdout.split(/\r?\n/)) {
@@ -156,7 +170,10 @@ function bootDaemon(
       stderr += chunk.toString('utf8');
     });
     child.on('error', () => finish(false, importError()));
-    child.on('close', () => finish(false, importError()));
+    child.on('close', () => {
+      resolveClosed();
+      finish(false, importError());
+    });
 
     const timer = setTimeout(() => finish(sawStarted(), importError()), 60_000);
   });
