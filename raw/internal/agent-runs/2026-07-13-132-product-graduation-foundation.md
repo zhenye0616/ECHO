@@ -120,7 +120,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC2: passing — strict schema/config, deepest-match filesystem probe, product-local paths, transactional runtime, bounded idempotent shutdown, and product-only CLI
 - AC3: passing — founder CLI brain isolated in lab adapter with explicit dispatch/brief injection and no product fallback
 - AC4: implementation passing — product-only Vitest config, shared environment/network/child-process guard, sanitized child sentinel, red fixtures, structural test scan, and renamed broad suite; CI scratch-artifact wiring completes with AC5
-- AC5: pending
+- AC5: in progress — independent private package metadata and the exact root-lock-derived 43-package runtime shrinkwrap are committed; Git-object builder/offline support/install verification remain
 - AC6: pending
 - AC7: pending
 - AC8: pending
