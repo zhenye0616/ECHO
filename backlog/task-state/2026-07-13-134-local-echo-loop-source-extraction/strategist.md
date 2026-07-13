@@ -7,24 +7,24 @@ Extract the internal orchestration protocol into a local source-independent `ech
 - `echo-loop` owns agent skills, backlog/task-state, review queue, coordination/deadlines, builder/reviewer/merge workflows, and operator tooling.
 - Source is pinned to `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; target is `/Users/zhenye/Desktop/echo-loop` on a local migration branch with no remote.
 - Lifecycle is `ABSENT -> RUNNING -> PUBLISHED | FAILED`; automatic resume, stale-owner takeover, quarantine tokens, checkpoint reuse, and later-process signaling are forbidden.
-- Atomic target-specific state-directory creation elects one run. The active supervisor owns and cleans its child process group.
-- `discard` refuses a final target or possibly-live process, archives evidence/state/staging/cache/output without deletion, and requires a fresh pinned extraction.
-- Migration record publication precedes no-replace target publication. Target + byte-identical record + committed candidate identity define published state.
+- A fully initialized/fsynced run directory is RENAME_EXCL-elected into the fixed claim; durable state and a launch gate bind child PID/PGID/start/executable before work. Only the active supervisor cleans its group.
+- `discard` refuses a final target or exact live process and atomically renames the whole claim to an archive; PID reuse is quiescent and never signaled.
+- No-replace target publication defines PUBLISHED with committed candidate identity. The Project_echo record is a separate post-publish, expected-parent CAS evidence commit.
 - Copy protocol implementation and installable templates, not Project_echo history, product/context code, raw corpus, or completed queue state.
 - Split loop-owned coordination/task-state APIs from retrieval MCP; no context tools ship in echo-loop.
-- Coordination idempotency is scoped by caller identity and canonical operation/payload bytes; mismatched reuse fails without state change.
+- Coordination idempotency accepts strict ASCII caller/key formats and covers only effects in the same SQLite transaction; external actions are forbidden and outbox intent is not exactly-once delivery.
 - Store initialization intent and every terminal open/migration failure leave collision-safe, fsynced diagnostics with stderr fallback.
 - Preserve proposed-review, ready seals, atomic claim, worktree isolation, reviewer independence, fresh eyes, and founder checkpoints.
 - Source closure classifies imports, literal/computed reads, shell/shebang edges, package scripts, PATH lookups, and child executables; undeclared host reads/exec fail closed.
 - Tests mutate only disposable local fixture repositories with isolated Git config, hooks, credentials, and fixture-owned file remotes.
 - Node `22.22.1` and npm `10.9.4` are hard preflights; source bytes come only from pinned commit objects.
-- Pre-isolation acquisition builds an integrity-manifested run cache; all candidate work then runs offline under sanitized environment and OS sandbox.
-- `verify-handoff` derives canonical paths and validates original control blobs despite the later record-only evidence commit.
+- Acquisition uses env-i, run-owned config/HOME, scrubbed secrets, and a credential-denying filesystem sandbox. Candidate work uses an integrity-manifested cache offline under a validated executable/runtime-read closure.
+- `verify-handoff` derives canonical paths, validates original control blobs, and accepts only the control HEAD or one exact record-only child commit.
 - No global install, launchd change, sibling dependency, remote, or authority transfer occurs.
 
 ## open_questions
 
-- R6 by independent `codex` and `codex-ops` bindings must confirm the structural cut and the runtime-edge, idempotency, diagnostics, publication, and handoff contracts.
+- R7 by independent `codex` and `codex-ops` bindings must confirm atomic discard/target publication, gated processes, runtime closure, strict transactional idempotency, live-vs-stale initialization, record CAS, and handoff.
 - A later cutover decides how repositories install/consume echo-loop and where each repository's queue state lives.
 
 ## dont_touch

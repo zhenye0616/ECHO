@@ -1,7 +1,7 @@
 # One-shot lifecycle for the three local source extractions
 
 Date: 2026-07-13
-Status: locked for proposal R6
+Status: locked for proposal R7
 Applies to: items 133 (`echo-brain`), 134 (`echo-loop`), and 135 (`echo-context`)
 
 ## Decision
@@ -12,7 +12,9 @@ Each local repository extraction is one attended, deterministic operation with l
 
 There is no automatic crash resume, stale-owner takeover, quarantine token, nonce rotation, checkpoint reuse, or later invocation that signals a recorded process. If a run fails before publication, the operator first proves its processes/resources are quiescent, uses an explicit `discard` command to archive all run material without deletion, and begins a fresh extraction from the pinned source commit.
 
-Publication remains no-replace and evidence-bound: publish the deterministic migration record, then publish the verified staged repository. The final target, byte-identical record, and committed candidate identity are the durable `PUBLISHED` fact. Read-only `status` and `verify-handoff` derive that state even if the active process dies immediately after the target rename.
+Run election itself has no empty-claim window: each lane fully initializes and fsyncs a run-specific directory, then no-replace-renames it to the fixed target claim. Discard is the inverse single-directory rename into an archive, not a sequence of partial moves.
+
+Publication remains no-replace and evidence-bound, but only the verified staged repository is in the atomic extraction path. The final target and its committed candidate identity are the durable `PUBLISHED` fact. The deterministic Project_echo migration record is published afterward as a separate idempotent evidence commit using an expected-parent ref CAS; evidence failure never rolls back or mutates the target.
 
 ## Why
 
@@ -27,7 +29,7 @@ The safer engineering shape is to remove automatic recovery rather than continue
 - No target remotes, source mutation, live-state migration, installation, cutover, or authority transfer.
 - Deterministic provenance, dependency, parity, migration-record, and handoff evidence.
 - Sanitized environment, offline candidate execution, OS sandbox, and source/sibling independence tests.
-- No-replace target/record publication and canonical-path handoff verification.
+- No-replace target publication, post-publish record-only evidence CAS, and canonical-path handoff verification.
 - Project_echo remains migration source, backup, and authority until a later founder checkpoint.
 
 ## Removed mechanisms
@@ -35,9 +37,9 @@ The safer engineering shape is to remove automatic recovery rather than continue
 - Resume commands and reusable checkpoints.
 - Stale-lock quarantine, takeover, owner nonces, one-use tokens, and fcntl takeover guards.
 - Artifact-specific recovery locks.
-- Parent-child takeover handshakes and signaling by a later process.
+- Parent-child takeover handshakes and signaling by a later process. A launch gate remains only so the active parent durably records a child group before releasing it to work.
 - Reconcile code that mutates an incomplete run; only read-only derivation of an already-published result remains.
 
 ## Review and build consequence
 
-R6 verifies that the removal is complete and that retained invariants remain testable. Builders implement only the one-shot lifecycle. Any pre-publication failure ends the lane until the operator explicitly archives it and starts a fresh run.
+R7 verifies that the removal is complete and that retained invariants remain testable. Builders implement only the one-shot extraction lifecycle; `publish-record` is post-publication evidence, never extraction recovery. Any pre-publication failure ends the lane until the operator atomically archives the whole claim and starts a fresh run.
