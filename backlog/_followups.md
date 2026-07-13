@@ -519,3 +519,4 @@ Process lessons folded to R6.merge_mechanics: [119] verify brace balance after k
 - 2026-07-13 (from 132 review): extend scanGraph to run collectBuiltinChildProcessAccesses on non-owner closure files — getBuiltinModule('child_process') currently evades the static fence on shipped code (tests-only today); add red closure fixture.
 - 2026-07-13 (from 132 review): tighten tools/product mount-line regex or add a device-path-containing-' on ' fixture.
 - 2026-07-13 (from 132 review): consider exit 0 from product `run` on clean SIGTERM/SIGINT shutdown (currently 1).
+- 2026-07-13 (cleanup, founder-deferred): extract shared decision-gate machinery (decision-store, draft-store, intake-seed, propose-decision tool) out of src/surfaces/ceo-slack-responder/ into a neutral home, then remove the Slack/Linear responder legs. Deferred until after YC demo freeze; intake-terminal (kept) depends on the intake bridge that imports these modules.
