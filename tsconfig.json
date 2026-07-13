@@ -20,6 +20,5 @@
     "vitest*.config.ts"
   ],
   "exclude": [
-    "tools/echo-overlay/**/*"
   ]
 }
