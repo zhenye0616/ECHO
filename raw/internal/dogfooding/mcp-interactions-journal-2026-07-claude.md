@@ -563,3 +563,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP). Investigator consultee: zero ECHO MCP calls → skip-rule.
 - **Verdict:** useful — third consecutive active-trigger acceptance.
 - **Note:** r3 produced genuinely NEW load-bearing defects (mount selection, CI wiring) rather than patch-drift — evidence the verification rounds are earning their cost. r4 instructed to converge absent new load-bearing defects.
+
+## 2026-07-13 03:20 PDT — watcher r5 dispatch active-trigger (item 132 graduation foundation)
+
+- **Trigger:** r4 combined: codex-ops proceed/zero findings; codex one MED (seed-inventory→fence handoff not executable — third consecutive round finding bugs in the same comparison scaffolding). Disposition: mechanism DROPPED with removal-proof matrix (state/behavior/owners/tests removed; allowlist remains sole authority). Removal-only patch 981f9da1; r5 dispatched as removal-verification.
+- **Query inputs:** coord_invoke ×2 — codex, codex-ops; request_path=.../r5/request.md; correlation_id from r5 frontmatter.
+- **Returned:** both ok.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
+- **Verdict:** useful.
+- **Note:** first live use of the removal-over-deeper-patching discipline in this item; skill's win condition predicts removal-only rounds converge next round.
