@@ -4,13 +4,13 @@
 
 - Role: Codex builder
 - Branch: `agent/132-product-graduation-foundation`
-- Starting SHA: `0984ca6f39bd6d6755db5d9f79c6e35592eb5a29`
+- Starting SHA: `0984ca6f63e7f98c940d922011146f2f61a2f4c7`
 - Worktree: `/Users/zhenye/Desktop/Project_echo--132-product-graduation-foundation`
 - Backlog state, main checkout, and remote refs were not modified.
 
 ## What I implemented
 
-- AC1 through AC7 are implemented. AC1's import-fence tool was the first source deliverable.
+- AC1 through AC9 are implemented and committed. AC1's import-fence tool was the first source deliverable.
 
 ## AC1 phase-1 closure inventory
 
@@ -108,7 +108,9 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 
 ## Files modified
 
-- In progress; final counts and head SHA will be recorded at closeout.
+- 54 tracked paths changed across 13 implementation commits plus this closeout evidence commit.
+- Verified implementation head: `ad4bea2e6214b2fe053a5d3cc986e3904f3eae45`.
+- The only path outside the spec's `files_to_modify` list is `tests/packaging/packed-manifest.test.ts`; its inline snapshot was mechanically refreshed to list exactly the 20 new compiled seam/product files observed by the existing generic-package contract. No generic package behavior or inherited AC8 debt changed.
 
 ## Decisions made during implementation
 
@@ -148,3 +150,19 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 ## Drift events caught
 
 - None.
+
+## Final verification results
+
+- `npm run typecheck`: PASS (1 command passed, 0 failed).
+- `npm run lint`: PASS (ESLint and task-state lint both passed; 2 checks passed, 0 failed).
+- `npm run test:repo`: PASS (184 files passed, 1 file intentionally skipped, 0 failed; 1,894 tests passed, 21 skipped, 1 todo, 0 failed; 1,916 total).
+- `npm run test:product`: PASS (7 files passed, 0 failed; 89 tests passed, 0 skipped, 0 failed).
+- `npm run test:orchestration`: PASS (30 files passed, 0 failed; 269 tests passed, 0 skipped, 0 failed).
+- `npm run product:check-boundary`: PASS (1 fence passed, 0 failed; final closure 23 internal modules and 2 declared external packages; 0 forbidden/unresolved edges).
+- Fresh support preparation: PASS (1 run passed, 0 failed; 294 hashed support/cache/header entries).
+- Fresh Git-object artifact build: PASS (1 tarball passed, 0 failed), version `0.1.0-dev.132-closeout`, source `ad4bea2e6214b2fe053a5d3cc986e3904f3eae45`, size 53,416 bytes, SHA-256 `ec8af1a85994e1a94e2b3e34641fff0a32b8f408f631313ca8748bd920fc7941`.
+- Bundle checksum/support verification: PASS (1 bundle passed, 0 failed; 0 verification errors).
+- Offline installed-artifact verification on the available `darwin/x64` host: PASS (1 install passed, 0 failed; 44 packages installed from the exact cache; toolchain preflight 13 checks passed, 0 failed; installed `validate-config` and `selftest` both exited 0, reported local APFS, `maturity: DEV`, and `wedge_executed: false`).
+- Phase-1 target-cell execution on the available host: ENVIRONMENT-LIMITED FAIL (0 passed, 1 failed before install). The evidence correctly recorded `darwin/x64` versus the declared `darwin/arm64` target and left all target cells red; it blocks local production of arm64 target evidence, but blocks no implementation AC because the workflow and its static/forced-failure contracts are implemented and the installed artifact passed locally. The actual arm64 qualification job was not executed from this worktree.
+- `git diff --check`: PASS (1 check passed, 0 failed).
+- Required closeout commands and artifact/selftest checks: 9 passed, 0 failed. Extra architecture-strict target execution: 0 passed, 1 expected environment mismatch, recorded above without waiver.
