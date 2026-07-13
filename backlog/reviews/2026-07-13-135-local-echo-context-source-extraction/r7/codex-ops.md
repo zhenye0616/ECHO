@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 7
+reviewer: "codex-ops"
+artifact_sha: "a4a4e1255143c8338bcfcfa123c0f59d5d7b1582"
+completed_at: '2026-07-13T23:41:31Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC1 — claim election and discard"
+    finding: "The claim can be observed between a quiescence check and a new child or state registration, so discard can rename it while the elected supervisor remains able to mutate it. Durably bind the supervisor identity before claim publication and require a claim-scoped kernel lifetime lock held by every mutator; discard must acquire an exclusive freeze and then revalidate owner, children, resources, and state digest immediately before RENAME_EXCL. Test overlaps at every spawn-registration and state-write boundary."
+  - severity: "high"
+    where: "AC1 — gated PID identity and discard"
+    finding: "A stable PID and start identity with a changed executable is a same-process exec transition, not PID reuse; treating that mismatch as quiescent can permit discard while work is live. Only a changed kernel start identity may establish reuse; a same-start executable mismatch and any surviving member of the recorded PGID must block discard. Test shim-to-final-exec and leader-exit-with-descendant-survival cases."
+  - severity: "high"
+    where: "AC1 — claim, discard, and target-publication durability"
+    finding: "Each described rename crosses directory parents, but the spec requires only a singular parent fsync. Fsync both source and destination directories after every claim, discard, and publication rename. Recovery from a visible rename with a missing or failed receipt must validate the exact moved object, re-fsync both parents, and durably record completion before deriving CLAIMED or PUBLISHED; target plus candidate alone must not certify an unacknowledged publication."
+  - severity: "high"
+    where: "AC1 — pre-claim initializer path"
+    finding: "Two extracts using the same run ID share `/new/135-<run-id>`, allowing concurrent mutation or loser cleanup of another contender, while no bounded path-safe run-ID grammar is specified. Validate the run ID, create an exclusively owned per-attempt initializer using exclusive mkdir or a nonce, and bind cleanup by directory descriptor and inode. Test same-ID overlap, stale recovery, traversal, separators, and overlong IDs."
+  - severity: "high"
+    where: "AC7 — offline installs and cache admission"
+    finding: "Script-enabled source and candidate installs reuse one writable acquisition cache, and later invocations promise network denial without an explicit filesystem-write sandbox. A source lifecycle script can mutate the cache or other run or host paths before the candidate consumes it. Use sealed verified cache snapshots or isolated per-phase copies, separate npm metadata and logs, validate cache content before and after every use, and confine every later npm invocation to phase-owned scratch writes."
+  - severity: "high"
+    where: "AC1 — publish-record CAS and index repair"
+    finding: "The temporary-index commit and ref CAS do not materialize the migration record in the checked-out worktree. Updating only the bound index leaves a deletion, while pre-CAS materialization creates an untracked crash window rejected by clean preflight. Specify atomic fsynced worktree-file materialization and exact retry repair of both worktree and index across file rename/fsync, ref CAS, and index-update failpoints, refusing any unrelated byte or ref drift."
+  - severity: "high"
+    where: "AC3, AC7, and AC8 — runtime network sandbox"
+    finding: "Loopback-only access permits arbitrary host loopback services, including the authoritative live ECHO daemon, so source and candidate can share live contamination and still pass parity and non-loopback probes. Deny all network for stdio MCP snapshots; split service-test permissions so each process can access only its exact run-owned endpoint, and add unrelated IPv4 and IPv6 loopback sentinel listeners that must be policy-denied."
+  - severity: "medium"
+    where: "AC8 — verify-handoff"
+    finding: "Accepting the original control HEAD allows final handoff to succeed when publish-record was omitted or failed. Require the exact record-only child for successful handoff; expose control-HEAD target validation only as a distinct pending, non-success diagnostic and test omitted, failed, and partially repaired record publication."
+---
