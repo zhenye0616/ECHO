@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
+import { realpathSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import type { Writable } from 'node:stream';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {
   classifyStateFilesystem,
   loadProductRuntimeConfig,
@@ -150,6 +151,9 @@ export async function runProductCli(
   return 1;
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] !== undefined &&
+  realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
+) {
   process.exitCode = await runProductCli(process.argv.slice(2));
 }
