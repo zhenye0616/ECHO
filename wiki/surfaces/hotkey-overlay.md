@@ -12,7 +12,7 @@ aliases:
 
 # Hotkey Overlay
 
-> Shipped v0 dogfood (retired): see [[hotkey-overlay-raycast]]. This page describes the V1 vision (still `planned`). The v0 shipped as a Raycast extension at `tools/raycast-echo/` but was **removed on 2026-05-31 (item 081)** once the Tauri desktop overlay (`tools/echo-overlay/`) became the shipped operator surface; the `decisions` job moved to that overlay, and the Raycast-only `echo`/`recap` jobs were retired without a replacement.
+> Shipped v0 dogfood (retired): see [[hotkey-overlay-raycast]]. This page describes the V1 vision (still `planned`/deferred). The v0 shipped as a Raycast extension at `tools/raycast-echo/` but was **removed on 2026-05-31 (item 081)** once the Tauri desktop overlay (`tools/echo-overlay/`) became the shipped operator surface; the `decisions` job moved to that overlay, and the Raycast-only `echo`/`recap` jobs were retired without a replacement. That Tauri overlay was itself **retired and removed from the tree on 2026-07-13** (founder-directed cleanup, commit 3520506c): desktop-surface work is not part of the Team decision product, and no operator overlay ships today. Both v0 surfaces now exist only in git history.
 
 ## Definition
 

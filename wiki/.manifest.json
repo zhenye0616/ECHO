@@ -988,5 +988,19 @@
     ],
     "topic": "Architecture",
     "subtopic": "Observability"
+  },
+  "architecture/product-composition-boundary.md": {
+    "status": "shipped",
+    "title": "Product Composition Boundary (echo-brain)",
+    "link": "product-composition-boundary",
+    "summary": "Additive in-repo echo-brain boundary: versioned allowlist + transitive import fence, fail-closed product runtime, hermetic test:product lane, and Git-object build-once artifact identity (item 132, DEV).",
+    "aliases": [
+      "Product Composition Boundary",
+      "echo-brain Boundary",
+      "Product Source Fence",
+      "Import Fence"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Product Boundary"
   }
 }

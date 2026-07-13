@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 76 pages · 74 shipped · 2 planned · 2 deferred (parked commitments) · 3 retired (historical; superseded, not current direction)
+**Status:** 77 pages · 75 shipped · 2 planned · 2 deferred (parked commitments) · 3 retired (historical; superseded, not current direction)
 
 ---
 
@@ -80,6 +80,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[mcp-compact-view-projection|MCP Compact View Projection]] — Daemon-side field-hygiene projection (view: 'compact') for find_clusters + get_atoms — KEEP/DROP rules, composes with wire-shape caps, default 'rich' preserves byte-identical legacy output (item 064).
 - [[normalization|Normalization (Read-Time)]] — Pure read-time layer that turns raw CaptureEvents into NormalizedContextEvent atoms via per-source adapters; storage stays raw.
 - [[normalized-context-event|NormalizedContextEvent (the atom shape)]] — The joinable contract every read-path consumer speaks: schema_version 1, open vocabularies, observable hints, provenance to raw.
+- [[product-composition-boundary|Product Composition Boundary (echo-brain)]] — Additive in-repo echo-brain boundary: versioned allowlist + transitive import fence, fail-closed product runtime, hermetic test:product lane, and Git-object build-once artifact identity (item 132, DEV).
 - [[signal-formation|Signal Formation (Station 2)]] — Granola signal extraction chassis: settle gate, fingerprint checkpoint, strict-JSON brain, verbatim quote anchoring, extractor_version/supersedes manifests, signal contract, skip observability.
 - [[signal-window|Signal Window (getSignalWindow)]] — Internal seam: one windowed read of raw+derived context, full fidelity; event-time and append-order (late-arrival-safe) orderings; machine/company scope; canonical_subject loop filter.
 - [[storage|Storage]] — Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface + before filters, composite (timestamp, id) ordering, canonical-Z timestamps.
