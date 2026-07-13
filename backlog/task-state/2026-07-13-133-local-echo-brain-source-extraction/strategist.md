@@ -6,19 +6,21 @@ Extract the reviewed item-132 product closure into a fully independent local `ec
 
 - `echo-brain` is the complete client-facing Team decision product, not merely the model adapter.
 - Source input is pinned to `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; dirty journals and `.agents/` are excluded.
-- Target path is `/Users/zhenye/Desktop/echo-brain`; it must be absent before the builder begins.
+- Final target is `/Users/zhenye/Desktop/echo-brain`; atomic lock + same-filesystem staging make the extraction crash-resumable, and unknown existing paths are never adopted or deleted.
 - The target is a real local Git repository on a migration branch with no configured remote.
 - Copy only the item-132 product closure plus source/test/build necessities; record every copy/relocation/rewrite with hashes.
 - No symlink, submodule, workspace, `file:`, Git, tarball-path, or runtime import may reach `Project_echo` or sibling repos.
 - The new repo owns its package, lockfile, configs, tests, build, artifact, state paths, and qualification evidence.
-- Preserve product behavior; path-only migration changes are allowed and must be recorded. Feature work is rejected.
-- Verification must make the source checkout inaccessible and run clean install through installed-artifact selftest.
+- Node `22.22.1` and npm `10.9.4` are hard preflights; committed `package-lock.json` is required.
+- The pinned source has exactly eight `tests/product` files; every one gets a machine-checked port/exclusion disposition and only literal import/fixture path rewrites are allowed.
+- Verification uses process-scoped `sandbox-exec` source-read denial and runs clean install through installed-artifact selftest from a captured committed HEAD.
+- The migration record pins a clean local HEAD/hash handoff; the candidate is preserved unchanged through independent review.
 - `Project_echo` remains backup and migration authority; candidate authority stays false until a later founder checkpoint.
 - Maturity remains DEV; no real data, credentials, release, or FOUNDER LIVE evidence.
 
 ## open_questions
 
-- Cross-vendor review must validate the source/test/build closure and the feasibility of temporarily making the source path inaccessible during parity verification.
+- R3 by independent `codex` and `codex-ops` bindings must verify the crash-safe lifecycle, exact test parity, and scoped isolation patch.
 - The later authority-transfer item will decide remote creation, branch protection, and old-path freeze; none blocks local extraction.
 
 ## dont_touch
