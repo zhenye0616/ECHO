@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -6,6 +6,14 @@ const REPO = process.cwd();
 
 function source(path: string): string {
   return readFileSync(join(REPO, path), 'utf8');
+}
+
+function typescriptSources(dir: string): string[] {
+  return readdirSync(join(REPO, dir), { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return typescriptSources(path);
+    return entry.isFile() && entry.name.endsWith('.ts') ? [path] : [];
+  });
 }
 
 describe('command spawn security boundary', () => {
@@ -22,8 +30,17 @@ describe('command spawn security boundary', () => {
 
     expect(registration).not.toContain("from 'node:child_process'");
     expect(registration).toContain("crossSpawn('claude', args");
-    expect(probe).not.toContain('spawn as nodeSpawn');
+    expect(probe).not.toMatch(
+      /import\s*\{[^}]*\bspawn\b[^}]*\}\s*from\s*['"]node:child_process['"]/s,
+    );
     expect(probe).toContain("crossSpawn('codex', args");
     expect(probe).toContain("crossSpawn('claude', args");
+  });
+
+  it('keeps the superseded command resolver unreachable from production code', () => {
+    const imports = typescriptSources('src').filter(
+      (path) => path !== 'src/util/subprocess.ts' && source(path).includes('util/subprocess'),
+    );
+    expect(imports).toEqual([]);
   });
 });
