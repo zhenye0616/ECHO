@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-132-product-graduation-foundation"
+round: 1
+reviewer: "codex"
+artifact_sha: "6b0d582d0ecc83dd19870a50fbb24c062a1808f6"
+completed_at: '2026-07-13T09:16:49Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC1 and files_to_modify"
+    finding: "The fixed maximum allowlist is not demonstrated to be transitively closed, while likely dependencies of granola-poller, granola-signals, post-meeting-brief, and storage may reach sources.ts, paths.ts, brain.ts, or other unlisted helpers. Because the builder may neither extend the allowlist nor modify several allowed modules, one such edge blocks implementation. Inventory the current closure, amend AC1 with the closed path set, and add every required dependency-seam refactor to files_to_modify before promotion."
+  - severity: "medium"
+    where: "AC2 filesystem-type probe"
+    finding: "The probe contract leaves the builder to choose between incompatible macOS mechanisms such as numeric fs.statfs types and Darwin filesystem-name inspection, so rejection of nfs, smbfs, afpfs, and WebDAV is not falsifiable. Specify the adapter API and normalization table, closest-existing-ancestor and realpath/symlink behavior, and add a macOS integration assertion plus injected fixtures for every prohibited and unclassifiable type."
+  - severity: "medium"
+    where: "AC3 compatibility tests"
+    finding: "The DI refactor says the lab adapter preserves parsing, preflight, prompt execution, timeout behavior, and environment-based brain selection, but the required tests cover only selection, timeout, errors, and shutdown and do not exercise the actual dispatch composition boundary. Add an authorized dispatch-level test that spies on createLabGranolaSignalOptions and proves the existing environment mapping, preflight, prompt/parser options, timeout, and no-fallback behavior are unchanged."
+  - severity: "high"
+    where: "AC4 and AC7 workflow triggers"
+    finding: "test:repo explicitly excludes tests/product while the only replacement execution is a path-filtered workflow whose relevant paths are unspecified. A change to an allowed transitive source, schema, lockfile, build tool, or product test can therefore silently miss the product suite. Enumerate and test the complete trigger set from source-boundary inputs, or run test:product unconditionally in the existing CI workflow."
+  - severity: "medium"
+    where: "AC4 hermetic setupFiles guard"
+    finding: "Intercepting outbound sockets and uncontrolled clock reads is underspecified and can either miss node:http, node:https, node:tls, or child-process traffic or break Vitest's own timing. Define the guarded APIs, per-file installation and restoration lifecycle, fixed-clock mechanism, and child-process environment contract; extend the guard test to prove direct fetch, raw socket, HTTP client, real-clock, and spawned-process escape attempts fail."
+  - severity: "high"
+    where: "AC5 and AC7 offline native installation"
+    finding: "An exact npm cache does not by itself make better-sqlite3 installable offline: its prebuild path can fetch outside npm and its source-build fallback can make node-gyp fetch Node headers. Select one target-specific strategy, either hash and carry the matching prebuild or carry exact Node headers and set npm_config_nodedir with the macOS toolchain, include those inputs in qualification-support hashes, and test that the fallback succeeds under the poisoned network rather than merely asserting npm --offline."
+  - severity: "high"
+    where: "AC1 closure output and AC5 build-artifact.mjs"
+    finding: "The builder accepts a caller-supplied source SHA and writes closure/artifact outputs without a specified output path, identity check, locking, or atomic publication, allowing a clean tree at one commit to be labeled with another SHA and concurrent or retried builds to overwrite a lineage. Require an explicit external --out-dir, verify git rev-parse HEAD equals the normalized source SHA and git status including untracked files is empty, build in a fresh temporary sibling, and atomically rename to a previously absent final directory containing the closure manifest and exactly one pack result."
+---
