@@ -8,6 +8,7 @@ created: 2026-07-13
 blocked_by: []
 task_state_ref: 2026-07-13-132-product-graduation-foundation
 requested_reviewers: ["codex", "cursor"]
+ready_content_sha: a1da0de63fc7eff07de4856daa22b26c3147067447d813c9bc960536bc0641b2
 files_to_modify:
   - src/product/                                      # NEW: isolated product composition, config, runtime, CLI, health, and evidence types
   - src/capture/granola-source-policy.ts              # NEW: Granola-only API/derived allowlist with no Machine-capture constants

@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R5 — both reviewers proceed with zero findings on the removal-only verification round. Five rounds total: r1 14 findings (all patched, 291870c3), r2 12 propagation-completions (a532c695, reframe gate + investigator), r3 5 incl. convergent deepest-match HIGH and ci.yml wiring HIGH (03817c4e, investigator), r4 single MED → comparison mechanism dropped with removal-proof matrix (981f9da1), r5 clean.
 
