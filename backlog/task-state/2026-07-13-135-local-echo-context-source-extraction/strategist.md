@@ -1,42 +1,41 @@
 ## current_thesis
 
-Extract cross-tool capture, storage, normalization, retrieval, and context APIs into a local source-independent `echo-context` repository. Prove synthetic parity while leaving the live daemon, MCP, and state untouched.
+Extract capture, normalization, storage, retrieval, and context APIs into a local source-independent `echo-context` repository. Use one attended deterministic run and synthetic parity while leaving the live daemon, MCP, and state untouched.
 
 ## locked_decisions
 
 - `echo-context` owns capture, normalization, identity, append-only context storage, clustering/retrieval, permissions, health, and context APIs.
-- Source input is `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; final target `/Users/zhenye/Desktop/echo-context` is published only from verified same-filesystem staging under an atomic lock.
-- `tools/repository-extraction/echo-context.mjs` owns external lifecycle state, stale-lock quarantine, no-replace publication, exact reconcile-only recovery, process-group supervision, and handoff verification.
-- Target-keyed lock takeover is fcntl-serialized with one-use resume token; recorded PGID/sockets/SQLite locks must be quiescent and committed control bytes must match.
-- The target is local Git on a migration branch with no remote, install, publication, or authority transfer.
-- Retrieval MCP is exactly eight pinned tools (`echo_ping`, `echo_resolve_mru`, `find_clusters`, `get_atom`, `get_atoms`, `get_recent_work_context`, `search_memories`, `wait_for_new_turns`); coord/task-state/review tools are forbidden.
-- Product decision extraction, cards/briefs/approval, Slack/Linear, and client delivery are forbidden.
-- State uses a distinct `ECHO_CONTEXT_HOME`; no implicit read of live `~/.echo` state is allowed.
-- All verification uses synthetic scratch data and ephemeral ports; live state migration is a later item.
-- Raw Granola capture may be copied here; product semantics stay out. echo-brain may own a separate minimal copy with provenance.
-- Every copied/relocated/rewritten file has source blob and destination hash provenance.
-- The source-at-SHA parity candidate is exactly 211 paths (109 source, 102 test/fixture) at SHA-256 `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`; every row requires an owned or excluded disposition.
-- A committed source-evidence bundle is compared to commit objects before isolation; standalone parity and eight-tool schema checks consume digests/fixtures without source access.
-- Source tool evidence comes from executing the pinned source MCP snapshot against scratch state, not parsing the target manifest; normalization and aggregate digests are fixed.
-- Direct dependencies derive from final bare imports plus a fixed dev-tool set at exact source-lock versions.
-- Pre-isolation acquisition produces an integrity-manifested per-run npm cache; all isolated installs are offline.
-- Node `22.22.1` and npm `10.9.4` are hard preflights; committed `package-lock.json` and commit-object materialization are required.
-- Verification denies source reads/external writes/non-loopback networking at the OS layer; a process-group supervisor proves cleanup after hangs and injected failures.
-- The migration record pins a clean local HEAD/hash handoff for independent review.
-- No source/sibling dependency, symlink, submodule, shared writable state, or behavior change.
+- Source is pinned to `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; target is `/Users/zhenye/Desktop/echo-context` on a local migration branch with no remote.
+- Lifecycle is `ABSENT -> RUNNING -> PUBLISHED | FAILED`; no automatic resume, takeover, quarantine token, checkpoint reuse, or later-process signaling exists.
+- Atomic target-specific state-directory creation elects one run. The active supervisor owns and cleans its process group, sockets, and scratch database.
+- `discard` refuses a final target or possibly-live resource, archives state/staging/record/cache/output without deletion, and requires a fresh pinned extraction.
+- Migration record publication precedes no-replace target publication. Target + byte-identical record + committed candidate identity define published state.
+- Retrieval MCP contains exactly the eight pinned context tools; coordination, task-state, review, and product tools are forbidden.
+- Source-tool evidence executes the pinned source MCP against immutable synthetic fixtures under sanitized scratch state and a loopback-only sandbox.
+- State uses distinct `ECHO_CONTEXT_HOME`; live `~/.echo` state, credentials, daemon, and MCP configuration are never read or mutated.
+- Raw Granola capture may be copied as a generic source; decision extraction, cards, briefs, approval, and delivery stay out.
+- The candidate inventory is exactly 211 paths (109 source, 102 test/fixture) at pinned SHA-256 `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
+- Every copied/relocated/rewritten file has source blob and destination hash provenance; standalone parity requires no source access.
+- Direct dependencies derive from final bare imports plus fixed dev tools at exact source-lock versions.
+- Pre-isolation acquisition builds an integrity-manifested run cache; all candidate work then runs offline under sanitized environment and OS sandbox.
+- AF_INET and AF_INET6 probes independently prove loopback allow and known-listener non-loopback policy denial; missing topology is a preflight failure, not a skip.
+- Node `22.22.1` and npm `10.9.4` are hard preflights; source bytes come only from pinned commit objects.
+- `verify-handoff` derives canonical paths and validates original control blobs despite the later record-only evidence commit.
+- No source/sibling dependency, symlink, submodule, shared writable state, behavior change, remote, or authority transfer occurs.
 
 ## open_questions
 
-- R5 by independent `codex` and `codex-ops` bindings must verify takeover/PGID cleanup, cold-cache offline install, executable source-tool snapshot, four-direction IPv4/IPv6 sandbox probes, and trusted handoff.
-- Later cutover will decide live-state migration, rollback, service installation, and echo-brain's versioned read-only context contract.
+- R6 by independent `codex` and `codex-ops` bindings must confirm the structural cut plus tool-evidence fixtures, network probes, publication, and handoff contracts.
+- Later cutover decides live-state migration, rollback, service installation, and echo-brain's read-only context contract.
 
 ## dont_touch
 
 - Do not access or alter live daemon, MCP, state, credentials, launchd, or user config.
 - Do not add retrieval/capture features or include product/loop code.
-- Do not touch `/Users/zhenye/Desktop/echo-brain`, `/Users/zhenye/Desktop/echo-loop`, current wiki, or holdout-131.
+- Do not touch sibling targets, current wiki, or holdout-131.
 
 ## canonical_anchors
 
+- decision: raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md
 - spec: backlog/proposed/2026-07-13-135-local-echo-context-source-extraction.md
 - reviews: backlog/reviews/2026-07-13-135-local-echo-context-source-extraction/

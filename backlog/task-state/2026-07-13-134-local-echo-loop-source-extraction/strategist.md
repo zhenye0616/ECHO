@@ -1,39 +1,40 @@
 ## current_thesis
 
-Extract the internal orchestration protocol into a local source-independent `echo-loop` repository while leaving the active Project_echo loop untouched. Prove the loop on disposable fixture repos before any installation or authority transfer.
+Extract the internal orchestration protocol into a local source-independent `echo-loop` repository while leaving the active Project_echo loop untouched. Use one attended deterministic run and prove behavior on disposable fixture repos before installation or authority transfer.
 
 ## locked_decisions
 
-- `echo-loop` means agent skills, backlog/task-state, review queue, coordination/deadlines, builder/reviewer/merge workflows, and operator tooling.
-- Source input is `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; final target `/Users/zhenye/Desktop/echo-loop` is published only from verified same-filesystem staging under an atomic lock.
-- `tools/repository-extraction/echo-loop.mjs` owns bootstrap/control state outside the candidate, no-replace publication, stale-lock quarantine, reconcile-only recovery, and read-only handoff verification.
-- Target-keyed lock takeover is fcntl-serialized, returns a one-use resume token, and cannot proceed until the recorded child process group is dead; control revision hashes bind all reuse.
-- The target is local Git on a migration branch with no remote or publication.
-- Copy protocol implementation and templates, not Project_echo's historical backlog/archive/reviews/wiki/raw corpus.
-- Split loop-owned coord/task-state APIs from context retrieval MCP; no retrieval tools ship in echo-loop.
-- Loop coordination uses private SQLite WAL; one transaction inserts by caller idempotency key and applies role/deadline projection, while duplicate retry returns the original sequence without reapplying state.
-- Canonical skills remain vendor-neutral; client adapters are derived and drift-checked.
+- `echo-loop` owns agent skills, backlog/task-state, review queue, coordination/deadlines, builder/reviewer/merge workflows, and operator tooling.
+- Source is pinned to `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; target is `/Users/zhenye/Desktop/echo-loop` on a local migration branch with no remote.
+- Lifecycle is `ABSENT -> RUNNING -> PUBLISHED | FAILED`; automatic resume, stale-owner takeover, quarantine tokens, checkpoint reuse, and later-process signaling are forbidden.
+- Atomic target-specific state-directory creation elects one run. The active supervisor owns and cleans its child process group.
+- `discard` refuses a final target or possibly-live process, archives evidence/state/staging/cache/output without deletion, and requires a fresh pinned extraction.
+- Migration record publication precedes no-replace target publication. Target + byte-identical record + committed candidate identity define published state.
+- Copy protocol implementation and installable templates, not Project_echo history, product/context code, raw corpus, or completed queue state.
+- Split loop-owned coordination/task-state APIs from retrieval MCP; no context tools ship in echo-loop.
+- Coordination idempotency is scoped by caller identity and canonical operation/payload bytes; mismatched reuse fails without state change.
+- Store initialization intent and every terminal open/migration failure leave collision-safe, fsynced diagnostics with stderr fallback.
 - Preserve proposed-review, ready seals, atomic claim, worktree isolation, reviewer independence, fresh eyes, and founder checkpoints.
-- Tests mutate only disposable local fixture repositories and local bare remotes.
-- Fixture Git runs with isolated HOME/config/hooks/credentials and validates every bare remote remains beneath its scratch root.
-- Node `22.22.1` and npm `10.9.4` are hard preflights; source materialization reads committed objects only.
-- Source/dependency plans are deterministic and machine-checked; sandbox denies source reads, all network, and external writes.
-- Source/dependency closure includes runtime reads, shell sourcing, package executables, and child-process binaries. Verification installs only from an integrity-manifested per-run offline cache.
-- Coord idempotency binds key to a canonical operation+payload fingerprint; mismatched reuse fails without projection change and all terminal store failures log durably.
-- No global install, launchd change, sibling repo dependency, or authority transfer occurs.
+- Source closure classifies imports, literal/computed reads, shell/shebang edges, package scripts, PATH lookups, and child executables; undeclared host reads/exec fail closed.
+- Tests mutate only disposable local fixture repositories with isolated Git config, hooks, credentials, and fixture-owned file remotes.
+- Node `22.22.1` and npm `10.9.4` are hard preflights; source bytes come only from pinned commit objects.
+- Pre-isolation acquisition builds an integrity-manifested run cache; all candidate work then runs offline under sanitized environment and OS sandbox.
+- `verify-handoff` derives canonical paths and validates original control blobs despite the later record-only evidence commit.
+- No global install, launchd change, sibling dependency, remote, or authority transfer occurs.
 
 ## open_questions
 
-- R5 by independent `codex` and `codex-ops` bindings must verify serialized takeover/PGID cleanup, offline cache, runtime-edge closure, request fingerprints, durable failure logs, and trusted handoff flags.
-- Later cutover will decide how each repository installs/consumes echo-loop and where its own backlog state lives.
+- R6 by independent `codex` and `codex-ops` bindings must confirm the structural cut and the runtime-edge, idempotency, diagnostics, publication, and handoff contracts.
+- A later cutover decides how repositories install/consume echo-loop and where each repository's queue state lives.
 
 ## dont_touch
 
 - Do not change the active Project_echo loop, review launchd jobs, or user-level skill adapters.
 - Do not include product logic, capture/retrieval context logic, or historical project corpus.
-- Do not touch `/Users/zhenye/Desktop/echo-brain`, `/Users/zhenye/Desktop/echo-context`, real remotes, wiki, or holdout-131.
+- Do not touch sibling targets, real remotes, wiki, or holdout-131.
 
 ## canonical_anchors
 
+- decision: raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md
 - spec: backlog/proposed/2026-07-13-134-local-echo-loop-source-extraction.md
 - reviews: backlog/reviews/2026-07-13-134-local-echo-loop-source-extraction/
