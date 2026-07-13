@@ -12,8 +12,6 @@ export interface ResolvedCommand {
   prependArgs?: string[];
 }
 
-const WINDOWS_CMD_METACHARACTERS = /[&|<>^%!()"\r\n]/;
-
 const DEFAULT_WINDOWS_PATHEXT = ['.COM', '.EXE', '.BAT', '.CMD'] as const;
 
 function windowsPathEntries(env: NodeJS.ProcessEnv): string[] {
@@ -77,12 +75,4 @@ export function resolveCommandForCurrentProcess(cmd: string): ResolvedCommand {
     env: process.env,
     existsSync: nodeExistsSync,
   });
-}
-
-export function assertSafeCommandArgs(resolved: ResolvedCommand, args: readonly string[]): void {
-  if (resolved.prependArgs === undefined) return;
-  const unsafe = args.find((arg) => WINDOWS_CMD_METACHARACTERS.test(arg));
-  if (unsafe !== undefined) {
-    throw new Error('Windows command arguments contain unsupported shell metacharacters');
-  }
 }
