@@ -554,3 +554,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP). Investigator consultee made zero ECHO MCP calls (git/file reads only) → skip-rule, no proxy entry.
 - **Verdict:** useful — second consecutive active-trigger acceptance; launchd fallback not needed this round.
 - **Note:** r2→r3 tick ran the full disposition discipline (reframe gate + investigator + removal-proof reasoning) autonomously; convergence expected at r3 absent new load-bearing defects.
+
+## 2026-07-13 03:05 PDT — watcher r4 dispatch active-trigger (item 132 graduation foundation)
+
+- **Trigger:** watch tick combined r3 (5 findings: convergent HIGH deepest-match mount defect, HIGH ci.yml artifact-producer contradiction, HIGH standalone-tool child_process gap, MED seed-inventory circularity). Reframe gate fired again; investigator returned propagation_completion and endorsed the narrow static child_process rule over runtime preload. Patches at 03817c4e; r4 dispatched.
+- **Query inputs:** coord_invoke ×2 — role=codex, role=codex-ops; request_path=.../r4/request.md; correlation_id from r4 frontmatter; X-Echo-Role: claude.
+- **Returned:** both ok.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP). Investigator consultee: zero ECHO MCP calls → skip-rule.
+- **Verdict:** useful — third consecutive active-trigger acceptance.
+- **Note:** r3 produced genuinely NEW load-bearing defects (mount selection, CI wiring) rather than patch-drift — evidence the verification rounds are earning their cost. r4 instructed to converge absent new load-bearing defects.
