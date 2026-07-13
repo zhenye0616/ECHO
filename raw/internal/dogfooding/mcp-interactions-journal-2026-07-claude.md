@@ -526,3 +526,13 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right (after self-inflicted retry) — the chain recovered the cross-tool handoff context in one atom; the codex turn's final message was the actual baton.
 - **Note:** copy the `source` string from the resolver output verbatim; exact-source search returns empty (not an error) on a one-character typo, indistinguishable from "session not captured" without re-checking the path. A resolver→search compositional call that passes the descriptor through mechanically would remove this failure class.
 - **Conjecture:** none
+
+### 2026-07-12 21:10 PDT — independent PR #10 G1 closure-record review
+
+- **Trigger:** Independent exact-tip review of the G1 closure record at `e71efe6b`; the reviewer was asked to check the 27-row tally, gate boundaries, inherited qualification failures, and live-enforcement claims.
+- **Query inputs:** (1) `search_memories({query: "27 rows total", source_app: "git", limit: 5})`; (2) `search_memories({query: "align G1 record with enforcement", source_app: "git"})`; (3) `search_memories({query: "g1-exposure-baseline-closure", source_app: "git"})`.
+- **Returned:** (1) 4 git matches, including commits `cddc127`, `c8ddd38`, `d80b515`, and `96695c6`, which corroborated the pre-closure 27-row / 1-resolved tally; (2) and (3) returned 0 matches because the two PR #10 commits had not yet entered main-repo git capture.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** partial — the baseline tally retrieval was useful and correct; expected branch-only commits were absent from captured main history. The independent review itself returned READY with no medium-or-higher findings.
+- **Note:** The calls occurred even though the parent invoked Claude with tools disabled; the reviewer disclosed them in its final response and requested journal-by-proxy. Use strict empty MCP configuration for the follow-up review to avoid recursive unlogged retrieval.
+- **Conjecture:** Branch-aware git capture would make exact-tip review retrieval useful before merge; absent that, immutable supplied diffs remain the authority.
