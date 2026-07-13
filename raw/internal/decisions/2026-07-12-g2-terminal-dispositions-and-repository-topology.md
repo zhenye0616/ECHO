@@ -3,7 +3,7 @@
 **Date:** 2026-07-12 PDT
 **Founder instruction:** `APPROVE TERMINAL PACK`
 **Decision input SHA:** `938b4905c78d0d9be3d97e331a69816ff2045023`
-**Status:** founder-approved terminal disposition package; awaiting independent mechanical verification and a separate SHA-bound G2 halt-lift
+**Status:** landed at main SHA `4cc700001ac07b66fdf0700643b29cdde8b83fb7`; independently verified; separate SHA-bound lift signed in `2026-07-12-clarity-halt-lift.md` and effective when that record lands
 **Product maturity:** DEV; unchanged
 
 ## Decision boundary
@@ -74,4 +74,4 @@ The prior history decision remains `DEFER`: founder-owned, triggered by the firs
 
 After reconciliation, the canonical register contains 27 rows: 11 `resolved`, 16 `deferred-with-owner-and-trigger`, zero `accepted-risk`, and zero `pending`. P1 and A6 retain their existing resolved evidence. The 25 dispositions above cite this record.
 
-The next step is an independent mechanical review at the exact decision-branch tip, followed by founder approval to land this decision-only package. G2 remains open after landing until the separate SHA-bound halt-lift is signed.
+Independent mechanical review completed at the exact landed SHA with verdict `G2_MECHANICALLY_READY`. The founder then signed the separate SHA-bound `2026-07-12-clarity-halt-lift.md`. G2 remains operationally open only until that record lands on `main` without changing the approved base.
