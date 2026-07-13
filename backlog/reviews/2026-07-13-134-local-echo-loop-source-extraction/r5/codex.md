@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-134-local-echo-loop-source-extraction"
+round: 5
+reviewer: "codex"
+artifact_sha: "22b706d9a16591ff3b4ecaa1cc9fbac89baa9da4"
+completed_at: '2026-07-13T22:39:36Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC1 — Create one local echo-loop Git repository with no remote"
+    finding: "The fcntl guard lacks a stable-inode and holder-lifetime contract. If the helper locks echo-loop.lock itself, renaming that inode and creating its replacement lets another process lock the replacement while the first critical section remains active. Specify a separate guard path that is never renamed, require the helper to retain its descriptor through an explicit ready/done IPC handshake covering all lock-state mutations and fsyncs, and add a failpoint test that pauses after rename while proving a contender remains blocked."
+  - severity: "high"
+    where: "AC1 — quarantine-lock and supervised PGID takeover"
+    finding: "Leader start identity alone does not define a safe negative proof after the leader exits or a PID/PGID is reused. Require the wrapper to remain the process-group leader and reap descendants, name the Darwin API and identity fields checked immediately before every signal, refuse rather than signal on identity mismatch, and require repeated post-reap ESRCH probes before replacement ownership. Add tests for leader exit with surviving descendants, identity mismatch, and a crash immediately after single-use token consumption."
+  - severity: "high"
+    where: "AC2 and AC7 — source-plan runtime-edge closure"
+    finding: "The plan closes literal imports, reads, and child-process binaries, but the isolation policy denies source reads, network, and external writes while still permitting undeclared host reads. Computed fs.readFile paths or computed spawn targets can therefore preserve a hidden host dependency. Require default-denied host reads with explicit candidate/cache/runtime/system allowlists or an equivalent runtime-observation gate, and add fixtures for nonliteral external reads and nonliteral executable resolution."
+  - severity: "high"
+    where: "AC7 — dependency-cache-ready"
+    finding: "npm ci cannot itself enforce that network requests are limited to the exact lockfile resolved URLs, and the stated acquisition command omits --no-audit and --no-fund. Specify a concrete enforcement mechanism such as a verified lockfile downloader or allowlisting proxy, including redirect validation, integrity verification before cache admission, and disabled audit/fund traffic. Tests must reject an unexpected endpoint and a redirect outside the resolved-URL allowlist before proving offline installation."
+  - severity: "medium"
+    where: "AC3 — durable diagnostics for initialization and migration failures"
+    finding: "A process killed during initialization cannot atomically write a diagnostic at the moment of termination, so the current killed-initialization requirement is not falsifiable as written. Define a fsynced external initialization-intent marker that the next opener converts into a durable diagnostic, or narrow the requirement to injected catchable failures. Specify file and parent-directory fsyncs and test the actual kill/reopen recovery sequence."
+  - severity: "medium"
+    where: "AC3 — request fingerprint and idempotency-key conflict behavior"
+    finding: "Sorted-key UTF-8 JSON does not fully define the fingerprint bytes or key scope. Specify a recursive canonicalization algorithm, construct one unambiguous canonical object containing operation and payload, define handling of unsupported numeric/value forms, and make uniqueness explicitly caller_id plus idempotency_key. Add nested-key-order equivalence and caller-scope tests alongside the existing concurrency cases."
+  - severity: "high"
+    where: "AC8 — verify-handoff trusted inputs"
+    finding: "verify-handoff accepts caller-selected record and state paths, so agreement among those files and candidate.v1.json proves self-consistency but not that the inputs are the orchestrator-published artifacts. Derive or strictly validate canonical non-symlink paths from the production root and expected run ID, anchor the state to the persisted control identity, and reject alternate self-consistent bundles. Add a test passing forged but mutually consistent record/state/candidate inputs from another directory."
+---
