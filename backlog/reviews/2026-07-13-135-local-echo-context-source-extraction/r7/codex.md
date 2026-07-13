@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 7
+reviewer: "codex"
+artifact_sha: "a4a4e1255143c8338bcfcfa123c0f59d5d7b1582"
+completed_at: '2026-07-13T23:38:17Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC1 — initialized election and discard"
+    finding: "The pre-claim path `new/135-<run-id>` is shared by concurrent invocations using the same caller-supplied run ID, but exclusive creation and attempt ownership are not required. Two extractors can populate the same tree before claim `RENAME_EXCL`, allowing mixed bytes or loser cleanup of another attempt. Require a validated run-ID grammar, per-attempt exclusive nonce or owner token, fsynced supervisor identity before election, discard binding to the expected run ID and owner, and injected same-ID election/discard races."
+  - severity: "high"
+    where: "AC1 — child gate and exact process identity"
+    finding: "The gate does not define whether the recorded executable is the final post-`exec` image or how surviving descendants remain attributable after their group leader exits. Specify a stable supervisor or post-`exec` acknowledgement protocol, the macOS birth-identity source, descendant/PGID membership checks, and failpoint tests for executable transition, leader exit, and PID/PGID reuse."
+  - severity: "high"
+    where: "AC1 — target publication durability"
+    finding: "Defining PUBLISHED from target presence plus `candidate.v1.json` permits recovery after a crash between target rename and parent-directory fsync to report success without proven durability. Require a durable publication intent/completion receipt and recovery that validates the candidate and successfully re-fsyncs the target parent before PUBLISHED or handoff can succeed."
+  - severity: "high"
+    where: "AC1 — `publish-record` CAS and repair"
+    finding: "The exact-child retry contract does not pin the commit message, author/committer identities, timestamps, tree, and resulting SHA, while repairing only the index cannot make the bound worktree clean because the record bytes initially remain under the claim. Define deterministic commit bytes, ref/index/worktree revalidation and lock ordering, crash-safe materialization of the exact record file and index without overwriting drift, and tests for every post-CAS repair window."
+  - severity: "high"
+    where: "AC3 — source/candidate fixture parity"
+    finding: "The immutable fixture corpus has no committed path, input digest, exact JSON-RPC requests, seed-state contract, or clock/randomness/timeout controls. Because canonicalization preserves scalar values, separate source and candidate runs can differ through timestamps, IDs, paths, waits, or shared-state mutation. Pin a committed fixture manifest and digest, require fresh identical state per run and deterministic volatile inputs, and prove both implementations consume the same request bytes."
+  - severity: "high"
+    where: "AC7 — acquisition and offline install closure"
+    finding: "The single networked `npm ci` does not identify its working root or lockfile, so it does not establish that the cache covers both the exported source lock and staged candidate lock used by later offline installs. Pin both lock hashes and roots, warm and verify both closures or prove candidate closure is a subset, then admit the cache only after clean source and candidate installs succeed with empty `node_modules`, the sanitized environment, pinned toolchain, and network denial."
+  - severity: "medium"
+    where: "AC7–AC8 — network denial probes"
+    finding: "AC8 binds the service only to `127.0.0.1`, so connecting to a non-loopback address can fail because no listener exists rather than because the sandbox denied it; policy-denial evidence and the inbound accept topology are also unspecified. Define exact AF_INET/AF_INET6 probe addresses, argv, accepted denial errno or sandbox evidence, persistent known-listener controls, and any pre-bound/inherited-socket mechanism needed for accept testing, then make AC8 use that controlled probe."
+---
