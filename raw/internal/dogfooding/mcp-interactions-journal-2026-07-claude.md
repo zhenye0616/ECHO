@@ -536,3 +536,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** partial — the baseline tally retrieval was useful and correct; expected branch-only commits were absent from captured main history. The independent review itself returned READY with no medium-or-higher findings.
 - **Note:** The calls occurred even though the parent invoked Claude with tools disabled; the reviewer disclosed them in its final response and requested journal-by-proxy. Use strict empty MCP configuration for the follow-up review to avoid recursive unlogged retrieval.
 - **Conjecture:** Branch-aware git capture would make exact-tip review retrieval useful before merge; absent that, immutable supplied diffs remain the authority.
+
+## 2026-07-13 02:25 PDT — watcher r2 dispatch active-trigger (item 132 graduation foundation)
+
+- **Trigger:** review-queue-watch tick dispatched r2 on 2026-07-13-132-product-graduation-foundation (r1: 14 findings, all accepted-with-patch at 291870c3); 057b post-push hook fires coord_invoke per headless reviewer.
+- **Query inputs:** coord_invoke ×2 — role=codex then role=codex-ops, request_path=backlog/reviews/2026-07-13-132-product-graduation-foundation/r2/request.md, correlation_id from r2 request frontmatter, X-Echo-Role: claude.
+- **Returned:** both ok; schema_version 1 coord_invoke payloads with reviewer_invoked_id e806785b… (codex) and 1948631d… (codex-ops), wrapper_path resolved to repo wrappers.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP); no memory/cluster retrieval in this tick.
+- **Verdict:** useful — active trigger accepted for both roles; no 406/identity-gate rejection.
+- **Note:** first post-G2 product-spec round driven end-to-end by the full-auto loop (request → codex+codex-ops ticks → combine → 14 dispositions → spec patch → r2 dispatch) with zero founder dispatch messages.
