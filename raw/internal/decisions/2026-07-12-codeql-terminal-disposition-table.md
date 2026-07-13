@@ -6,8 +6,8 @@
 **Disposition input head:** `5df97a26932f971b52e4a5f2d4c23ac4ae07b05e`
 **Current implementation head:** `3c69f8154cb1344585d0c51fb619c3ef706f3c6a`
 **Base:** `main` at `f77ba415fd6848fbb52586dc0ca4ada522097bac`
-**Status:** founder-approved dispositions executed; post-merge fixed-alert closure remains pending
-**Mode:** PR-ref CodeQL is clean; `main` and G1 remain unchanged/open until founder-approved landing and post-land verification
+**Status:** complete; post-merge fixed-alert closure verified
+**Mode:** G1 closed; G2 open; product maturity DEV
 
 ## Plain-English result
 
@@ -121,7 +121,15 @@ Pre-push verification on 2026-07-12:
 - Alerts still open: exactly `1-8` and `10`, all on unchanged `refs/heads/main`. They are the nine approved fixes and must close naturally in a post-land `main` analysis; they were not dismissed.
 - No product boundary, product spec, maturity stage, G2 state, or `main` ref changed.
 
-Execution-order steps 1-5 are complete. Steps 6-8 remain gated on founder merge approval and the first post-land `main` runs.
+**Pre-land status (superseded):** execution-order steps 1-5 were complete; steps 6-8 awaited founder merge approval and the first post-land `main` runs.
+
+## Post-land terminal readback
+
+- PR #8 merged at `cddc127cff02477d3d5b3bab51ae5203e26e58e5`; alerts `1-6`, `10`, and PR-only `80` closed through the approved fixes.
+- PR #9 independently reviewed and merged the remaining literal spawn-boundary fix at security evidence SHA `48ed4f87e288a5dc863220a2622e2668bd5b8f0a`.
+- Post-land CodeQL run [29222882099](https://github.com/zhenye0616/ECHO/actions/runs/29222882099) passed at `48ed4f87`. Alerts `7-8` are `fixed`; open-alert count is zero.
+- The 70 dismissals retain their exact evidence comments and grouped reasons. No fix-designated alert was dismissed.
+- Required execution steps 1-8 are complete. The attached A6/G1 record is `2026-07-12-g1-exposure-baseline-closure.md`.
 
 ## Required execution order
 

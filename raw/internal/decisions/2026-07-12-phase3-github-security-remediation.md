@@ -5,7 +5,7 @@
 **Executor:** Codex security executor
 **Repository baseline:** `zhenye0616/ECHO` at `main` SHA `f77ba415fd6848fbb52586dc0ca4ada522097bac`
 **Readiness branch input:** `maint/clarity-phase2` at `a2c53cb924b048bef29726a37ccb6d0e17b45346`
-**Gate state:** G1 open; G2 open; product maturity DEV
+**Gate state:** G1 closed; G2 open; product maturity DEV
 
 ## Authority and boundary
 
@@ -97,4 +97,10 @@ The later founder-approved CodeQL fix head `3c69f815` triggered a new PR analysi
 
 Any future action-pin upgrade must repeat the official-repository tag-ref dereference and record the resulting commit SHA before changing a workflow.
 
-G1 remains open until the landed evidence and every control/finding above has a terminal disposition. G2 remains open independently.
+## Final G1 readback
+
+PR #8 landed at `cddc127c`; PR #9 landed the final command-spawn fixes at security evidence SHA `48ed4f87`. Post-land CodeQL run `29222882099` and secret-scan run `29222882305` passed. Alerts `7-8` closed naturally, all other fix-designated alerts were already fixed, 70 evidence-specific dismissals remain intact, and GitHub reports zero open CodeQL alerts.
+
+Repository SHA-pin enforcement and GitHub-owned-only action restriction are enabled. Main ruleset `18842228` now requires the always-running CodeQL and full-history Gitleaks contexts with strict head freshness. Package, quality, and onboarding checks remain active for source changes but are not unconditional required contexts because their workflows intentionally skip docs-only PRs. Dependabot alert `15` is terminally dismissed as tolerable risk for the non-client internal Fleet overlay, with an explicit reopen-before-reactivation/packaging/distribution trigger. Exact closure evidence is in `2026-07-12-g1-exposure-baseline-closure.md`.
+
+G1 is closed. G2 remains open independently; product maturity remains DEV.
