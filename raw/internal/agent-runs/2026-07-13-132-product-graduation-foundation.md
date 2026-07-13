@@ -119,7 +119,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC1: passing — fence modes, reduced closure, source/pipeline/state seams, and compatibility checks
 - AC2: passing — strict schema/config, deepest-match filesystem probe, product-local paths, transactional runtime, bounded idempotent shutdown, and product-only CLI
 - AC3: passing — founder CLI brain isolated in lab adapter with explicit dispatch/brief injection and no product fallback
-- AC4: pending
+- AC4: implementation passing — product-only Vitest config, shared environment/network/child-process guard, sanitized child sentinel, red fixtures, structural test scan, and renamed broad suite; CI scratch-artifact wiring completes with AC5
 - AC5: pending
 - AC6: pending
 - AC7: pending
@@ -133,6 +133,8 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC1 focused verification: PASS (7 files, 100 tests); typecheck, lint, and `git diff --check` PASS.
 - AC2 focused verification: PASS (3 files, 48 tests); typecheck, lint, boundary check, and `git diff --check` PASS.
 - AC3 focused verification: PASS (4 files, 68 tests); typecheck, lint, boundary check, and `git diff --check` PASS.
+- AC4 product verification: PASS (4 files, 56 tests); typecheck, lint, boundary check, formatting, and `git diff --check` PASS.
+- AC4 renamed broad-suite verification: FAIL (183 files passed, 1 file failed, 1 file skipped; 1,893 tests passed, 1 failed, 21 skipped, 1 todo). The only failure is the existing inline generic-package file-list snapshot in `tests/packaging/packed-manifest.test.ts`, which correctly observes the new compiled seam/product files. That test is outside this item's `files_to_modify`; no snapshot update or generic-package behavior change was made. This is a repository-suite expectation update, not a product-suite or AC1–AC4 functional failure. It currently blocks an all-green `test:repo` closeout unless the authorized scope is amended or the strategist updates the generic-package snapshot.
 
 ## Open questions for founder
 

@@ -44,6 +44,7 @@
   "scripts": {
     "test": "vitest run",
     "test:product": "vitest run --config vitest.product.config.ts",
+    "test:repo": "vitest run --config vitest.repo.config.ts",
     "test:orchestration": "vitest run --config vitest.orchestration.config.ts",
     "build:cli": "tsc -p tsconfig.cli.json && node scripts/copy-sql-migrations.js",
     "prepack": "npm run build:cli",

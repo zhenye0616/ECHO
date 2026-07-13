@@ -145,9 +145,7 @@ function compilerOptions(projectRoot) {
 }
 
 function literalText(node) {
-  return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
-    ? node.text
-    : null;
+  return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? node.text : null;
 }
 
 function collectModuleReferences(sourceFile) {
@@ -204,7 +202,10 @@ function collectModuleReferences(sourceFile) {
         literalText(node.initializer.arguments[0])?.replace(/^node:/, '') === 'module'
       ) {
         for (const element of node.name.elements) {
-          if ((element.propertyName?.getText(sourceFile) ?? element.name.getText(sourceFile)) === 'createRequire') {
+          if (
+            (element.propertyName?.getText(sourceFile) ?? element.name.getText(sourceFile)) ===
+            'createRequire'
+          ) {
             createRequireFactories.add(element.name.getText(sourceFile));
           }
         }
@@ -229,6 +230,28 @@ function collectModuleReferences(sourceFile) {
   return references;
 }
 
+function collectBuiltinChildProcessAccesses(sourceFile) {
+  const accesses = [];
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'getBuiltinModule'
+    ) {
+      const specifier = literalText(node.arguments[0] ?? node.expression);
+      if (specifier?.replace(/^node:/, '') === 'child_process') {
+        accesses.push({
+          kind: 'getBuiltinModule',
+          line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return accesses;
+}
+
 function resolveInternal(specifier, containingFile, projectRoot, options) {
   const normalizedSpecifier = specifier.startsWith('src/')
     ? resolve(projectRoot, specifier)
@@ -250,7 +273,9 @@ function resolveInternal(specifier, containingFile, projectRoot, options) {
     }
   }
   if (resolvedFile === undefined) {
-    throw new BoundaryError(`unresolved internal module '${specifier}' from ${normalizeRelative(projectRoot, containingFile)}`);
+    throw new BoundaryError(
+      `unresolved internal module '${specifier}' from ${normalizeRelative(projectRoot, containingFile)}`,
+    );
   }
   const withoutDeclaration = resolvedFile.replace(/\.d\.(?:ts|mts|cts)$/, '.ts');
   const normalized = normalizeRelative(projectRoot, withoutDeclaration);
@@ -279,7 +304,11 @@ function scanGraph({ projectRoot, roots, manifest }) {
       if (!pathMatches(current, allowedPaths)) {
         violations.push(`${current}: path is outside allowed_internal_paths`);
       }
-      if (forbiddenRoots.some((root) => current === root.replace(/\/$/, '') || current.startsWith(root))) {
+      if (
+        forbiddenRoots.some(
+          (root) => current === root.replace(/\/$/, '') || current.startsWith(root),
+        )
+      ) {
         violations.push(`${current}: path enters forbidden_internal_roots`);
       }
     }
@@ -342,6 +371,43 @@ function scanGraph({ projectRoot, roots, manifest }) {
   };
 }
 
+function scanProductTestChildProcessAccess(projectRoot, childProcessOwner) {
+  const testRoot = resolve(projectRoot, 'tests/product');
+  const files = ts.sys.readDirectory(testRoot, SOURCE_EXTENSIONS, undefined, ['**/*']);
+  const violations = [];
+
+  for (const absolute of files) {
+    const current = normalizeRelative(projectRoot, absolute);
+    if (current === childProcessOwner) continue;
+    const sourceFile = ts.createSourceFile(
+      absolute,
+      readFileSync(absolute, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+      absolute.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
+    for (const reference of collectModuleReferences(sourceFile)) {
+      if (reference.specifier?.replace(/^node:/, '') === 'child_process') {
+        violations.push(
+          `${current}:${reference.line} (${reference.kind}): child_process is restricted to ${childProcessOwner}`,
+        );
+      }
+    }
+    for (const access of collectBuiltinChildProcessAccesses(sourceFile)) {
+      violations.push(
+        `${current}:${access.line} (${access.kind}): child_process is restricted to ${childProcessOwner}`,
+      );
+    }
+  }
+
+  if (violations.length > 0) {
+    throw new BoundaryError(
+      'product source boundary rejected direct child_process access in product tests',
+      violations.sort(),
+    );
+  }
+}
+
 function validateManifest(manifest) {
   const requiredArrays = [
     'entry_points',
@@ -353,7 +419,10 @@ function validateManifest(manifest) {
     throw new BoundaryError('boundary manifest must set boundary_version to 1');
   }
   for (const field of requiredArrays) {
-    if (!Array.isArray(manifest[field]) || !manifest[field].every((value) => typeof value === 'string')) {
+    if (
+      !Array.isArray(manifest[field]) ||
+      !manifest[field].every((value) => typeof value === 'string')
+    ) {
       throw new BoundaryError(`boundary manifest field '${field}' must be an array of strings`);
     }
   }
@@ -401,6 +470,10 @@ function main() {
   const manifest = readJson(manifestPath);
   validateManifest(manifest);
   const graph = scanGraph({ projectRoot, roots: manifest.entry_points, manifest });
+  scanProductTestChildProcessAccess(
+    projectRoot,
+    manifest.child_process_owner ?? 'src/product/spawn-sanitized-child.ts',
+  );
   writeResult(
     {
       boundary_version: manifest.boundary_version,

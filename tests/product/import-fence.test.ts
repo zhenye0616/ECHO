@@ -41,7 +41,10 @@ function fixture(files: Record<string, string>, overrides: Record<string, unknow
   return root;
 }
 
-async function run(args: readonly string[], cwd = REPO_ROOT): Promise<{
+async function run(
+  args: readonly string[],
+  cwd = REPO_ROOT,
+): Promise<{
   status: number | null;
   stdout: string;
   stderr: string;
@@ -123,8 +126,19 @@ describe('product transitive import fence', () => {
     },
     {
       name: 'direct child process import',
-      files: { 'src/product/index.ts': "import { spawn } from 'node:child_process';\nvoid spawn;\n" },
+      files: {
+        'src/product/index.ts': "import { spawn } from 'node:child_process';\nvoid spawn;\n",
+      },
       expected: 'child_process is restricted',
+    },
+    {
+      name: 'direct child process import in a product test',
+      files: {
+        'src/product/index.ts': 'export const ok = true;\n',
+        'tests/product/direct-spawn.test.ts':
+          "import { spawnSync } from 'node:child_process';\nvoid spawnSync;\n",
+      },
+      expected: 'direct child_process access in product tests',
     },
   ])('rejects $name', async ({ files, overrides = {}, expected }) => {
     const root = fixture(files as unknown as Record<string, string>, overrides);
@@ -155,13 +169,7 @@ describe('product transitive import fence', () => {
       'src/product/a.ts': 'export const a = true;\n',
       'src/product/z.ts': 'export const z = true;\n',
     });
-    const args = [
-      '--project-root',
-      root,
-      '--seed-inventory',
-      '--roots',
-      'src/product/index.ts',
-    ];
+    const args = ['--project-root', root, '--seed-inventory', '--roots', 'src/product/index.ts'];
     const first = await run(args);
     const second = await run(args);
     expect(first.status, first.stderr).toBe(0);
