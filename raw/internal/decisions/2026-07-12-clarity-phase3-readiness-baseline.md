@@ -86,18 +86,22 @@ A different binding verifies the complete register at an exact main SHA: row cou
 
 **Ready when:** the checker records a clean result or all findings are resolved and rechecked at the new exact SHA.
 
+**Completed 2026-07-12:** Claude Fable 5, acting as a non-author read-only binding with tools and MCP disabled, verified the exact landed main SHA `4cc700001ac07b66fdf0700643b29cdde8b83fb7`. It confirmed 27 unique terminal rows, the 11/16/0/0 tally, every deferred owner/trigger, cited-artifact existence, inventory parity, and product/maturity/topology consistency. No medium-or-higher findings remained; verdict `G2_MECHANICALLY_READY`.
+
 ### R7 — Separate founder halt-lift consideration
 
 Only after R4-R6 may the founder consider a separate `clarity-halt-lift` decision naming the approved main SHA. That decision may authorize reviewed conversion of approved acceptance outlines into `backlog/proposed/`; it does not authorize direct-to-ready work and does not advance product maturity.
 
 The first post-lift proposal remains the graduation foundation: product composition root and source fence, runtime isolation, `tests/product/`, build-once artifact identity, and machine-readable qualification evidence.
 
+**Founder signature 2026-07-12:** `LIFT G2 AT 4cc700001ac07b66fdf0700643b29cdde8b83fb7`. The signed record is `2026-07-12-clarity-halt-lift.md`. R7 becomes complete, and G2 closes, when that record lands on `main` without changing the approved base. Product maturity remains DEV.
+
 ## Current stop line
 
-**Superseding status 2026-07-12:** R1-R5 are complete on the decision branch and G1 is closed. The stop line is now R6: independently verify the terminal register at the exact candidate tip, obtain founder approval to land it, recheck the exact landed SHA, and then obtain the separate founder G2 signature. Product specs and maturity advancement remain halted.
+**Superseding status 2026-07-12:** R1-R6 are complete and the founder has signed R7 at exact main SHA `4cc700001ac07b66fdf0700643b29cdde8b83fb7`. The stop line is landing the separate halt-lift record. Until it lands, product specs and maturity advancement remain halted. After it lands, reviewed conversion into `backlog/proposed/` is authorized; maturity remains DEV.
 
 **Historical pre-land stop line:** R2 remediation authority was granted by the founder's instruction to proceed with Phase 3. The next irreversible action then requiring authority was the R3 update of `main`.
 
 **Historical pre-land qualification finding:** the first remote PR run exposed inherited onboarding/release failures requiring product/runtime or package work across the halt. The security-only landing proceeded under founder authority; those failures remain post-G2 qualification blockers. Exact run evidence is in `2026-07-12-phase3-github-security-remediation.md`.
 
-No Phase 3 readiness work may update `main`, fix additional product/source findings beyond the founder-approved CodeQL table, or silently convert “recommended” choices in the founder packet into decisions.
+No Phase 3 readiness work may silently convert "recommended" choices in the founder packet into decisions. The only authorized `main` update at this stop line is the separately reviewed halt-lift record; product/source work remains out of scope for that update.
