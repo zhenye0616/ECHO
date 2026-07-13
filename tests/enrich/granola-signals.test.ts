@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setEchoHomeRoot } from '../../src/echo-home/paths.js';
 import {
   filterToCurrentSignalRuns,
@@ -20,6 +20,12 @@ import { MemoryStorage } from '../../src/storage/memory.js';
 import type { CaptureEvent, EventId } from '../../src/storage/interface.js';
 import { captureStdout } from '../fixtures/stdout.js';
 import { normalizeSubject } from '../../src/util/subject.js';
+import {
+  createLabGranolaSignalOptions,
+  resolveLabGranolaSignalAdapterConfig,
+  type LabGranolaSignalAdapterDependencies,
+} from '../../src/enrich/granola-signals-cli-adapter.js';
+import { startEnrichmentDispatch } from '../../src/enrich/dispatch.js';
 
 // Repoint ECHO_HOME at a fresh temp so any worker-heartbeat write (item 120,
 // from the worker run() wrapper and the boot-disable path) lands in temp, never
@@ -29,6 +35,97 @@ beforeEach(() => {
   const home = mkdtempSync(join(tmpdir(), 'echo-granola-signals-home-'));
   homeDirs.push(home);
   setEchoHomeRoot(home);
+});
+
+describe('explicit lab CLI adapter composition', () => {
+  const input: GranolaSignalExtractionInput = {
+    note_id: 'synthetic-note',
+    meeting_title: 'Synthetic meeting',
+    updated_at: '2026-07-13T00:00:00.000Z',
+    summary_text: 'A'.repeat(1_100),
+    summary_dedupe_key: 'summary-key',
+    transcript_text: 'Synthetic transcript',
+    transcript_dedupe_key: 'transcript-key',
+    transcript_items: [],
+  };
+
+  it('preserves environment mapping, preflight, prompt/parser behavior, and timeout without fallback', async () => {
+    const env = {
+      ECHO_GRANOLA_SIGNAL_BRAIN: 'claude',
+      ECHO_GRANOLA_SIGNAL_CONTEXT_REPO_PATH: '/tmp/echo-context',
+      ECHO_GRANOLA_SIGNAL_BRAIN_TIMEOUT_MS: '4321',
+    } as NodeJS.ProcessEnv;
+    expect(resolveLabGranolaSignalAdapterConfig(env)).toMatchObject({
+      brain: 'claude',
+      contextRepoPath: '/tmp/echo-context',
+      timeoutMs: 4321,
+      env,
+    });
+
+    const preflight = vi.fn(async () => {});
+    const run = vi.fn(async (...args: Parameters<LabGranolaSignalAdapterDependencies['run']>) => {
+      void args;
+      return {
+        ok: true,
+        outcome: 'ok' as const,
+        durationMs: 1,
+        answer: '{"signals":[]}',
+      };
+    });
+    const options = createLabGranolaSignalOptions(env, { preflight, run });
+    expect(options.adapter?.id).toBe('lab-cli:claude');
+    await options.adapter!.preflight();
+    expect(preflight).toHaveBeenCalledWith('claude', env);
+    expect(await options.adapter!.extract(input, { extractor_version: 'fixture' })).toEqual([]);
+    expect(run).toHaveBeenCalledTimes(1);
+    const [prompt, runOptions] = run.mock.calls[0]!;
+    expect(prompt).toContain('Synthetic meeting');
+    expect(runOptions).toMatchObject({
+      brain: 'claude',
+      contextRepoPath: '/tmp/echo-context',
+      timeoutMs: 5321,
+      env,
+    });
+    expect(run.mock.calls).toHaveLength(1);
+  });
+
+  it('fails invalid lab adapter selection rather than silently switching', () => {
+    expect(() =>
+      createLabGranolaSignalOptions({
+        ECHO_GRANOLA_SIGNAL_BRAIN: 'not-a-brain',
+        ECHO_GRANOLA_SIGNAL_CONTEXT_REPO_PATH: '/tmp',
+      }),
+    ).toThrow(/must be codex or claude/i);
+  });
+
+  it('injects createLabGranolaSignalOptions at the dispatch boundary', async () => {
+    const env = {
+      ECHO_GRANOLA_SIGNAL_BRAIN: 'codex',
+      ECHO_GRANOLA_SIGNAL_CONTEXT_REPO_PATH: '/tmp',
+    } as NodeJS.ProcessEnv;
+    const createLabOptions = vi.fn(() => ({ extractFn: async () => [] }));
+    const dispatch = await startEnrichmentDispatch(new MemoryStorage(), {
+      createLabOptions,
+      granolaSignals: { env, runOnStart: false },
+      driftSweep: { env: {}, runOnStart: false },
+    });
+    try {
+      expect(createLabOptions).toHaveBeenCalledOnce();
+      expect(createLabOptions).toHaveBeenCalledWith(env);
+      expect(dispatch.granolaSignals.enabled).toBe(true);
+    } finally {
+      await dispatch.stop();
+    }
+  });
+
+  it('keeps the reusable core free of founder CLI imports and defaults', () => {
+    const source = readFileSync(
+      join(import.meta.dirname, '../../src/enrich/granola-signals.ts'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/brain\/brain|runBrain|preflightBrain|parseBrainName/);
+    expect(source).not.toMatch(/['"](?:codex|claude)['"]/);
+  });
 });
 afterEach(() => {
   while (homeDirs.length > 0) {

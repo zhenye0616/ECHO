@@ -4,6 +4,7 @@ import {
   type GranolaSignalWorkerHandle,
   type GranolaSignalWorkerOptions,
 } from './granola-signals.js';
+import { createLabGranolaSignalOptions } from './granola-signals-cli-adapter.js';
 import {
   startDriftSweepWorker,
   type DriftSweepWorkerHandle,
@@ -19,13 +20,20 @@ export interface EnrichmentDispatchHandle {
 export interface EnrichmentDispatchOptions {
   granolaSignals?: GranolaSignalWorkerOptions;
   driftSweep?: DriftSweepWorkerOptions;
+  createLabOptions?: typeof createLabGranolaSignalOptions;
 }
 
 export async function startEnrichmentDispatch(
   storage: Storage,
   options: EnrichmentDispatchOptions = {},
 ): Promise<EnrichmentDispatchHandle> {
-  const granolaSignals = await startGranolaSignalWorker(storage, options.granolaSignals);
+  const labOptions = (options.createLabOptions ?? createLabGranolaSignalOptions)(
+    options.granolaSignals?.env ?? process.env,
+  );
+  const granolaSignals = await startGranolaSignalWorker(storage, {
+    ...labOptions,
+    ...options.granolaSignals,
+  });
   // Item 114 AC1 — the drift sweep is registered here and chained AFTER the
   // signal worker (runSignalsFirst) so each tick reads freshly-extracted signal
   // atoms before judging them against recorded decisions. Fail-closed inside

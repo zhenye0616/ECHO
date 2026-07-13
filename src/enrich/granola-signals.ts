@@ -1,13 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { isAbsolute, dirname, join } from 'node:path';
-import { isAllowedDerived } from '../capture/sources.js';
-import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
+import { dirname, join } from 'node:path';
+import {
+  GRANOLA_API_SOURCE,
+  GRANOLA_DERIVED_INDEX_SOURCE,
+  GRANOLA_DERIVED_SOURCE,
+  isAllowedGranolaDerivedSource,
+} from '../capture/granola-source-policy.js';
+import { ECHO_STATE_PATHS } from '../echo-home/state-paths.js';
 import { atomicWrite } from '../echo-home/adapters/atomic-write.js';
 import { isNonEmptyString } from '../guards.js';
 import { createLogger } from '../logging/index.js';
 import { normalizeSubject } from '../util/subject.js';
-import { parseBrainName, preflightBrain, runBrain, type BrainName } from '../brain/brain.js';
 import type { CaptureEvent, EventId, Storage } from '../storage/interface.js';
 import { parseJson } from '../util/json.js';
 import {
@@ -21,9 +25,9 @@ import {
   type WorkerHeartbeat,
 } from './worker-heartbeat.js';
 
-export const GRANOLA_RAW_SOURCE = 'api:granola';
-export const GRANOLA_SIGNAL_SOURCE = 'derived:granola-signals';
-export const GRANOLA_SIGNAL_INDEX_SOURCE = 'derived:granola-signals-index';
+export const GRANOLA_RAW_SOURCE = GRANOLA_API_SOURCE;
+export const GRANOLA_SIGNAL_SOURCE = GRANOLA_DERIVED_SOURCE;
+export const GRANOLA_SIGNAL_INDEX_SOURCE = GRANOLA_DERIVED_INDEX_SOURCE;
 export const GRANOLA_SIGNAL_EXTRACTOR_VERSION = 'granola-signals@1';
 export const GRANOLA_SIGNAL_CHECKPOINT_SCHEMA_VERSION = 1;
 export const DEFAULT_GRANOLA_SIGNAL_WORKER_INTERVAL_MS = 300_000;
@@ -88,6 +92,12 @@ export type GranolaSignalExtractor = (
   context: GranolaSignalExtractionContext,
 ) => Promise<GranolaExtractedSignal[]>;
 
+export interface GranolaSignalAdapter {
+  id: string;
+  preflight: () => Promise<void>;
+  extract: GranolaSignalExtractor;
+}
+
 export interface GranolaSignalCheckpointEntry {
   input_fingerprint: string;
   extractor_version: string;
@@ -117,6 +127,7 @@ export interface GranolaSignalWorkerOptions {
   checkpointPath?: string;
   extractorVersion?: string;
   extractFn?: GranolaSignalExtractor;
+  adapter?: GranolaSignalAdapter;
   now?: () => string;
   settleMs?: number;
   lowConfidenceThreshold?: number;
@@ -132,8 +143,9 @@ export interface GranolaSignalWorkerOptions {
   workerIntervalMs?: number;
   runOnStart?: boolean;
   env?: NodeJS.ProcessEnv;
-  /** Test seam for brain availability probing; defaults to preflightBrain. */
-  preflight?: (brain: BrainName, env: NodeJS.ProcessEnv) => Promise<void>;
+  /** Compatibility-only injected availability seam; never selects an adapter. */
+  preflight?: () => Promise<void>;
+  heartbeatPath?: string;
 }
 
 /**
@@ -187,13 +199,6 @@ interface PreparedSignal {
   rationaleLinkTarget?: string;
 }
 
-interface BrainExtractorConfig {
-  brain: BrainName;
-  contextRepoPath: string;
-  timeoutMs: number;
-  env: NodeJS.ProcessEnv;
-}
-
 class GranolaSignalCheckpointError extends Error {
   constructor(message: string) {
     super(message);
@@ -209,7 +214,7 @@ export class GranolaExtractorParseError extends Error {
 }
 
 export function granolaSignalCheckpointPath(): string {
-  return join(ECHO_HOME_PATHS.state, 'granola-signals-checkpoint.json');
+  return join(ECHO_STATE_PATHS.state, 'granola-signals-checkpoint.json');
 }
 
 function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
@@ -746,7 +751,10 @@ export async function runGranolaSignalWorkerOnce(
   extractFn: GranolaSignalExtractor,
   options: GranolaSignalWorkerOptions = {},
 ): Promise<GranolaSignalWorkerResult> {
-  if (!isAllowedDerived('granola-signals') || !isAllowedDerived('granola-signals-index')) {
+  if (
+    !isAllowedGranolaDerivedSource(GRANOLA_SIGNAL_SOURCE) ||
+    !isAllowedGranolaDerivedSource(GRANOLA_SIGNAL_INDEX_SOURCE)
+  ) {
     return {
       status: 'error',
       reason: 'source_not_allowlisted',
@@ -934,48 +942,6 @@ export async function runGranolaSignalWorkerOnce(
   }
 }
 
-function parsePositiveInt(raw: string | undefined, fallback: number): number {
-  if (raw === undefined || raw.trim() === '') return fallback;
-  const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
-function resolveBrainExtractorConfig(env: NodeJS.ProcessEnv): BrainExtractorConfig {
-  const brain = parseBrainName(env['ECHO_GRANOLA_SIGNAL_BRAIN'] ?? env['ECHO_CEO_BRAIN']);
-  const contextRepoPath =
-    env['ECHO_GRANOLA_SIGNAL_CONTEXT_REPO_PATH'] ??
-    env['ECHO_CEO_CONTEXT_REPO_PATH'] ??
-    process.cwd();
-  if (!isAbsolute(contextRepoPath)) {
-    throw new Error('ECHO_GRANOLA_SIGNAL_CONTEXT_REPO_PATH must be absolute when set');
-  }
-  return {
-    brain,
-    contextRepoPath,
-    timeoutMs: parsePositiveInt(
-      env['ECHO_GRANOLA_SIGNAL_BRAIN_TIMEOUT_MS'],
-      DEFAULT_GRANOLA_SIGNAL_BRAIN_TIMEOUT_MS,
-    ),
-    env,
-  };
-}
-
-function defaultExtractorFromBrain(config: BrainExtractorConfig): GranolaSignalExtractor {
-  return async (input) => {
-    const prompt = buildExtractionPrompt(input);
-    const result = await runBrain(prompt, {
-      brain: config.brain,
-      contextRepoPath: config.contextRepoPath,
-      timeoutMs: computeGranolaSignalBrainTimeoutMs(config.timeoutMs, prompt.length),
-      env: config.env,
-    });
-    if (!result.ok || result.answer === undefined) {
-      throw new Error(result.reason ?? result.outcome);
-    }
-    return parseExtractorAnswer(result.answer);
-  };
-}
-
 export function computeGranolaSignalBrainTimeoutMs(base: number, promptChars: number): number {
   const scaled = base + 1000 * Math.max(0, Math.ceil(promptChars / 1024) - 1);
   return Math.min(Math.max(scaled, base), GRANOLA_SIGNAL_BRAIN_TIMEOUT_CAP_MS);
@@ -1138,30 +1104,38 @@ export async function startGranolaSignalWorker(
   options: GranolaSignalWorkerOptions = {},
 ): Promise<GranolaSignalWorkerHandle> {
   let extractFn: GranolaSignalExtractor | null = options.extractFn ?? null;
-  let brainConfig: BrainExtractorConfig | null = null;
-  if (extractFn === null) {
-    try {
-      brainConfig = resolveBrainExtractorConfig(options.env ?? process.env);
-    } catch (err) {
-      // Item 120 AC3: config-parse disable is a permanent disable — make it
-      // observable with a `disabled` heartbeat carrying the caught error.
-      log.error('disabled', { reason: (err as Error).message });
-      writeWorkerHeartbeat(GRANOLA_SIGNALS_WORKER, {
+  const compatibilityAdapter: GranolaSignalAdapter | undefined =
+    options.preflight === undefined
+      ? undefined
+      : {
+          id: 'injected-preflight-only',
+          preflight: options.preflight,
+          extract: async () => {
+            throw new Error('Granola signal extractor dependency is unavailable');
+          },
+        };
+  const adapter = options.adapter ?? compatibilityAdapter;
+  if (extractFn === null && adapter === undefined) {
+    const reason = 'Granola signal extractor and adapter health dependencies are required';
+    log.error('disabled', { reason });
+    writeWorkerHeartbeat(
+      GRANOLA_SIGNALS_WORKER,
+      {
         schema_version: 1,
         worker: GRANOLA_SIGNALS_WORKER,
         last_tick_at: new Date().toISOString(),
         status: 'disabled',
-        reason: (err as Error).message,
-      });
-      return {
-        enabled: false,
-        run: async () => ({ status: 'skipped', reason: 'disabled' }),
-        stop: async () => {},
-      };
-    }
+        reason,
+      },
+      options.heartbeatPath,
+    );
+    return {
+      enabled: false,
+      run: async () => ({ status: 'skipped', reason: 'disabled' }),
+      stop: async () => {},
+    };
   }
   const nowFn = options.now ?? (() => new Date().toISOString());
-  const preflight = options.preflight ?? preflightBrain;
 
   // Brain preflight is LAZY with per-tick retry. Probing at boot raced the
   // daemon's capture boot-scan: event-loop saturation delays the child-exit
@@ -1171,15 +1145,17 @@ export async function startGranolaSignalWorker(
   // disable; only availability probing retries, once per tick.
   async function ensureExtractFn(): Promise<GranolaSignalExtractor | null> {
     if (extractFn !== null) return extractFn;
-    const config = brainConfig!;
     try {
-      await preflight(config.brain, config.env);
+      await adapter!.preflight();
     } catch (err) {
-      log.warn('brain_preflight_failed_will_retry', { reason: (err as Error).message });
+      log.warn('adapter_preflight_failed_will_retry', {
+        adapter: adapter!.id,
+        reason: (err as Error).message,
+      });
       return null;
     }
-    extractFn = defaultExtractorFromBrain(config);
-    log.info('brain_preflight_ok', { brain: config.brain });
+    extractFn = adapter!.extract;
+    log.info('adapter_preflight_ok', { adapter: adapter!.id });
     return extractFn;
   }
 
@@ -1215,7 +1191,11 @@ export async function startGranolaSignalWorker(
   // (the f19dc419 class) is no longer indistinguishable from a quiet day.
   async function run(): Promise<GranolaSignalWorkerResult> {
     const result = await runInner();
-    writeWorkerHeartbeat(GRANOLA_SIGNALS_WORKER, granolaSignalHeartbeat(result, nowFn()));
+    writeWorkerHeartbeat(
+      GRANOLA_SIGNALS_WORKER,
+      granolaSignalHeartbeat(result, nowFn()),
+      options.heartbeatPath,
+    );
     return result;
   }
 

@@ -13,7 +13,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { atomicWrite } from '../echo-home/adapters/atomic-write.js';
-import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
+import { ECHO_STATE_PATHS } from '../echo-home/state-paths.js';
 import { createLogger } from '../logging/index.js';
 
 const log = createLogger('enrich.worker-heartbeat');
@@ -50,7 +50,7 @@ export interface WorkerHeartbeat {
  * repoints ECHO_HOME via `setEchoHomeRoot` resolves the temp state dir here.
  */
 export function workerHeartbeatPath(name: string): string {
-  return join(ECHO_HOME_PATHS.state, `worker-heartbeat-${name}.json`);
+  return join(ECHO_STATE_PATHS.state, `worker-heartbeat-${name}.json`);
 }
 
 /**
@@ -61,8 +61,12 @@ export function workerHeartbeatPath(name: string): string {
  * (symlinked target, ENOSPC, …) is caught and logged, never propagated into the
  * worker's `run()` or boot path.
  */
-export function writeWorkerHeartbeat(name: string, heartbeat: WorkerHeartbeat): void {
-  const filePath = workerHeartbeatPath(name);
+export function writeWorkerHeartbeat(
+  name: string,
+  heartbeat: WorkerHeartbeat,
+  destination = workerHeartbeatPath(name),
+): void {
+  const filePath = destination;
   try {
     mkdirSync(dirname(filePath), { recursive: true });
     atomicWrite({ filePath, content: `${JSON.stringify(heartbeat, null, 2)}\n` });

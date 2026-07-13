@@ -166,6 +166,36 @@ describe('echoctl brief', () => {
     expect(json.carryover).toEqual([]);
   });
 
+  it('selects the explicit lab CLI adapter when no fixture extractor is supplied', async () => {
+    const outDir = tempDir('echo-brief-lab-adapter-out-');
+    const cpDir = tempDir('echo-brief-lab-adapter-cp-');
+    const env = {
+      ECHO_GRANOLA_SIGNAL_BRAIN: 'claude',
+      ECHO_GRANOLA_SIGNAL_CONTEXT_REPO_PATH: '/tmp/echo-context',
+    } as NodeJS.ProcessEnv;
+    const createLabOptions = vi.fn(() => ({ extractFn: async () => extractedSignals() }));
+    const client = new MockGranolaClient(
+      listOne('note-lab', '2026-07-09T22:05:00.000Z'),
+      new Map([['note-lab', noteDetail('note-lab', '2026-07-09T22:05:00.000Z')]]),
+    );
+    const code = await runBrief({
+      argv: ['--note', 'note-lab', '--out-dir', outDir],
+      storage: new MemoryStorage(),
+      client,
+      env,
+      createLabOptions,
+      pollCheckpointPath: join(cpDir, 'granola.json'),
+      signalCheckpointPath: join(cpDir, 'signals.json'),
+      now: () => new Date('2026-07-09T22:06:00.000Z'),
+      stdout: { write: () => true },
+      stderr: { write: () => true },
+    });
+    expect(code).toBe(0);
+    expect(createLabOptions).toHaveBeenCalledOnce();
+    expect(createLabOptions).toHaveBeenCalledWith(env);
+    expect(readFileSync(join(outDir, 'brief-note-lab.md'), 'utf8')).toContain('Ship the brief');
+  });
+
   it('fails argv-less mode when newest stored note is outside the freshness window', async () => {
     const cpDir = tempDir('echo-brief-stale-');
     const store = new MemoryStorage();
