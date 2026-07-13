@@ -8,6 +8,8 @@
 **Main/origin main:** unchanged at the Phase 1 baseline
 **Product maturity:** DEV; unchanged
 
+**Superseded current-state note (2026-07-12):** this remains the historical Phase 2 checkpoint. G1 later closed, and the founder approved the remaining G2 terminal package in `2026-07-12-g2-terminal-dispositions-and-repository-topology.md`. The current register tally is 11 resolved / 16 deferred-with-owner-and-trigger / 0 pending. G2 itself remains open pending independent verification and a separate SHA-bound halt-lift.
+
 ## What this checkpoint means
 
 Phase 2 has completed the executor work needed to make the remaining closure questions decidable. It has not completed the founder decisions, lifted the clarity halt, created product specs, built the client carve, or advanced product maturity.

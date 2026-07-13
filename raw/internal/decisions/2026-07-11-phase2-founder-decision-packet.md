@@ -1,8 +1,10 @@
 # Phase 2 founder decision packet
 
-**Status:** awaiting founder session
+**Status:** terminal package approved 2026-07-12; retained as historical decision input
 **Purpose:** collect the decisions required to close G1/G2 without reopening product demand
 **Locked input:** Team decision product, meeting-to-brief wedge, aggressive selling, and client-machine endpoint remain decided
+
+**Superseding readback:** the founder approved the complete package with `APPROVE TERMINAL PACK`. The authoritative dispositions and repository topology are in `2026-07-12-g2-terminal-dispositions-and-repository-topology.md`. Every “answer needed” label below is historical input, not a currently pending G2 row. G2 remains open until independent mechanical verification and a separate SHA-bound founder halt-lift.
 
 Answer one group at a time. A checked option in an older template is not valid until the decision, owner, date, and commit SHA are recorded. Client/account identities belong in a private operating file; the public repo records roles, counts, and sanitized references only.
 
