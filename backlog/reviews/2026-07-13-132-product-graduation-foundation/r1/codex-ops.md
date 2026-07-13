@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-132-product-graduation-foundation"
+round: 1
+reviewer: "codex-ops"
+artifact_sha: "6b0d582d0ecc83dd19870a50fbb24c062a1808f6"
+completed_at: '2026-07-13T09:17:53Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "medium"
+    where: "AC2 — Product runtime owns only the wedge and fails closed"
+    finding: "The macOS filesystem-type probe lacks executable semantics. Node filesystem APIs do not portably return the named nfs/smbfs/afpfs/WebDAV labels, while invoking an unqualified stat binary creates a PATH and output-format hazard. Specify an injectable classifier whose production adapter uses an absolute macOS executable or documented API, a bounded timeout, stable locale, normalized raw values, and fixtures for every blocked, local, unknown, and command-failure result."
+  - severity: "medium"
+    where: "AC2 — Product runtime owns only the wedge and fails closed"
+    finding: "A deterministic shutdown handle covers successful startup but not partial startup failure or process termination. If polling starts before a later dependency fails, run can retain timers, locks, or file handles and hang unattended. Require transactional startup with reverse-order rollback, idempotent bounded shutdown, explicit SIGINT/SIGTERM handling, nonzero exit propagation, and tests injecting failure after each component starts."
+  - severity: "medium"
+    where: "AC4 — test:product becomes a real hermetic product suite; AC5 — Product-only artifact"
+    finding: "Vitest setupFiles guards only the Vitest worker; packaged-product tests spawn npm and echo-brain children that can use sockets, fetch, HOME, or wall time without encountering the parent monkeypatch. Poisoned proxy variables do not stop direct sockets. Require the guard to propagate into spawned Node processes or use an OS-level deny mechanism, and add sentinel child-process tests proving direct network and credential access fail."
+  - severity: "medium"
+    where: "AC5 — Product-only artifact is built once and is installable without the repo"
+    finding: "The exact-lock npm cache does not close better-sqlite3's build-from-source inputs. node-gyp may fetch Node 22 headers outside the npm cache, so the poisoned proxy turns a clean macOS runner into a deterministic failure. Require a hashed matching prebuild or bundled exact Node headers with npm_config_nodedir, verify the compiler/toolchain before installation, and test that no header or prebuild download is attempted."
+  - severity: "medium"
+    where: "AC4 — test:product becomes a real hermetic product suite; AC7 — CI qualifies the same bytes"
+    finding: "test:repo explicitly excludes tests/product while the only replacement workflow is path-filtered using an unspecified relevant-path set. Omitting a shared source, lockfile, TypeScript/Vitest config, schema, or boundary-manifest path silently removes product coverage from CI. Define an exhaustive trigger contract derived from the source boundary and test infrastructure, validate it with a contract test, or run test:product in ordinary CI for every pull request."
+  - severity: "medium"
+    where: "AC7 — CI qualifies the same bytes on the declared phase-1 target"
+    finding: "Normal job and needs semantics can skip evidence upload and final aggregation as soon as an install, selftest, or machine cell fails, leaving no machine-readable red report. Require bounded job and child-process timeouts, always-run evidence collection/uploads, and an aggregation path that records failed, timed-out, or missing dependencies as explicit red cells while preserving the workflow's failing conclusion."
+  - severity: "medium"
+    where: "AC5 — Product-only artifact; AC7 — CI qualifies the same bytes"
+    finding: "Artifact source identity is not tied to the tree actually checked out. Pull-request workflows commonly build a synthetic merge ref while an input may name the head SHA, allowing a clean artifact to carry the wrong source SHA. Require the builder to compare the supplied SHA with the checked-out HEAD, define event-specific checkout semantics, and propagate that verified SHA unchanged through manifests, reports, and artifact names."
+---
