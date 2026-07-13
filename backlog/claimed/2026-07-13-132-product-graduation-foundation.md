@@ -53,9 +53,9 @@ spec_refs:
   - package.json                                                                      # current generic echoctl package; product artifact must remain separate
   - vitest.product.config.ts                                                          # current misleading broad-suite semantics to correct (lines 1-23)
   - .github/workflows/ci.yml                                                          # current quality job that depends on the broad-suite semantics
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "codex"
+claimed_at: "2026-07-13T10:30:00Z"
+branch: "agent/132-product-graduation-foundation"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
