@@ -49,6 +49,7 @@
     "product:check-boundary": "node tools/product/check-boundary.mjs",
     "product:prepare-offline-deps": "node tools/product/prepare-offline-deps.mjs",
     "product:build-artifact": "node tools/product/build-artifact.mjs",
+    "product:validate-qualification": "node tools/product/validate-qualification.mjs",
     "build:cli": "tsc -p tsconfig.cli.json && node scripts/copy-sql-migrations.js",
     "prepack": "npm run build:cli",
     "daemon": "vite-node src/daemon/index.ts",
