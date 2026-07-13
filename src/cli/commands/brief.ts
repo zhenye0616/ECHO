@@ -12,6 +12,7 @@ import {
   startGranolaSignalWorker,
   type GranolaSignalExtractor,
 } from '../../enrich/granola-signals.js';
+import { createLabGranolaSignalOptions } from '../../enrich/granola-signals-cli-adapter.js';
 import {
   compilePostMeetingBrief,
   PostMeetingBriefError,
@@ -136,6 +137,10 @@ export async function runBrief(opts: BriefCommandOptions): Promise<number> {
       await clearGranolaSignalFailure(target.note_id, opts.signalCheckpointPath);
     }
 
+    const adapterOptions =
+      opts.extractFn === undefined
+        ? createLabGranolaSignalOptions(opts.env ?? process.env)
+        : { extractFn: opts.extractFn };
     const worker = await startGranolaSignalWorker(storage, {
       checkpointPath: opts.signalCheckpointPath,
       runOnStart: false,
@@ -143,7 +148,7 @@ export async function runBrief(opts: BriefCommandOptions): Promise<number> {
       maxNotesPerTick: 1,
       targetNoteId: target.note_id,
       env: opts.env,
-      extractFn: opts.extractFn,
+      ...adapterOptions,
     });
     try {
       const extraction = await worker.run();

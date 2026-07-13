@@ -1,13 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, normalize, resolve } from 'node:path';
 import { Ajv, type AnySchema, type ValidateFunction } from 'ajv';
 import { isNonEmptyString } from '../guards.js';
 import { atomicWrite } from './adapters/atomic-write.js';
+import { resolveEchoStatePaths, setEchoStateRoot } from './state-paths.js';
 
-const root = isNonEmptyString(process.env['ECHO_HOME'])
-  ? resolve(process.env['ECHO_HOME'])
-  : join(homedir(), '.echo');
+const root = resolveEchoStatePaths().root;
 
 export interface EchoHomePaths {
   root: string;
@@ -22,24 +20,19 @@ export interface EchoHomePaths {
 }
 
 function resolveRoot(homeOverride?: string): string {
-  if (homeOverride !== undefined) {
-    if (!isNonEmptyString(homeOverride)) throw new Error('invalid --home: expected path');
-    return resolve(homeOverride);
-  }
-  return isNonEmptyString(process.env['ECHO_HOME'])
-    ? resolve(process.env['ECHO_HOME'])
-    : join(homedir(), '.echo');
+  return resolveEchoStatePaths(homeOverride).root;
 }
 
 export function resolveEchoHomePaths(homeOverride?: string): EchoHomePaths {
-  const resolvedRoot = resolveRoot(homeOverride);
+  const statePaths = resolveEchoStatePaths(resolveRoot(homeOverride));
+  const resolvedRoot = statePaths.root;
   return Object.freeze({
     root: resolvedRoot,
     skills: join(resolvedRoot, 'skills'),
     roles: join(resolvedRoot, 'roles'),
     workflows: join(resolvedRoot, 'workflows'),
     adapters: join(resolvedRoot, 'adapters'),
-    state: join(resolvedRoot, 'state'),
+    state: statePaths.state,
     stateOnboarding: join(resolvedRoot, 'state', 'onboarding.json'),
     stateProjects: join(resolvedRoot, 'state', 'projects.json'),
     stateCaptureSources: join(resolvedRoot, 'state', 'capture-sources.json'),
@@ -49,6 +42,7 @@ export function resolveEchoHomePaths(homeOverride?: string): EchoHomePaths {
 export let ECHO_HOME_PATHS = resolveEchoHomePaths(root);
 
 export function setEchoHomeRoot(homeOverride: string): EchoHomePaths {
+  setEchoStateRoot(homeOverride);
   ECHO_HOME_PATHS = resolveEchoHomePaths(homeOverride);
   process.env['ECHO_HOME'] = ECHO_HOME_PATHS.root;
   return ECHO_HOME_PATHS;

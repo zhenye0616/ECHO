@@ -2,14 +2,18 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { isNonEmptyString } from '../../guards.js';
-import { ECHO_HOME_PATHS } from '../../echo-home/paths.js';
+import { ECHO_STATE_PATHS } from '../../echo-home/state-paths.js';
 import { atomicWrite } from '../../echo-home/adapters/atomic-write.js';
 import { createLogger } from '../../logging/index.js';
 import type { AtomIterationRecord, CaptureEvent, Storage } from '../../storage/interface.js';
 import { parseJson } from '../../util/json.js';
-import { processCandidate } from '../pipeline.js';
+import {
+  GRANOLA_API_SOURCE,
+  GRANOLA_SOURCE_POLICY,
+} from '../granola-source-policy.js';
+import { processCandidateWithPolicy } from '../pipeline-core.js';
 
-export const GRANOLA_SOURCE = 'api:granola';
+export const GRANOLA_SOURCE = GRANOLA_API_SOURCE;
 export const GRANOLA_API_BASE_URL = 'https://public-api.granola.ai/v1';
 export const GRANOLA_CHECKPOINT_SCHEMA_VERSION = 1;
 export const DEFAULT_GRANOLA_POLL_INTERVAL_MS = 60_000;
@@ -287,11 +291,11 @@ export async function withGranolaCheckpointLock<T>(
 }
 
 export function granolaCheckpointPath(): string {
-  return join(ECHO_HOME_PATHS.state, 'granola-checkpoint.json');
+  return join(ECHO_STATE_PATHS.state, 'granola-checkpoint.json');
 }
 
 export function granolaConfigPath(): string {
-  return join(ECHO_HOME_PATHS.state, 'granola.json');
+  return join(ECHO_STATE_PATHS.state, 'granola.json');
 }
 
 function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
@@ -935,7 +939,7 @@ export async function pollGranolaOnce(
           stage = `pipeline:${listNote.id}`;
           const events = granolaNoteToCaptureEvents(note, now());
           for (const event of events) {
-            const result = await processCandidate(event, storage);
+            const result = await processCandidateWithPolicy(event, storage, GRANOLA_SOURCE_POLICY);
             if (!result.accepted) {
               throw new Error(`Granola event rejected by pipeline: ${result.reason}`);
             }
