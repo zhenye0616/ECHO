@@ -545,3 +545,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP); no memory/cluster retrieval in this tick.
 - **Verdict:** useful — active trigger accepted for both roles; no 406/identity-gate rejection.
 - **Note:** first post-G2 product-spec round driven end-to-end by the full-auto loop (request → codex+codex-ops ticks → combine → 14 dispositions → spec patch → r2 dispatch) with zero founder dispatch messages.
+
+## 2026-07-13 02:50 PDT — watcher r3 dispatch active-trigger (item 132 graduation foundation)
+
+- **Trigger:** watch tick combined r2 (12 findings, all r1-patch-targeting → reframe gate fired; codex read-only investigator returned propagation_completion, validated with two strategist nuances incl. one true mechanism removal — Git-object staging replaces cleanliness check-then-use). r2 patches at a532c695; r3 dispatched.
+- **Query inputs:** coord_invoke ×2 — role=codex, role=codex-ops; request_path=backlog/reviews/2026-07-13-132-product-graduation-foundation/r3/request.md; correlation_id from r3 frontmatter; X-Echo-Role: claude.
+- **Returned:** both ok, schema_version 1 payloads with reviewer_invoked_ids.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP). Investigator consultee made zero ECHO MCP calls (git/file reads only) → skip-rule, no proxy entry.
+- **Verdict:** useful — second consecutive active-trigger acceptance; launchd fallback not needed this round.
+- **Note:** r2→r3 tick ran the full disposition discipline (reframe gate + investigator + removal-proof reasoning) autonomously; convergence expected at r3 absent new load-bearing defects.
