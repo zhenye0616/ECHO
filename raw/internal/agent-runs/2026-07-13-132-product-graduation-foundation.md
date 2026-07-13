@@ -124,7 +124,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC6: passing — versioned 24-cell matrix, strict standalone report-schema evaluator, controlled first-release N/A, authority/identity/skip/qualification validator, and DEV/incomplete draft generation
 - AC7: passing — exact-SHA single build, immutable bundle/support hashes, no-checkout macOS arm64 Node 22 target, two-prefix state isolation, always-run evidence uploads, standalone aggregation, and a final red-cell/dependency/identity/skip terminal gate
 - AC8: passing — product README and qualification-workflow comments preserve the exact generic package/platform debt owners, deadlines, support boundary, and blocking-red/no-retry disposition
-- AC9: pending
+- AC9: passing — private/unpublished package, DEV/incomplete-only report creation, no tag/release/publication/protected-environment mechanism, and an explicit ordered post-foundation handoff
 
 ## Test results
 
@@ -139,6 +139,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC6 focused verification: PASS (1 file, 8 tests). A complete machine-cell CI draft validates while human cells remain pending; missing cells, CI-authored human passes, forbidden N/A, identity mismatch, unexpected skips, and premature QUALIFIED all fail. The only permitted N/A is `upgrade-from-previous` with both founder and independent-reviewer rationale.
 - AC7 focused verification: PASS (3 files, 31 tests). The bundled verifier, DEV-draft creator, schema validator, target evidence, aggregator, and terminal gate run without a checkout. Static workflow assertions find exactly one product builder, no downstream checkout/build/pack, checksum verification before install, always-run uploads, and the terminal gate last. A forced target dependency failure produces a valid DEV/incomplete report with explicit red cells while the terminal gate exits 1.
 - AC8 focused verification: PASS (1 file, 6 tests). A static contract requires the exact inherited-debt tool/failure names, owners, deadlines, macOS-only support claim, and blocking-red/no-retry language in both the product README and workflow comments; it also rejects a Windows qualification runner.
+- AC9 focused verification: PASS (1 file, 7 tests). The negative-release contract checks private package metadata, DEV/incomplete report assignments, absence of tag/publication/release/protected-environment workflow mechanisms, all prohibited transition statements, and the exact five-gate handoff order.
 
 ## Open questions for founder
 

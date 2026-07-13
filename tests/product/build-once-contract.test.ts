@@ -227,6 +227,57 @@ describe('qualification workflow build-once and terminal contracts', () => {
     expect(workflow).not.toContain('windows-');
   });
 
+  it('keeps the foundation private, DEV-only, and ordered before later gates', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const readme = readFileSync(join(REPO_ROOT, 'product/README.md'), 'utf8');
+    const packageTemplate = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'product/package.template.json'), 'utf8'),
+    ) as { private: boolean };
+    const draftTool = readFileSync(
+      join(REPO_ROOT, 'tools/product/create-draft-report.mjs'),
+      'utf8',
+    );
+    const aggregateTool = readFileSync(
+      join(REPO_ROOT, 'tools/product/aggregate-evidence.mjs'),
+      'utf8',
+    );
+
+    expect(packageTemplate.private).toBe(true);
+    expect(draftTool).toContain("maturity: 'DEV'");
+    expect(draftTool).toContain("result: 'incomplete'");
+    expect(aggregateTool).toContain("report.maturity = 'DEV'");
+    expect(aggregateTool).toContain("report.result = 'incomplete'");
+    expect(workflow).not.toMatch(/^\s+environment:/m);
+    expect(workflow).not.toMatch(/\b(?:npm publish|gh release|git tag)\b/);
+    for (const excludedTransition of [
+      'no tag',
+      'GitHub Release',
+      'package publication',
+      'protected-environment approval',
+      'client installation',
+      'real meeting',
+      'credential change',
+      'repository transition',
+      'release authorization',
+    ]) {
+      expect(readme, excludedTransition).toContain(excludedTransition);
+    }
+
+    const orderedGates = [
+      'rank 2 first-run cutoff and newest-first behavior',
+      'rank 3 API-key brain adapter',
+      'V2 authentication probes and A2 cold-state grading',
+      'exact-artifact isolated FOUNDER LIVE',
+      'repository extraction and cutover before full qualification',
+    ];
+    let prior = -1;
+    for (const gate of orderedGates) {
+      const at = readme.indexOf(gate);
+      expect(at, gate).toBeGreaterThan(prior);
+      prior = at;
+    }
+  });
+
   it('uploads a valid incomplete DEV report but leaves a forced dependency failure red', async () => {
     const fixture = join(temporaryRoot, 'forced-failure');
     mkdirSync(fixture);
