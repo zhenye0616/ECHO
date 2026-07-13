@@ -321,7 +321,7 @@ Carried as open but already merged before the rewrite; archived with commit evid
 - **`get_recent_work_context` skeleton overflow cap** — `recent-work-context.ts` caps skeleton arrays; tests assert clipping.
 - **Daemon `uptime`** — `32e07e13` (replaces `unknown`; CLI tests assert it).
 - **Packed-install `files` allowlist** — `package.json` includes `assets/echo-{skills,roles,workflows}/**`; packaging tests cover it.
-- **🔴 CI-noise test-suite split** — shipped at HEAD `1cee7ecd` (product-gate split; product vitest config excludes orchestration suites).
+- **🔴 CI-noise test-suite split** — broad non-orchestration split shipped at `1cee7ecd`, but `test:product` still names a repo-wide suite. True product-only semantic correction → SPECCED as `backlog/proposed/2026-07-13-132-product-graduation-foundation.md`.
 - **Fixed-`sleep`→poll selftest** — `84033829` (CAP-02 polls daemon readiness/release).
 - **review-pending Codex fanout** — `skills/review-pending.md` now has Codex invocation + sidecar validation + commit/push.
 - **proposed→ready lifecycle docs** — repo docs (`backlog/README.md`, `AGENT_INSTRUCTIONS.md`, `CLAUDE.md`) describe `proposed/ → ready/` (note: pasted AGENTS preamble may still be stale — regenerate separately).

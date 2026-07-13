@@ -2,7 +2,7 @@
 
 Kanban-style work coordination across strategic conversations, one or more autonomous build agents, and founder review.
 
-> **Current operating gate (2026-07-11):** while G2 (the clarity-halt lift) is unsigned, the claim/build loop below is suspended for product work — no `proposed/` or `ready/` product specs are created, and nothing is claimed or built. Product decisions land in the closure register or `raw/internal/decisions/`. See `CLAUDE.md` "Current Commercial Focus" and `AGENTS.md` "Current operating gate" for the full rule; this README documents the mechanics that resume after G2 (and that continue now for explicitly permitted non-product maintenance).
+> **Current operating gate (2026-07-12):** G2 is lifted. Product work resumes through `proposed -> ready -> claimed`; `proposed/` remains review-only and is never selectable by `tools/blocked.py`. A merge does not advance product maturity or authorize an artifact release. See `CLAUDE.md` "Current Commercial Focus" and `AGENTS.md` "Current operating gate" for the full rule.
 
 ## The Three Roles
 

@@ -6,18 +6,18 @@ If this file ever conflicts with `CLAUDE.md`, `docs/AGENT_INSTRUCTIONS.md`, `bac
 
 ## Current operating gate (read before doing anything strategic)
 
-**Team-product carve + clarity halt (founder-locked 2026-07-11).** ECHO is going all in on the Team decision product; meeting→brief is the first saleable wedge and its pain/demand are considered proven. Machine context and Fleet orchestration remain internal assets, not parallel commercial roadmaps.
+**Team-product carve + post-lift proposal gate (founder-locked 2026-07-12).** ECHO is going all in on the Team decision product; meeting→brief is the first saleable wedge and its pain/demand are considered proven. Machine context and Fleet orchestration remain internal assets, not parallel commercial roadmaps.
 
-- **Before halt lift:** no build specs, carve, or product code. Work may close productization questions, correct orientation, run approved empirical checks, remove exposure/operating risk, and support customer outreach, offer design, or onboarding discovery.
-- **Halt lift:** requires the founder's committed decision at a named SHA per `2026-07-10-project-echo-orientation-and-closure.md`.
-- **After halt lift:** every product spec must directly serve the Team-product carve, assisted onboarding, client-machine install/operation, delivery, or the commercial/support/data boundary.
+- **Halt status:** G2 was founder-lifted in `raw/internal/decisions/2026-07-12-clarity-halt-lift.md` and landed on `main` at `ea5f5631`.
+- **Current proposal gate:** every product spec begins in `backlog/proposed/`, passes cross-vendor review, and is promoted to `ready/` before a builder may claim it.
+- **Product priority:** every product spec must directly serve the Team-product carve, assisted onboarding, client-machine install/operation, delivery, or the commercial/support/data boundary.
 - **Client endpoint:** after onboarding, the versioned package runs on the client's Mac without a repo checkout, founder's machine, or founder's personal CLI session.
 - **Graduation:** `DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE`; a demo, merge, or generic package never skips the qualification matrix.
 - **Scope guard:** do not build standalone Machine/Fleet features unless the Team product or current ECHO development workflow requires them.
 
 The older e1/e2 friction-first gate remains useful operating-model history, but it no longer controls product prioritization.
 
-While G2 is unsigned, the generic speccing checklist and Builder-Agent Loop below are suspended for product work. Record product decisions in the closure register or `raw/internal/decisions/`; create neither `backlog/proposed/` nor `backlog/ready/`, and do not claim/build product items. After G2, every new spec starts in `backlog/proposed/` and follows normal cross-vendor review before becoming claimable.
+G2 is lifted. Every new product spec starts in `backlog/proposed/` and follows normal cross-vendor review before becoming claimable. A merge leaves the product at DEV unless separate graduation evidence advances it.
 
 ## Role-typed task-state pointers (046+)
 
@@ -31,7 +31,7 @@ Claude Code auto-loads `~/.claude/projects/.../memory/MEMORY.md` (one-line hooks
 
 - The founder will paste relevant MEMORY.md hooks into your session preamble at the start of any session where memory context matters.
 - If a strategic question turns on a load-bearing fact you don't have (e.g., "which ECHO system is the product?", "what's the founder's timezone?"), ASK before guessing. Do not silently default to a generic answer that would have been overridden by memory.
-- Today's load-bearing hooks: timezone is PDT (`America/Los_Angeles`); Team product + meeting→brief commercial focus; client-machine endpoint after assisted onboarding; clarity halt until founder-signed lift; commit approved specs immediately; log every ECHO MCP call in the moment.
+- Today's load-bearing hooks: timezone is PDT (`America/Los_Angeles`); Team product + meeting→brief commercial focus; client-machine endpoint after assisted onboarding; G2 lifted with the post-lift proposed-review gate active; commit approved specs immediately; log every ECHO MCP call in the moment.
 
 ## Project Mission
 
@@ -69,7 +69,7 @@ ECHO uses three roles:
 
 **Reviewer Independence Rule:** the reviewer-and-merger of any item must be a different role/agent than the builder. Preference order: strategist → second builder agent (not the one that built this item) → founder. Self-review is structurally weaker than independent review and is not allowed. Codex acting as a builder must never review its own diff into `main`; it may be asked to review a *different* builder's pending item, in which case it operates in reviewer mode (read-only on the feature branch, write-allowed on `review_notes` and merge-prep, never running `git merge`/`git push` without founder green-light).
 
-Codex must identify which role the current user request implies. While G2 is unsigned, product coding requests remain strategist/closure work unless the founder explicitly commits the halt lift. After G2, normal coding tasks use builder mode unless the user is brainstorming strategy, asking for explanation only, or asking for review of another agent's work.
+Codex must identify which role the current user request implies. Product specification and boundary work remains strategist work until a proposal is reviewed and promoted to `ready/`. Normal coding tasks against a ready item use builder mode unless the user is brainstorming strategy, asking for explanation only, or asking for review of another agent's work.
 
 ### Strategist speccing checklist (after G2, when drafting `backlog/proposed/<id>.md`)
 
@@ -109,7 +109,7 @@ Codex must identify which role the current user request implies. While G2 is uns
 ## Repo Discipline From `CLAUDE.md`
 
 - Search existing wiki and backlog before creating new concepts.
-- Before G2, capture product decisions in the closure register or `raw/internal/decisions/`. After G2, actionable build decisions begin as `backlog/proposed/<id>.md`, not wiki pages or direct-to-ready items.
+- G2 is lifted. Actionable build decisions begin as `backlog/proposed/<id>.md`, not wiki pages or direct-to-ready items.
 - Put non-actionable background reasoning in `raw/internal/decisions/`.
 - Put research notes in `raw/external/precedents/` or `raw/external/competitor-scans/`.
 - Put validation and interview notes in `raw/internal/interviews/`.
