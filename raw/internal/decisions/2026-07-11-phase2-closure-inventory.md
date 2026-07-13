@@ -7,7 +7,7 @@
 
 This inventory does not replace the canonical register. It prevents a template, recommendation, or rubric from being mistaken for closure. Only `resolved`, `accepted-risk`, or `deferred-with-owner-and-trigger` are terminal states.
 
-| Row | Current state | Evidence now available | Missing closure | Decision owner / next action |
+| Row | Current state | Evidence now available | Remaining evidence / later execution | Decision owner / next action |
 |---|---|---|---|---|
 | P1 | resolved | Four-stage graduation decision and aligned skill | None | Preserve; do not treat mechanism as built |
 | V1 | resolved | Seven-day lookback, newest-first, explicit-only historical backfill | None | Preserve decision in `2026-07-12-g2-terminal-dispositions-and-repository-topology.md` |
