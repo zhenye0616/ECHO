@@ -39,7 +39,7 @@ The founder confirms this ordering:
 1. G1 remains closed on the landed security evidence. Any material control drift reopens the relevant security review, not product demand.
 2. G2 closes only when this signed record lands on `main` as a descendant of the approved SHA.
 3. G3 remains a separate demo-freeze decision and artifact seal.
-4. G4 history rewriting remains `DEFER`, founder-owned, triggered by the first exclusive maintenance window after holdout-131 evidence and branch/worktree closure, or an external report of the flagged content.
+4. G4 history rewriting remains `DEFER`, founder-owned, triggered by the first exclusive maintenance window after holdout-131 evidence and branch/worktree closure, or an external report of the flagged content. Conflicting path moves remain frozen or must be rebaselined.
 5. Post-lift product work first creates the in-place product-only composition boundary and isolated FOUNDER LIVE proof.
 6. `echo-brain` extraction follows that proof and precedes qualification. Native clone parity is required before authority transfers and old product paths freeze.
 7. G5 qualification builds once and verifies the exact artifact. G6 installs that exact artifact on the client machine and records acceptance before CLIENT LIVE.
@@ -66,7 +66,7 @@ Low-scope notes were non-blocking: external G1 evidence was not re-audited as pa
 
 ## Authorization and limits
 
-When this record lands, the founder lifts G2 and authorizes reviewed conversion of approved acceptance outlines into `backlog/proposed/` specifications. The first proposal remains the graduation foundation: product composition root and source fence, runtime isolation, `tests/product/`, build-once artifact identity, and machine-readable qualification evidence.
+When this record lands, the founder lifts G2 and authorizes reviewed conversion of ranked dispositions and their approved acceptance outlines into `backlog/proposed/` specifications. The first proposal remains the graduation foundation: product composition root and source fence, runtime isolation, `tests/product/`, build-once artifact identity, and machine-readable qualification evidence.
 
 This authorization does not permit direct-to-ready specifications, direct implementation, repository extraction, real-data probes, credential changes, release publication, or a maturity advance. Normal repository gates, independent review, founder main-push checkpoints, and the operating gate in force at proposal time still apply.
 
