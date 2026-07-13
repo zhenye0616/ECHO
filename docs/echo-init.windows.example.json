@@ -1,7 +1,0 @@
-{
-  "_comment": "Windows Phase-1 beta install answer file (context layer only). Copy to %TEMP%\\echo-init.json, set default_project_repo_root (note doubled backslashes), then: echoctl init --json --answer-file %TEMP%\\echo-init.json. Follow docs/echoctl-agent-onboard-runbook.md (Windows branches in Steps 0-5 + Windows Caveats W1-W6). Add repo_root the same way only if init cannot locate its source tree.",
-  "confirm_setup": true,
-  "profile": "customer",
-  "selected_agents": ["claude-code", "codex"],
-  "default_project_repo_root": "C:\\Users\\<user>\\path\\to\\their\\repo"
-}
