@@ -2,8 +2,8 @@
 
 **Baseline:** `f77ba415` plus Phase 2 security evidence through `10c578fd`
 **Canonical register:** `2026-07-10-project-echo-orientation-and-closure.md`
-**Current tally:** 27 rows total; 1 resolved; 26 pending
-**Readiness:** preparing founder decision session; G1 and G2 remain open
+**Current tally:** 27 rows total; 2 resolved; 25 pending
+**Readiness:** G1 closed; preparing founder G2 decision session
 
 This inventory does not replace the canonical register. It prevents a template, recommendation, or rubric from being mistaken for closure. Only `resolved`, `accepted-risk`, or `deferred-with-owner-and-trigger` are terminal states.
 
@@ -15,7 +15,7 @@ This inventory does not replace the canonical register. It prevents a template, 
 | A2 | pending | Cold-db risk and predeclared Phase 2 rubric | One-meeting scratch result + independent grade | Operator/grader after founder approves meeting |
 | A3 | pending | API-key direction and direct-SDK prior art | Economics, terms, payer, custody, topology | Founder decision packet group 4 |
 | A5 | pending | Client-local endpoint locked | Customer-two/multi-instance decision or owned deferral | Founder decision packet group 4 |
-| A6 | pending | HEAD redactions/policies; real scans + independent rerun; CI/hook branch; green branch CI run; Job C deferral; GitHub audit verified red | Remediate or explicitly accept/defer red GitHub controls; first post-merge `main` run | Founder authorizes remediation or risk disposition; security executor reruns evidence |
+| A6 | resolved | `2026-07-12-g1-exposure-baseline-closure.md`: landed scans, zero open CodeQL alerts, enforced repository controls, and terminal risk dispositions at evidence SHA `48ed4f87` | None for G1; preserve G4 history-rewrite deferral and product-qualification blockers | Security executor reruns the audit if a control changes or a dismissed boundary enters the client product |
 | B1 | pending | Milestone gates exist | Dates/dependencies confirmed with lab | Founder + lab checklist |
 | B5 | pending | Product/wedge locked; working-name deadline exists | Price, buyer/payment, first-client name | Founder decision packet group 3 |
 | B6 | pending | Install/use/repeat floor locked | Repeat count, rollout/rollback/support thresholds | Founder decision packet group 3 |
@@ -46,7 +46,7 @@ This inventory does not replace the canonical register. It prevents a template, 
 
 ## Work that cannot be closed by an executor alone
 
-- GitHub red-control remediation or explicit founder risk disposition, plus the first landed CI run needed to finish A6.
+- G1/A6 is complete. Control drift or a dismissed boundary entering the client product reopens the relevant security review, not product demand.
 - YC/demo choice and freeze authorization.
 - Commercial offer/price/buyer/payment/name/success/support decisions.
 - Vendor payer/custody/topology and embeddings decisions.

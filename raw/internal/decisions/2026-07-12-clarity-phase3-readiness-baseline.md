@@ -4,7 +4,7 @@
 **Starting branch:** `maint/clarity-phase2`
 **Starting SHA:** `19c5fc0122a598721a99b128c2006fc7bb7248ea`
 **Main baseline:** `f77ba415fd6848fbb52586dc0ca4ada522097bac`
-**Gate state:** G1 open; G2 open; product maturity DEV
+**Gate state:** G1 closed; G2 open; product maturity DEV
 **Scope:** closure, security, review, and landing readiness only
 
 ## Meaning of Phase 3
@@ -70,6 +70,8 @@ After the workflow exists on main, verify the first `main` secret-scan run at th
 
 **Ready when:** A6 has a terminal register state backed by landed scan evidence, the first green main run, and either verified remediation or explicit risk dispositions.
 
+**Completed 2026-07-12:** A6 is resolved by `2026-07-12-g1-exposure-baseline-closure.md`. PRs #8 and #9 landed; post-land CodeQL and full-history secret scanning passed at `48ed4f87`; CodeQL has zero open alerts; Actions SHA pinning, GitHub-owned action restriction, and strict required checks are enforced. G2 remains open.
+
 ### R5 — Founder closure session for the remaining register
 
 Work through `2026-07-11-phase2-founder-decision-packet.md` without reopening product demand. Record each answer in a dated decision artifact or as `deferred-with-owner-and-trigger`. Run empirical rubrics only after their separate input/operator approvals.
@@ -90,7 +92,9 @@ The first post-lift proposal remains the graduation foundation: product composit
 
 ## Current stop line
 
-R2 remediation authority was granted by the founder's instruction to proceed with Phase 3. The next irreversible action requiring new authority is the R3 update of `main`. Before that checkpoint, the executor may finish branch-local remediation, verification, exact-tip independent review, branch push, and remote branch checks.
+**Superseding status 2026-07-12:** R1-R4 are complete and G1 is closed. The stop line is now R5: finish the remaining 25 register rows, perform the independent R6 mechanical check, and obtain the separate founder G2 signature. Product specs and maturity advancement remain halted.
+
+**Historical pre-land stop line:** R2 remediation authority was granted by the founder's instruction to proceed with Phase 3. The next irreversible action then requiring authority was the R3 update of `main`.
 
 The first remote PR run exposed inherited onboarding/release failures that require product/runtime or package work across the halt. The executor may complete the test-only Git timestamp/cleanup portability fix and rerun the branch. After that, founder direction is required on whether the inherited red checks block the security-only landing or receive a deferred-with-owner-and-trigger disposition. Exact run evidence is in `2026-07-12-phase3-github-security-remediation.md`.
 
