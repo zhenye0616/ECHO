@@ -34,6 +34,9 @@ raw/internal/interviews/
 # Claude Code subagent worktrees — harness state, not project content
 .claude/worktrees/
 
+# Generated agent-skill adapters — local tool cache, not a canonical skill source
+.agents/
+
 # Superpowers brainstorming companion — local mockups + browser state
 .superpowers/
 

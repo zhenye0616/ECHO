@@ -772,3 +772,12 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** `source_breakdown={"codex":1}`; resolved Codex session source `fs:$CODEX_HOME/sessions/<session>.jsonl`; repo filter `$REPO_ROOT`.
 - **Verdict:** partial - retrieval validates the exact handoff and safety constraints, but it does not define a separate Phase 3 work plan beyond beginning readiness from the committed Phase 2 founder-decision materials.
 - **Note:** The branch checkpoint and founder packet remain the authoritative scope: prepare decision/readiness work, preserve G1/G2 as open, and do not create product specs or product code.
+
+### 2026-07-12 19:40 PDT - independent Claude review verdict lookup
+
+- **Trigger:** Founder asked Codex to use ECHO to connect to the independent Claude reviewer and read the Phase 3 verdict.
+- **Query inputs:** `search_memories({query:"a1765c26", repo_path:"/Users/zhenye/Desktop/Project_echo", source_app:"claude_code", limit:10})`; `get_atom({id:"868f676d-4ab1-4ddb-93df-22b50abd4ec5"})` after the search reported content truncation.
+- **Returned:** One Claude Code match from session `bd676464-69d0-43ea-8eb5-127c5776c74a`, containing the exact review request and final verdict. Search content was truncated by 12,715 bytes; `get_atom` recovered the full 16,153-byte atom with no content truncation. Verdict: `READY`, no medium-or-higher findings, four LOW findings, exact reviewed SHA `a1765c26b73e046c5948099a3715bd13dc18a9dd`, and PR #8 ready for the founder merge decision subject to inherited-red-check disposition and optional macOS wait.
+- **Sources:** `source_app=claude_code`; exact source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/bd676464-69d0-43ea-8eb5-127c5776c74a.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** right - the exact candidate SHA retrieved the independent review and its SHA-bound verdict.
+- **Note:** The four LOW findings are Windows prompt/guard coupling, cosmetic trailing-backslash truncation in the Markdown dev report, explicit port 80 rejection, and stale non-`--script` invocation becoming a silent no-op; Claude says none should hold the merge.
