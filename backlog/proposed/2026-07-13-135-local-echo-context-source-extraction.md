@@ -7,7 +7,7 @@ estimate: 5d
 created: 2026-07-13
 blocked_by: []
 task_state_ref: 2026-07-13-135-local-echo-context-source-extraction
-requested_reviewers: ["codex", "cursor"]
+requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/**                       # NEW local-only context capture/retrieval repository; no remote
   - raw/internal/migrations/2026-07-13-135-echo-context.md     # NEW orchestrator-owned provenance, parity, and local-head record

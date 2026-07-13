@@ -8,7 +8,7 @@ created: 2026-07-13
 blocked_by:
   - 2026-07-13-132-product-graduation-foundation
 task_state_ref: 2026-07-13-133-local-echo-brain-source-extraction
-requested_reviewers: ["codex", "cursor"]
+requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - /Users/zhenye/Desktop/echo-brain/**                         # NEW local-only standalone client-product repository; no remote
   - raw/internal/migrations/2026-07-13-133-echo-brain.md       # NEW orchestrator-owned provenance, parity, and local-head record
