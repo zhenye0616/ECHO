@@ -118,7 +118,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 
 - AC1: passing — fence modes, reduced closure, source/pipeline/state seams, and compatibility checks
 - AC2: passing — strict schema/config, deepest-match filesystem probe, product-local paths, transactional runtime, bounded idempotent shutdown, and product-only CLI
-- AC3: pending
+- AC3: passing — founder CLI brain isolated in lab adapter with explicit dispatch/brief injection and no product fallback
 - AC4: pending
 - AC5: pending
 - AC6: pending
@@ -132,6 +132,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC1 phase-2 boundary check: PASS (19 product-closure modules, 1 external package).
 - AC1 focused verification: PASS (7 files, 100 tests); typecheck, lint, and `git diff --check` PASS.
 - AC2 focused verification: PASS (3 files, 48 tests); typecheck, lint, boundary check, and `git diff --check` PASS.
+- AC3 focused verification: PASS (4 files, 68 tests); typecheck, lint, boundary check, and `git diff --check` PASS.
 
 ## Open questions for founder
 

@@ -16,6 +16,16 @@ export interface LabGranolaSignalAdapterConfig {
   env: NodeJS.ProcessEnv;
 }
 
+export interface LabGranolaSignalAdapterDependencies {
+  preflight: typeof preflightBrain;
+  run: typeof runBrain;
+}
+
+const DEFAULT_DEPENDENCIES: LabGranolaSignalAdapterDependencies = {
+  preflight: preflightBrain,
+  run: runBrain,
+};
+
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
   if (raw === undefined || raw.trim() === '') return fallback;
   const value = Number.parseInt(raw, 10);
@@ -46,13 +56,14 @@ export function resolveLabGranolaSignalAdapterConfig(
 
 export function createLabGranolaSignalAdapter(
   config: LabGranolaSignalAdapterConfig,
+  dependencies: LabGranolaSignalAdapterDependencies = DEFAULT_DEPENDENCIES,
 ): GranolaSignalAdapter {
   return {
     id: `lab-cli:${config.brain}`,
-    preflight: () => preflightBrain(config.brain, config.env),
+    preflight: () => dependencies.preflight(config.brain, config.env),
     extract: async (input) => {
       const prompt = buildExtractionPrompt(input);
-      const result = await runBrain(prompt, {
+      const result = await dependencies.run(prompt, {
         brain: config.brain,
         contextRepoPath: config.contextRepoPath,
         timeoutMs: computeGranolaSignalBrainTimeoutMs(config.timeoutMs, prompt.length),
@@ -68,6 +79,12 @@ export function createLabGranolaSignalAdapter(
 
 export function createLabGranolaSignalOptions(
   env: NodeJS.ProcessEnv = process.env,
+  dependencies: LabGranolaSignalAdapterDependencies = DEFAULT_DEPENDENCIES,
 ): GranolaSignalWorkerOptions {
-  return { adapter: createLabGranolaSignalAdapter(resolveLabGranolaSignalAdapterConfig(env)) };
+  return {
+    adapter: createLabGranolaSignalAdapter(
+      resolveLabGranolaSignalAdapterConfig(env),
+      dependencies,
+    ),
+  };
 }

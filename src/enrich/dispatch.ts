@@ -20,13 +20,16 @@ export interface EnrichmentDispatchHandle {
 export interface EnrichmentDispatchOptions {
   granolaSignals?: GranolaSignalWorkerOptions;
   driftSweep?: DriftSweepWorkerOptions;
+  createLabOptions?: typeof createLabGranolaSignalOptions;
 }
 
 export async function startEnrichmentDispatch(
   storage: Storage,
   options: EnrichmentDispatchOptions = {},
 ): Promise<EnrichmentDispatchHandle> {
-  const labOptions = createLabGranolaSignalOptions(options.granolaSignals?.env ?? process.env);
+  const labOptions = (options.createLabOptions ?? createLabGranolaSignalOptions)(
+    options.granolaSignals?.env ?? process.env,
+  );
   const granolaSignals = await startGranolaSignalWorker(storage, {
     ...labOptions,
     ...options.granolaSignals,

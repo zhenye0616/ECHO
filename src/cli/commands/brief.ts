@@ -48,6 +48,7 @@ export interface BriefCommandOptions {
   pollCheckpointPath?: string;
   signalCheckpointPath?: string;
   configPath?: string;
+  createLabOptions?: typeof createLabGranolaSignalOptions;
 }
 
 function print(stream: Pick<Writable, 'write'>, text: string): void {
@@ -139,7 +140,7 @@ export async function runBrief(opts: BriefCommandOptions): Promise<number> {
 
     const adapterOptions =
       opts.extractFn === undefined
-        ? createLabGranolaSignalOptions(opts.env ?? process.env)
+        ? (opts.createLabOptions ?? createLabGranolaSignalOptions)(opts.env ?? process.env)
         : { extractFn: opts.extractFn };
     const worker = await startGranolaSignalWorker(storage, {
       checkpointPath: opts.signalCheckpointPath,
