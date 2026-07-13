@@ -307,8 +307,6 @@ describe('packed package manifest', () => {
         "dist/product/runtime.js",
         "dist/product/spawn-sanitized-child.d.ts",
         "dist/product/spawn-sanitized-child.js",
-        "dist/reasoning/causal.d.ts",
-        "dist/reasoning/causal.js",
         "dist/storage/interface.d.ts",
         "dist/storage/interface.js",
         "dist/storage/memory.d.ts",
