@@ -1,6 +1,7 @@
 {
   "boundary_version": 1,
   "entry_points": [
+    "src/product/cli.ts",
     "src/product/index.ts"
   ],
   "allowed_internal_paths": [
@@ -37,6 +38,7 @@
     "src/cli/commands/orchestration.ts"
   ],
   "allowed_external_runtime_packages": [
+    "ajv",
     "better-sqlite3"
   ],
   "child_process_owner": "src/product/spawn-sanitized-child.ts",
