@@ -7,7 +7,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| - | - | - | _(empty)_ | - | - | - |
+| PROPOSED | HIGH | 2026-07-13 | [2026-07-13-132-product-graduation-foundation](../backlog/proposed/2026-07-13-132-product-graduation-foundation.md) | Product graduation foundation: additive echo-brain composition boundary, product-only tests, and build-once qualification evidence | 5d | - |
 
 ## Ready
 

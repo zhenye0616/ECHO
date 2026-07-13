@@ -15,16 +15,16 @@ These seven files are required context for every run. Read them before doing any
 | File | Why |
 |---|---|
 | `docs/AGENT_INSTRUCTIONS.md` | This file — your operating manual; loop, drift rules, write/no-write lists |
-| `CLAUDE.md` | Canonical current operating model and pre/post-G2 gate |
+| `CLAUDE.md` | Canonical current operating model and post-G2 proposal gate |
 | `raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md` | Founder-locked product direction: Team product, meeting→brief wedge, client-machine endpoint |
 | `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md` | DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE and release-matrix contract |
-| `raw/internal/decisions/2026-07-10-project-echo-orientation-and-closure.md` | Current clarity halt, capability boundary, and lift gates |
+| `raw/internal/decisions/2026-07-12-clarity-halt-lift.md` | Founder-signed G2 lift and its exact approved base |
 | `docs/NORTH_STAR.md` | Daily orient — commercial focus, productization goal, drift questions |
 | `backlog/README.md` | Backlog stages, proposal review, claim mechanics, and founder merge gates |
 
 The **entire `wiki/` folder is your global context** — read-only, but readable on demand. Several product pages still document the retired Machine-context offer; do not treat `wiki/product/v1-spec.md` as current direction. The seven files above are mandatory; everything else is reachable as needed. The item's `spec_refs` list is *in addition to* these seven, not a substitute.
 
-**Current G2 gate:** while the founder-signed halt lift is absent, do not enter the claim/build loop for product work, even if a request appears executable. Record product decisions and closure evidence only. Customer outreach and onboarding discovery remain active; explicitly permitted non-product maintenance follows its stated allowance.
+**Current product gate:** G2 is lifted. Do not enter the claim/build loop for a product item until its `backlog/proposed/` spec has passed review and been promoted to `backlog/ready/` with a fresh `ready_content_sha`. A claim or merge does not advance the product beyond DEV or authorize an artifact release.
 
 ## Your Single Loop
 

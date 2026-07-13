@@ -83,7 +83,7 @@ See [Aravind Srinivas on agentic search](/Users/zhenye/Desktop/yc/yc-wiki/source
 - **Client package:** only meeting input/config, signal extraction + API-key brain, human gates, brief generation/delivery, local state/health, and upgrade/rollback/support/data instructions.
 - **Graduation:** `DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE`. The current candidate is formally DEV, with predecessor founder-regime evidence; a versioned, pinned, isolated candidate-package run is the next gate. Qualification permits client acceptance; only useful and repeat client use earns CLIENT LIVE.
 - **Keep out:** unrelated dev-tool capture, agent orchestration, autonomous action, and destination-app work unless the Team product directly requires them.
-- **Current halt:** no build specs or product-code work until the founder signs the clarity-halt lift. Customer outreach, offer design, and onboarding discovery continue; closure work must serve productization, not more demand discovery.
+- **Current gate:** G2 was founder-lifted in `raw/internal/decisions/2026-07-12-clarity-halt-lift.md` and landed on `main` at `ea5f5631`. Product work may resume through `proposed -> ready -> claimed`; the candidate remains DEV until it passes the separate graduation gates.
 - **Definition of done:** through assisted onboarding, the product is installed on the client's machine; the client then runs a real meeting, receives a useful brief, and repeats without the founder's machine participating.
 
 ## Naming
@@ -102,7 +102,7 @@ This repo coordinates three roles. **Multiple builder agents may run in parallel
 
 ### Cross-tool protocol lives in `skills/` (not `.claude/commands/`)
 
-The slash-command skills that drive ECHO's multi-agent workflow — `process-backlog`, `process-backlog-batch`, `review-pending`, `merge-and-cleanup`, `review-queue-codex`, `review-queue-cursor`, `review-queue-codex-ops`, `review-queue-watch`, `promote-to-product` (the future four-stage Team qualification/release gate; not executable before G2 and the successor carve) — are **the cross-tool collaboration protocol**, not Claude-Code-specific helpers. They define the grammar by which multiple AI clients coordinate as peers.
+The slash-command skills that drive ECHO's multi-agent workflow — `process-backlog`, `process-backlog-batch`, `review-pending`, `merge-and-cleanup`, `review-queue-codex`, `review-queue-cursor`, `review-queue-codex-ops`, `review-queue-watch`, `promote-to-product` (the four-stage Team qualification/release gate, used only after a product boundary exists) — are **the cross-tool collaboration protocol**, not Claude-Code-specific helpers. They define the grammar by which multiple AI clients coordinate as peers.
 
 - **Canonical source of truth:** `skills/<name>.md` — vendor-neutral, ECHO-namespaced.
 - **Claude Code adapter:** `.claude/commands/<name>.md` — derived real-file copy, maintained by `tools/sync-skills.sh`. **Do not hand-edit `.claude/commands/<name>.md`**; the sync script overwrites it. Edit the canonical `skills/<name>.md` and re-run `tools/sync-skills.sh` (or `tools/sync-skills.sh --check` to verify identity post-edit).
@@ -133,8 +133,8 @@ backlog/proposed/  →  backlog/ready/  →  backlog/claimed/  →  backlog/pend
 
 After any strategic conversation that lands an actionable decision:
 
-0. **Apply the current operating gate first.** While G2 is unsigned, record product decisions in the closure register or `raw/internal/decisions/`; create neither `proposed/` nor `ready/` product specs. Customer outreach and productization discovery may continue.
-1. **After G2, create a `backlog/proposed/<id>.md` item** — full spec lives here until spec-review promotes it to `ready/`. Include an "After Completion (Strategist Notes)" section noting which wiki pages should be created/updated post-shipment.
+0. **Apply the current operating gate first.** G2 is lifted. New product work must directly serve the Team-product carve and begin at DEV in `backlog/proposed/`; a merge does not advance maturity or authorize an artifact release.
+1. **Create a `backlog/proposed/<id>.md` item** — full spec lives here until spec-review promotes it to `ready/`. Include an "After Completion (Strategist Notes)" section noting which wiki pages should be created/updated post-shipment.
 2. **Do not hand-edit `docs/BACKLOG.md`.** It is generated from folder state by `tools/backlog_index.py`; regenerate it after merge when acting in strategist/post-shipment mode.
 3. **Do NOT touch `wiki/`.** Wiki edits happen only after items land in `complete/`.
 
@@ -142,7 +142,7 @@ When the founder reports items have moved to `complete/`, the strategist's *next
 
 ### Builder Agent Responsibilities
 
-These steps are suspended for product work while G2 is unsigned. After the halt lifts, or for explicitly permitted non-product maintenance, a builder agent runs:
+G2 is lifted, so a builder may run these steps for a product item only after its reviewed proposal has been promoted to `backlog/ready/` with a fresh `ready_content_sha`:
 
 1. **Pull `main`**, then **atomically claim** an item: a single commit on `main` that moves the file `ready/ → claimed/` and sets `claimed_by`, `claimed_at`, `branch` in frontmatter. Push immediately. If push is rejected, another agent won — pick the next ready item.
 2. **Create the worktree** at `~/Desktop/Project_echo--<slug>/` on a fresh `agent/<slug>` branch.
