@@ -21,7 +21,7 @@ G1 is closed because the exposure inventory, content handling policy, history de
 
 - Native secret scanning and push protection are enabled. GitHub's non-provider patterns and validity checks remain unavailable on the current repository/account plan and are a recorded residual.
 - Actions are restricted to GitHub-owned actions, every committed action reference is a full SHA, and repository `sha_pinning_required` is enabled.
-- Main ruleset `18842228` is active and strict. It requires both CodeQL analyses, the CodeQL aggregate check, full-history Gitleaks, package build, Ubuntu Node 22/24 quality, and Ubuntu Node 22/24 onboarding before merge. PR-only, merge-only, resolved-thread, deletion, and non-fast-forward protections remain active.
+- Main ruleset `18842228` is active and strict. It requires both CodeQL analyses, the CodeQL aggregate check, and full-history Gitleaks before merge. These security workflows run on every PR; package, quality, and onboarding workflows intentionally ignore docs-only changes and therefore cannot be unconditional required contexts. PR-only, merge-only, resolved-thread, deletion, and non-fast-forward protections remain active.
 - Release-tag ruleset `18842230`, protected `production` environment review, private vulnerability reporting, and immutable releases remain enabled.
 - Dependabot alert `15` for `glib` in the internal Fleet overlay is dismissed as `tolerable_risk`: that overlay is outside the Team client product and release artifact. The alert must be reopened and the dependency upgraded before overlay reactivation, packaging, or distribution.
 
@@ -30,4 +30,3 @@ G1 is closed because the exposure inventory, content handling policy, history de
 - The history rewrite remains deliberately deferred to G4 under `2026-07-11-filter-repo-decision-template.md`; prior clones and immutable historical copies remain an explicit residual.
 - Known Windows onboarding and Ubuntu/Windows installed-package validation failures are inherited product/package qualification work. They must be green before G5/CLIENT LIVE, but they are not evidence of an unresolved repository-exposure control.
 - G2 remains open. The remaining 25 halt-register rows still require terminal states and the founder must separately sign a halt-lift artifact at a named main SHA.
-

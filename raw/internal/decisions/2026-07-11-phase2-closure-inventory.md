@@ -43,10 +43,10 @@ This inventory does not replace the canonical register. It prevents a template, 
 - Reproducible sanitized semantic-history detectors run; known content/history caveat preserved.
 - Pinned all-path CI workflow and manual fail-closed pre-push installer implemented with focused tests.
 - Empirical rubrics, G3 template, and lab access checklist prepared without running live probes.
+- G1/A6 closed on landed scans, enforced repository controls, and terminal finding dispositions. Control drift or a dismissed boundary entering the client product reopens the relevant security review, not product demand.
 
 ## Work that cannot be closed by an executor alone
 
-- G1/A6 is complete. Control drift or a dismissed boundary entering the client product reopens the relevant security review, not product demand.
 - YC/demo choice and freeze authorization.
 - Commercial offer/price/buyer/payment/name/success/support decisions.
 - Vendor payer/custody/topology and embeddings decisions.
