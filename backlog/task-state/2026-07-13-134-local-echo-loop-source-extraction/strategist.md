@@ -1,37 +1,34 @@
 ## current_thesis
 
-Extract the internal orchestration protocol into a local source-independent `echo-loop` repository while leaving the active Project_echo loop untouched. Use one attended deterministic run and prove behavior on disposable fixture repos before installation or authority transfer.
+Materialize the internal orchestration protocol as a source-independent local `echo-loop` repository while leaving the active Project_echo loop untouched. Judge the final repo and fixture evidence, not migration machinery.
 
 ## locked_decisions
 
 - `echo-loop` owns agent skills, backlog/task-state, review queue, coordination/deadlines, builder/reviewer/merge workflows, and operator tooling.
-- Source is pinned to `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; target is `/Users/zhenye/Desktop/echo-loop` on a local migration branch with no remote.
-- Lifecycle is `ABSENT -> RUNNING -> PUBLISHED | FAILED`; automatic resume, stale-owner takeover, quarantine tokens, checkpoint reuse, and later-process signaling are forbidden.
-- A fully initialized/fsynced run directory is RENAME_EXCL-elected into the fixed claim; durable state and a launch gate bind child PID/PGID/start/executable before work. Only the active supervisor cleans its group.
-- `discard` refuses a final target or exact live process and atomically renames the whole claim to an archive; PID reuse is quiescent and never signaled.
-- No-replace target publication defines PUBLISHED with committed candidate identity. The Project_echo record is a separate post-publish, expected-parent CAS evidence commit.
-- Copy protocol implementation and installable templates, not Project_echo history, product/context code, raw corpus, or completed queue state.
-- Split loop-owned coordination/task-state APIs from retrieval MCP; no context tools ship in echo-loop.
-- Coordination idempotency accepts strict ASCII caller/key formats and covers only effects in the same SQLite transaction; external actions are forbidden and outbox intent is not exactly-once delivery.
-- Store initialization intent and every terminal open/migration failure leave collision-safe, fsynced diagnostics with stderr fallback.
-- Preserve proposed-review, ready seals, atomic claim, worktree isolation, reviewer independence, fresh eyes, and founder checkpoints.
-- Source closure classifies imports, literal/computed reads, shell/shebang edges, package scripts, PATH lookups, and child executables; undeclared host reads/exec fail closed.
-- Tests mutate only disposable local fixture repositories with isolated Git config, hooks, credentials, and fixture-owned file remotes.
-- Node `22.22.1` and npm `10.9.4` are hard preflights; source bytes come only from pinned commit objects.
-- Acquisition uses env-i, run-owned config/HOME, scrubbed secrets, and a credential-denying filesystem sandbox. Candidate work uses an integrity-manifested cache offline under a validated executable/runtime-read closure.
-- `verify-handoff` derives canonical paths, validates original control blobs, and accepts only the control HEAD or one exact record-only child commit.
-- No global install, launchd change, sibling dependency, remote, or authority transfer occurs.
+- Source is pinned to `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; dirty checkout bytes are excluded.
+- One attended builder owns absent target `/Users/zhenye/Desktop/echo-loop`; siblings never touch it.
+- The builder creates local branch `migration/2026-07-13-134` under sanitized Git config with no remote.
+- Project_echo gains no extraction CLI, lifecycle state, lock/takeover, publication/recovery helper, committed sandbox profile, or migration-framework tests.
+- An interrupted target is incomplete/unaccepted and manually archived before a fresh assigned run; no automatic adoption/resume/delete.
+- Copy protocol implementation and installable templates, not Project_echo history/wiki/raw/backlog archives or product/context code.
+- Loop APIs exclude retrieval MCP; loop state is private and tests preserve source transaction/order/role/deadline/idempotency behavior without promising external exactly-once effects.
+- Preserve proposed-review, ready seals, atomic claims, worktree isolation, reviewer independence, fresh eyes, and founder checkpoints.
+- Fixture Git runs only in scratch repos with explicit environment/config/object/index/transport containment.
+- Target provenance/source plan covers imports, reads, scripts, PATH, shell, and child executables; no source/sibling dependency.
+- Verification exports target HEAD, sanitizes dependency config, and denies Project_echo/sibling/live-state/network access for target checks.
+- The migration record pins target HEAD/tree, hashes, commands, tests, no-remotes, clean state, false authority, and not-installed.
+- Active Project_echo loop, launchd, user skills, remote state, and authority remain unchanged.
 
 ## open_questions
 
-- R7 by independent `codex` and `codex-ops` bindings must confirm atomic discard/target publication, gated processes, runtime closure, strict transactional idempotency, live-vs-stale initialization, record CAS, and handoff.
-- A later cutover decides how repositories install/consume echo-loop and where each repository's queue state lives.
+- R8 by independent `codex` and `codex-ops` must confirm the controller-free contract and fixture isolation are complete.
+- Later cutover decides installation, per-repository queue state, and authority transfer.
 
 ## dont_touch
 
-- Do not change the active Project_echo loop, review launchd jobs, or user-level skill adapters.
-- Do not include product logic, capture/retrieval context logic, or historical project corpus.
-- Do not touch sibling targets, real remotes, wiki, or holdout-131.
+- Do not change active loop/launchd/user skill adapters or any real repo/remote/state.
+- Do not include product meeting logic, context capture/retrieval, or historical corpus.
+- Do not touch siblings, wiki, or holdout-131.
 
 ## canonical_anchors
 

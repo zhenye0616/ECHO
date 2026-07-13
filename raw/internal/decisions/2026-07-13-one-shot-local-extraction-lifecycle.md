@@ -1,45 +1,37 @@
-# One-shot lifecycle for the three local source extractions
+# Local extraction is an attended build, not a product
 
 Date: 2026-07-13
-Status: locked for proposal R7
+Status: locked for proposal R8
 Applies to: items 133 (`echo-brain`), 134 (`echo-loop`), and 135 (`echo-context`)
 
 ## Decision
 
-Each local repository extraction is one attended, deterministic operation with lifecycle:
+The three local source splits are one-time, operator-attended repository builds. They will not ship or leave behind a generic extraction CLI, lifecycle state machine, lock/takeover protocol, publication transaction, recovery daemon, committed sandbox profile, or migration-framework tests in Project_echo.
 
-`ABSENT -> RUNNING -> PUBLISHED | FAILED`
+Each assigned builder owns one absent, disjoint target path and materializes it directly from pinned Project_echo commit objects. The durable outputs are only:
 
-There is no automatic crash resume, stale-owner takeover, quarantine token, nonce rotation, checkpoint reuse, or later invocation that signals a recorded process. If a run fails before publication, the operator first proves its processes/resources are quiescent, uses an explicit `discard` command to archive all run material without deletion, and begins a fresh extraction from the pinned source commit.
+- the standalone local Git repository;
+- its target-local provenance, boundary, dependency, parity, and test evidence; and
+- one Project_echo migration record committed with the builder handoff.
 
-Run election itself has no empty-claim window: each lane fully initializes and fsyncs a run-specific directory, then no-replace-renames it to the fixed target claim. Discard is the inverse single-directory rename into an archive, not a sequence of partial moves.
-
-Publication remains no-replace and evidence-bound, but only the verified staged repository is in the atomic extraction path. The final target and its committed candidate identity are the durable `PUBLISHED` fact. The deterministic Project_echo migration record is published afterward as a separate idempotent evidence commit using an expected-parent ref CAS; evidence failure never rolls back or mutates the target.
+If a builder is interrupted, the visible target is incomplete and unaccepted. The orchestrator inspects and manually archives it before a fresh assigned run. No agent automatically adopts, deletes, resumes, reconciles, or repairs it.
 
 ## Why
 
-R3-R5 repeatedly found correctness gaps in the recovery control plane: ownership transfer, process-group identity, token replay, lock serialization, artifact reuse, and reconcile semantics. An independent Claude Fable structural investigation found these mechanisms were accidental scope for a three-run, founder-attended local migration. They increased concurrency and recovery risk without improving the product boundary or parity proof.
+R3-R7 repeatedly found correctness gaps in a temporary extraction controller: ownership transfer, process-group identity, crash windows, directory-fsync ordering, record/ref/index coordination, runtime bootstrap trust, and recovery convergence. An independent Claude Fable structural investigation identified the root problem: we were productizing a distributed recovery protocol for three founder-attended local migrations.
 
-The safer engineering shape is to remove automatic recovery rather than continue hardening a temporary distributed lifecycle. The cost is rerunning an interrupted extraction. That is acceptable for three bounded local migrations and is made cheaper by preserving archived evidence and integrity-verified dependency cache material.
+That machinery did not improve the actual product boundaries or parity proof. Removing it is the strongest safety move: fewer privileged writes, no stale controller to maintain, no false claim of crash atomicity, and no coupling between the target repository and Project_echo evidence commits.
 
-## Invariants retained
+## Retained invariants
 
-- Three disjoint target lanes and target-specific state paths.
-- Exact source pin `2971310441b69735cbe759293abd8c4d044bf347`; source bytes come from committed objects, never the dirty checkout.
-- No target remotes, source mutation, live-state migration, installation, cutover, or authority transfer.
-- Deterministic provenance, dependency, parity, migration-record, and handoff evidence.
-- Sanitized environment, offline candidate execution, OS sandbox, and source/sibling independence tests.
-- No-replace target publication, post-publish record-only evidence CAS, and canonical-path handoff verification.
-- Project_echo remains migration source, backup, and authority until a later founder checkpoint.
+- Three disjoint lanes and accurate names: echo-brain, echo-loop, echo-context.
+- Exact source pin `2971310441b69735cbe759293abd8c4d044bf347`; dirty source bytes are excluded.
+- Project_echo remains source, backup, active authority, and historical record during migration.
+- No target remotes, source deletion/freeze, live-state migration, installation, cutover, or graduation.
+- Target-local provenance, dependency, boundary, parity, clean-install, and source-independence tests.
+- Sanitized dependency/test environments and synthetic data only.
+- Independent review of actual target HEAD/tree and the Project_echo migration record.
 
-## Removed mechanisms
+## Operational consequence
 
-- Resume commands and reusable checkpoints.
-- Stale-lock quarantine, takeover, owner nonces, one-use tokens, and fcntl takeover guards.
-- Artifact-specific recovery locks.
-- Parent-child takeover handshakes and signaling by a later process. A launch gate remains only so the active parent durably records a child group before releasing it to work.
-- Reconcile code that mutates an incomplete run; only read-only derivation of an already-published result remains.
-
-## Review and build consequence
-
-R7 verifies that the removal is complete and that retained invariants remain testable. Builders implement only the one-shot extraction lifecycle; `publish-record` is post-publication evidence, never extraction recovery. Any pre-publication failure ends the lane until the operator atomically archives the whole claim and starts a fresh run.
+Builders implement repository contents, not migration infrastructure. Reviewers judge the final repository and reproducible evidence. A failed run costs another attended build; it does not justify adding automatic recovery code.
