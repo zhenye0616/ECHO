@@ -6,21 +6,22 @@ Extract the internal orchestration protocol into a local source-independent `ech
 
 - `echo-loop` means agent skills, backlog/task-state, review queue, coordination/deadlines, builder/reviewer/merge workflows, and operator tooling.
 - Source input is `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; final target `/Users/zhenye/Desktop/echo-loop` is published only from verified same-filesystem staging under an atomic lock.
+- `tools/repository-extraction/echo-loop.mjs` owns bootstrap/control state outside the candidate, no-replace publication, stale-lock quarantine, reconcile-only recovery, and read-only handoff verification.
 - The target is local Git on a migration branch with no remote or publication.
 - Copy protocol implementation and templates, not Project_echo's historical backlog/archive/reviews/wiki/raw corpus.
 - Split loop-owned coord/task-state APIs from context retrieval MCP; no retrieval tools ship in echo-loop.
-- Loop coordination uses private SQLite WAL at `ECHO_LOOP_HOME/state/coord.sqlite`, transactionally preserving append order, idempotency, and deadline races; it never reads echo-context state.
+- Loop coordination uses private SQLite WAL; one transaction inserts by caller idempotency key and applies role/deadline projection, while duplicate retry returns the original sequence without reapplying state.
 - Canonical skills remain vendor-neutral; client adapters are derived and drift-checked.
 - Preserve proposed-review, ready seals, atomic claim, worktree isolation, reviewer independence, fresh eyes, and founder checkpoints.
 - Tests mutate only disposable local fixture repositories and local bare remotes.
 - Fixture Git runs with isolated HOME/config/hooks/credentials and validates every bare remote remains beneath its scratch root.
 - Node `22.22.1` and npm `10.9.4` are hard preflights; source materialization reads committed objects only.
-- Process-scoped source denial and a clean local-HEAD/hash handoff gate independent review.
+- Source/dependency plans are deterministic and machine-checked; sandbox denies source reads, all network, and external writes.
 - No global install, launchd change, sibling repo dependency, or authority transfer occurs.
 
 ## open_questions
 
-- R3 by independent `codex` and `codex-ops` bindings must verify lifecycle, SQLite concurrency, fixture isolation, and local review handoff.
+- R4 by independent `codex` and `codex-ops` bindings must verify external lifecycle control, transactional coord idempotency, source/dependency plans, sandboxing, and handoff.
 - Later cutover will decide how each repository installs/consumes echo-loop and where its own backlog state lives.
 
 ## dont_touch
