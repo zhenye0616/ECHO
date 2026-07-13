@@ -13,9 +13,11 @@ G2 is lifted and this is the first post-lift proposal. The immediate job is not 
 - Split the reusable Granola signal core from the founder-CLI brain adapter. The generic lab daemon explicitly injects the old adapter; product code has no CLI fallback.
 - The existing `echoctl brief` command explicitly injects that same lab adapter when no test extractor is supplied; the refactor must not break the founder workflow.
 - Split the Granola API/derived policy and policy-injected pipeline core from `capture/sources.ts`; product closure must contain no founder desktop or developer-capture registry constants.
+- Split minimal local state-path resolution from `echo-home/paths.ts`; product closure must contain no retired profiles, project registration, or review defaults.
 - Rank 3, not this item, supplies the real client-scoped API-key brain. Missing production adapter fails closed.
 - `test:product` becomes only `tests/product/**`; the current broad non-orchestration suite is preserved as `test:repo` and CI runs both honestly.
 - The product artifact is a distinct private `echo-brain` tarball, not a renamed generic `echoctl` package.
+- Product runtime dependencies are exact and shrinkwrapped. Packaged tests install only from a hashed offline cache; no child-process registry access is permitted.
 - Build once. Every downstream job consumes the same checksum-verified bytes; no repack or rebuild is allowed.
 - In qualification CI, build the tarball before `test:product` and pass its directory to the packaged test. Local scratch test lineages remain allowed and cannot be uploaded as qualification evidence.
 - Qualification evidence is machine-readable and can remain DEV/incomplete. CI cannot pass reviewer/founder authority cells or claim QUALIFIED.
