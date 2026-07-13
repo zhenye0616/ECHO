@@ -7,7 +7,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| PROPOSED | HIGH | 2026-07-13 | [2026-07-13-132-product-graduation-foundation](../backlog/proposed/2026-07-13-132-product-graduation-foundation.md) | Product graduation foundation: additive echo-brain composition boundary, product-only tests, and build-once qualification evidence | 5d | - |
+| - | - | - | _(empty)_ | - | - | - |
 
 ## Ready
 
@@ -140,6 +140,7 @@ Do not edit by hand.
 | COMPLETE | HIGH | 2026-07-07 | [2026-07-07-129-deadline-anchor-emitted-at](../backlog/complete/2026-07-07-129-deadline-anchor-emitted-at.md) | Coord deadlines anchor on emitted_at, not tracker-now — restarts stop silently re-baselining every open deadline; the deadline_missed detector becomes able to fire in production | 0.25d | - |
 | COMPLETE | HIGH | 2026-07-09 | [2026-07-09-130-decision-changeset-compiler-v0](../backlog/complete/2026-07-09-130-decision-changeset-compiler-v0.md) | Decision→Linear changeset compiler v0: meeting decision cards materialize as an editable batch changeset (creates + closes), human-confirmed in one gesture | 2.5d | - |
 | COMPLETE | HIGH | 2026-07-10 | [2026-07-10-131-post-meeting-brief-generator-v0](../backlog/complete/2026-07-10-131-post-meeting-brief-generator-v0.md) | Post-meeting brief generator v0: harden the meeting→brief fast path around six root causes; canonical tool-agnostic brief object + markdown render as a CLI command | 2d | - |
+| COMPLETE | HIGH | 2026-07-13 | [2026-07-13-132-product-graduation-foundation](../backlog/complete/2026-07-13-132-product-graduation-foundation.md) | Product graduation foundation: additive echo-brain composition boundary, product-only tests, and build-once qualification evidence | 5d | - |
 | COMPLETE | MED | 2026-05-14 | [2026-05-14-052-sync-skills-check-in-merge-and-cleanup](../backlog/complete/2026-05-14-052-sync-skills-check-in-merge-and-cleanup.md) | /merge-and-cleanup C5 verify includes tools/sync-skills.sh --check + pre-commit hook | 0.25-0.5d | - |
 | COMPLETE | MED | 2026-05-14 | [2026-05-14-053-reviewer-completed-at-coercion](../backlog/complete/2026-05-14-053-reviewer-completed-at-coercion.md) | Reviewer schema accepts/coerces unquoted-YAML completed_at timestamps (two-prong — quoted-example prompts + defensive coercion) | 0.5-1d | - |
 | COMPLETE | MED | 2026-05-15 | [2026-05-15-054-merge-cleanup-cross-vendor-conflict-review](../backlog/complete/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review.md) | /merge-and-cleanup C3.5 — optional cross-vendor mid-merge conflict-resolution review (codifies the ad-hoc pattern that worked on 050) | 0.5d | - |
