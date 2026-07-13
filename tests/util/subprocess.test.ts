@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSafeCommandArgs, resolveCommand } from '../../src/util/subprocess.js';
+import { resolveCommand } from '../../src/util/subprocess.js';
 
 describe('resolveCommand', () => {
   it('finds a Windows .cmd shim through injected PATH and PATHEXT', () => {
@@ -47,31 +47,5 @@ describe('resolveCommand', () => {
       },
     });
     expect(result).toEqual({ command: 'claude' });
-  });
-
-  it('rejects shell metacharacters when Windows requires a .cmd shim', () => {
-    const resolved = {
-      command: 'C:\\Windows\\System32\\cmd.exe',
-      prependArgs: ['/d', '/s', '/c', 'C:\\Tools\\claude.CMD'],
-    };
-
-    for (const metacharacter of ['&', '|', '<', '>', '^', '%', '!', '(', ')', '"', '\r', '\n']) {
-      expect(() => assertSafeCommandArgs(resolved, [`value${metacharacter}injected`])).toThrow(
-        /unsupported shell metacharacters/,
-      );
-    }
-  });
-
-  it('allows ordinary argv values and does not constrain direct executables', () => {
-    const shim = {
-      command: 'cmd.exe',
-      prependArgs: ['/d', '/s', '/c', 'C:\\Tools\\claude.CMD'],
-    };
-    expect(() =>
-      assertSafeCommandArgs(shim, ['--print', 'http://127.0.0.1:38478/mcp']),
-    ).not.toThrow();
-    expect(() =>
-      assertSafeCommandArgs({ command: 'C:\\Tools\\claude.EXE' }, ['value&preserved']),
-    ).not.toThrow();
   });
 });

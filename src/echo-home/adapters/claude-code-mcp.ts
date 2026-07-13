@@ -1,6 +1,4 @@
-import { spawn as nodeSpawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { assertSafeCommandArgs, resolveCommand } from '../../util/subprocess.js';
+import crossSpawn from 'cross-spawn';
 
 export interface ClaudeCodeMcpSpawnResult {
   exitCode: number;
@@ -80,24 +78,18 @@ function appendBounded(current: string, chunk: string, limit: number): string {
 }
 
 function realSpawn(
-  cmd: string,
   args: string[],
   opts: { timeoutMs: number; outputLimit: number },
 ): Promise<ClaudeCodeMcpSpawnResult> {
   return new Promise((resolvePromise, reject) => {
-    if (cmd !== 'claude') {
-      reject(new Error('Unsupported Claude Code registration executable'));
-      return;
-    }
-    const resolved = resolveCommand('claude', {
-      platform: process.platform,
-      env: process.env,
-      existsSync,
-    });
-    assertSafeCommandArgs(resolved, args);
-    const child = nodeSpawn(resolved.command, [...(resolved.prependArgs ?? []), ...args], {
+    // The pinned launcher owns Windows .cmd discovery and argument escaping.
+    const child = crossSpawn('claude', args, {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    if (child.stdout === null || child.stderr === null) {
+      reject(new Error('Claude Code registration subprocess did not expose output pipes'));
+      return;
+    }
     let stdout = '';
     let stderr = '';
     let timedOut = false;
@@ -139,7 +131,7 @@ export async function registerClaudeCodeMcpServer(
 ): Promise<ClaudeCodeMcpRegisterResult> {
   const timeoutMs = deps.timeoutMs ?? CLAUDE_CODE_MCP_TIMEOUT_MS;
   const outputLimit = deps.outputLimit ?? DEFAULT_OUTPUT_LIMIT;
-  const spawn = deps.spawn ?? realSpawn;
+  const spawn = deps.spawn;
   let args: string[];
   try {
     args = claudeCodeMcpAddArgs(mcpServerUrl);
@@ -154,7 +146,10 @@ export async function registerClaudeCodeMcpServer(
 
   let result: ClaudeCodeMcpSpawnResult;
   try {
-    result = await spawn('claude', args, { timeoutMs, outputLimit });
+    result =
+      spawn === undefined
+        ? await realSpawn(args, { timeoutMs, outputLimit })
+        : await spawn('claude', args, { timeoutMs, outputLimit });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       return { action: 'cli-unavailable', command };

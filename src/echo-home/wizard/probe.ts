@@ -1,7 +1,6 @@
-import { spawn as nodeSpawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import crossSpawn from 'cross-spawn';
+import type { SpawnOptions } from 'node:child_process';
 import type { AgentKind } from './detect-agents.js';
-import { assertSafeCommandArgs, resolveCommand } from '../../util/subprocess.js';
 
 export type ProbeOutcome =
   | { agent: AgentKind; probed: true; latencyMs: number }
@@ -39,20 +38,21 @@ function realSpawn(
   opts?: { timeoutMs: number },
 ): Promise<SpawnResult> {
   return new Promise((resolvePromise, reject) => {
-    if (cmd !== 'codex' && cmd !== 'claude') {
+    // Keep executable names literal; cross-spawn owns Windows .cmd escaping.
+    const spawnOptions: SpawnOptions = { stdio: ['ignore', 'pipe', 'pipe'] };
+    let child;
+    if (cmd === 'codex') {
+      child = crossSpawn('codex', args, spawnOptions);
+    } else if (cmd === 'claude') {
+      child = crossSpawn('claude', args, spawnOptions);
+    } else {
       reject(new Error('Unsupported probe executable'));
       return;
     }
-    const executable = cmd === 'codex' ? 'codex' : 'claude';
-    const resolved = resolveCommand(executable, {
-      platform: process.platform,
-      env: process.env,
-      existsSync,
-    });
-    assertSafeCommandArgs(resolved, args);
-    const child = nodeSpawn(resolved.command, [...(resolved.prependArgs ?? []), ...args], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    if (child.stdout === null || child.stderr === null) {
+      reject(new Error('Probe subprocess did not expose output pipes'));
+      return;
+    }
     let stdout = '';
     let stderr = '';
     let timedOut = false;
