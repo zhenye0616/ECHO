@@ -114,6 +114,16 @@ describe('qualification report validator', () => {
     expect(response.result.errors).toContain('missing mandatory matrix cell: distribution');
   });
 
+  it('enforces nested schema closure without checkout dependencies', async () => {
+    const report = completeDraft();
+    (report.artifact as Record<string, unknown>).undeclared = true;
+    const response = await validate(report);
+    expect(response.status).toBe(1);
+    expect(response.result.errors).toContain(
+      "/artifact must NOT have additional property 'undeclared'",
+    );
+  });
+
   it('rejects a CI-authored pass in a human-authority cell', async () => {
     const report = completeDraft();
     const cell = cells(report).find((candidate) => candidate.id === 'release-authorization')!;

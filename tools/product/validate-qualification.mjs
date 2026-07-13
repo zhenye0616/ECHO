@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import Ajv from 'ajv';
+import { fileURLToPath } from 'node:url';
 
 const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(TOOL_DIR, '../..');
@@ -32,20 +31,115 @@ function samePlatform(left, right) {
   );
 }
 
-export function validateQualificationReport(report, options = {}) {
-  const ajv = new Ajv({ allErrors: true, strict: false });
-  const validateSchema = ajv.compile(readJson(SCHEMA_PATH));
+function plainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function pointerGet(document, pointer) {
+  if (!pointer.startsWith('#/')) throw new Error(`unsupported schema reference: ${pointer}`);
+  return pointer
+    .slice(2)
+    .split('/')
+    .map((part) => part.replaceAll('~1', '/').replaceAll('~0', '~'))
+    .reduce((value, part) => value?.[part], document);
+}
+
+function jsonTypeMatches(value, type) {
+  if (type === 'null') return value === null;
+  if (type === 'array') return Array.isArray(value);
+  if (type === 'object') return plainObject(value);
+  if (type === 'integer') return Number.isInteger(value);
+  return typeof value === type;
+}
+
+function validateSchemaValue(value, rule, root, path, errors) {
+  if (rule.$ref !== undefined) {
+    const referenced = pointerGet(root, rule.$ref);
+    if (referenced === undefined) throw new Error(`unresolved schema reference: ${rule.$ref}`);
+    validateSchemaValue(value, referenced, root, path, errors);
+    return;
+  }
+  if (rule.oneOf !== undefined) {
+    const variants = rule.oneOf.filter((variant) => {
+      const variantErrors = [];
+      validateSchemaValue(value, variant, root, path, variantErrors);
+      return variantErrors.length === 0;
+    });
+    if (variants.length !== 1) errors.push(`${path} must match exactly one schema variant`);
+    return;
+  }
+  if (rule.type !== undefined && !jsonTypeMatches(value, rule.type)) {
+    errors.push(`${path} must be ${rule.type}`);
+    return;
+  }
+  if (rule.const !== undefined && value !== rule.const) {
+    errors.push(`${path} must be equal to constant`);
+  }
+  if (rule.enum !== undefined && !rule.enum.includes(value)) {
+    errors.push(`${path} must be equal to one of the allowed values`);
+  }
+  if (typeof value === 'string') {
+    if (rule.minLength !== undefined && value.length < rule.minLength) {
+      errors.push(`${path} must NOT have fewer than ${rule.minLength} characters`);
+    }
+    if (rule.pattern !== undefined && !new RegExp(rule.pattern, 'u').test(value)) {
+      errors.push(`${path} must match pattern ${rule.pattern}`);
+    }
+  }
+  if (typeof value === 'number' && rule.minimum !== undefined && value < rule.minimum) {
+    errors.push(`${path} must be >= ${rule.minimum}`);
+  }
+  if (Array.isArray(value)) {
+    if (rule.minItems !== undefined && value.length < rule.minItems) {
+      errors.push(`${path} must NOT have fewer than ${rule.minItems} items`);
+    }
+    if (rule.maxItems !== undefined && value.length > rule.maxItems) {
+      errors.push(`${path} must NOT have more than ${rule.maxItems} items`);
+    }
+    if (rule.uniqueItems === true) {
+      const serialized = value.map((item) => JSON.stringify(item));
+      if (new Set(serialized).size !== serialized.length) {
+        errors.push(`${path} must NOT have duplicate items`);
+      }
+    }
+    if (rule.items !== undefined) {
+      value.forEach((item, index) =>
+        validateSchemaValue(item, rule.items, root, `${path}/${index}`, errors),
+      );
+    }
+  }
+  if (plainObject(value)) {
+    for (const key of rule.required ?? []) {
+      if (!(key in value)) errors.push(`${path} must have required property '${key}'`);
+    }
+    const properties = rule.properties ?? {};
+    if (rule.additionalProperties === false) {
+      for (const key of Object.keys(value)) {
+        if (!(key in properties)) errors.push(`${path} must NOT have additional property '${key}'`);
+      }
+    }
+    for (const [key, propertyRule] of Object.entries(properties)) {
+      if (key in value) {
+        validateSchemaValue(value[key], propertyRule, root, `${path}/${key}`, errors);
+      }
+    }
+  }
+}
+
+function schemaShapeErrors(report, schema) {
   const errors = [];
-  if (!validateSchema(report)) {
-    errors.push(
-      ...(validateSchema.errors ?? []).map(
-        (error) => `${error.instancePath || '/'} ${error.message ?? error.keyword}`,
-      ),
-    );
+  validateSchemaValue(report, schema, schema, '', errors);
+  return errors;
+}
+
+export function validateQualificationReport(report, options = {}) {
+  const schema = readJson(options.schemaPath ?? SCHEMA_PATH);
+  const errors = schemaShapeErrors(report, schema);
+  if (errors.length > 0) {
     return { ok: false, errors: errors.sort() };
   }
 
-  const matrix = readJson(MATRIX_PATH);
+  const matrix = readJson(options.matrixPath ?? MATRIX_PATH);
   const definitions = new Map(matrix.cells.map((cell) => [cell.id, cell]));
   const byId = new Map();
   for (const cell of report.cells) {
@@ -163,7 +257,7 @@ function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
-    if (!['--report', '--artifact-manifest'].includes(flag)) {
+    if (!['--report', '--artifact-manifest', '--schema', '--matrix'].includes(flag)) {
       throw new Error(`unknown argument: ${flag}`);
     }
     const value = argv[++index];
@@ -174,6 +268,11 @@ function parseArgs(argv) {
   if (args['artifact-manifest'] !== undefined && !isAbsolute(args['artifact-manifest'])) {
     throw new Error('--artifact-manifest must be absolute');
   }
+  for (const flag of ['schema', 'matrix']) {
+    if (args[flag] !== undefined && !isAbsolute(args[flag])) {
+      throw new Error(`--${flag} must be absolute`);
+    }
+  }
   return args;
 }
 
@@ -181,12 +280,17 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   const result = validateQualificationReport(readJson(args.report), {
     artifactManifestPath: args['artifact-manifest'],
+    schemaPath: args.schema,
+    matrixPath: args.matrix,
   });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   if (!result.ok) process.exitCode = 1;
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] !== undefined &&
+  realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
+) {
   try {
     main();
   } catch (error) {

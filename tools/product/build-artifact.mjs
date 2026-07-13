@@ -68,6 +68,7 @@ function run(command, args, options = {}) {
     env: options.env ?? process.env,
     maxBuffer: 20 * 1024 * 1024,
     stdio: options.stdio,
+    timeout: options.timeout ?? 180_000,
   });
   if (result.status !== 0) {
     const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : '';

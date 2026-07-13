@@ -164,6 +164,71 @@ describe('product-only artifact', () => {
     }
   });
 
+  it('runs the hashed verification and DEV-draft tools without a checkout', async () => {
+    const verified = await run(
+      process.execPath,
+      [
+        join(supportDir, 'verify-bundle.mjs'),
+        '--artifact-dir',
+        artifactDir,
+        '--support-dir',
+        supportDir,
+      ],
+      { cwd: temporaryRoot },
+    );
+    expect(verified.status, verified.stderr).toBe(0);
+    expect(JSON.parse(verified.stdout)).toMatchObject({ ok: true, errors: [] });
+
+    const draft = join(temporaryRoot, 'standalone-draft.json');
+    const created = await run(
+      process.execPath,
+      [
+        join(supportDir, 'create-draft-report.mjs'),
+        '--artifact-manifest',
+        artifactManifestPath,
+        '--matrix',
+        join(supportDir, 'schemas/product/qualification-matrix.v1.json'),
+        '--output',
+        draft,
+        '--capability-id',
+        'team-meeting-to-brief',
+        '--spec-id',
+        '2026-07-13-132-product-graduation-foundation',
+        '--ci-run-id',
+        'standalone-fixture',
+        '--ci-run-attempt',
+        '1',
+        '--ci-workflow',
+        'product-qualification',
+        '--boundary-status',
+        'pass',
+        '--product-test-status',
+        'pass',
+        '--unexpected-skip-count',
+        '0',
+      ],
+      { cwd: temporaryRoot },
+    );
+    expect(created.status, created.stderr).toBe(0);
+    const validated = await run(
+      process.execPath,
+      [
+        join(supportDir, 'validate-qualification.mjs'),
+        '--report',
+        draft,
+        '--artifact-manifest',
+        artifactManifestPath,
+        '--schema',
+        join(supportDir, 'schemas/product/qualification-report.v1.schema.json'),
+        '--matrix',
+        join(supportDir, 'schemas/product/qualification-matrix.v1.json'),
+      ],
+      { cwd: temporaryRoot },
+    );
+    expect(validated.status, validated.stderr).toBe(0);
+    expect(JSON.parse(validated.stdout)).toEqual({ ok: true, errors: [] });
+  });
+
   it('installs from the exact cache and runs config validation plus offline selftest', async () => {
     const prefix = join(temporaryRoot, 'installed-prefix');
     const evidence = join(temporaryRoot, 'install-evidence.json');

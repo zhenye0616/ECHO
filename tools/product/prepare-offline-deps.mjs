@@ -173,8 +173,30 @@ function main() {
     mkdirSync(join(nodedir, 'include'), { recursive: true });
     cpSync(headersSource, join(nodedir, 'include/node'), { recursive: true, dereference: true });
     writeFileSync(join(nodedir, 'node-version.txt'), `${expectedNode}\n`);
-    cpSync(join(TOOL_DIR, 'toolchain-preflight.mjs'), join(temporary, 'toolchain-preflight.mjs'));
-    cpSync(join(TOOL_DIR, 'install-offline.mjs'), join(temporary, 'install-offline.mjs'));
+    for (const script of [
+      'toolchain-preflight.mjs',
+      'install-offline.mjs',
+      'verify-bundle.mjs',
+      'run-target-cell.mjs',
+      'create-draft-report.mjs',
+      'validate-qualification.mjs',
+      'aggregate-evidence.mjs',
+      'terminal-gate.mjs',
+    ]) {
+      cpSync(join(TOOL_DIR, script), join(temporary, script));
+    }
+    mkdirSync(join(temporary, 'schemas/product'), { recursive: true });
+    for (const schema of ['qualification-report.v1.schema.json', 'qualification-matrix.v1.json']) {
+      cpSync(
+        join(REPO_ROOT, 'schemas/product', schema),
+        join(temporary, 'schemas/product', schema),
+      );
+    }
+    mkdirSync(join(temporary, 'synthetic'), { recursive: true });
+    writeFileSync(
+      join(temporary, 'synthetic/seed.json'),
+      '{"schema_version":1,"synthetic":true,"content":"fixture-only"}\n',
+    );
 
     const preflight = runToolchainPreflight({ expectedNode, nodedir });
     writeFileSync(

@@ -165,3 +165,159 @@ describe('Git-object product builder', () => {
     expect(overwrite.stderr).toContain('--out-dir already exists');
   }, 60_000);
 });
+
+describe('qualification workflow build-once and terminal contracts', () => {
+  const workflowPath = join(REPO_ROOT, '.github/workflows/product-qualification.yml');
+
+  it('has one pack producer and no downstream checkout, pack, or rebuild', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    expect(workflow.match(/tools\/product\/build-artifact\.mjs/g)).toHaveLength(1);
+    expect(workflow).not.toContain('npm pack');
+    expect(workflow).toContain('ref: ${{ steps.expected.outputs.sha }}');
+    expect(workflow).toContain('${{ github.event.pull_request.head.sha }}');
+    const target = workflow.split('\n  target:\n')[1]!.split('\n  aggregate:\n')[0]!;
+    const aggregate = workflow.split('\n  aggregate:\n')[1]!;
+    for (const downstream of [target, aggregate]) {
+      expect(downstream).not.toContain('actions/checkout@');
+      expect(downstream).not.toContain('build-artifact.mjs');
+      expect(downstream).not.toContain('npm pack');
+    }
+    expect(target.indexOf('Verify exact bytes before install')).toBeLessThan(
+      target.indexOf('Run clean install'),
+    );
+  });
+
+  it('keeps evidence uploads always-running and puts the terminal gate last', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    for (const uploadName of [
+      'Upload immutable build bundle',
+      'Upload immutable target evidence',
+      'Upload immutable final DEV report',
+    ]) {
+      const at = workflow.indexOf(`- name: ${uploadName}`);
+      expect(at, uploadName).toBeGreaterThan(-1);
+      expect(workflow.slice(at, at + 180), uploadName).toContain('if: always()');
+    }
+    expect(workflow.indexOf('- name: Final terminal gate')).toBeGreaterThan(
+      workflow.indexOf('- name: Upload immutable final DEV report'),
+    );
+    expect(workflow).not.toMatch(/\b(?:tags|release):/);
+  });
+
+  it('uploads a valid incomplete DEV report but leaves a forced dependency failure red', async () => {
+    const fixture = join(temporaryRoot, 'forced-failure');
+    mkdirSync(fixture);
+    const artifactManifest = join(fixture, 'artifact-manifest.json');
+    writeFileSync(
+      artifactManifest,
+      `${JSON.stringify(
+        {
+          schema_version: 1,
+          source_sha: '1'.repeat(40),
+          version: '0.1.0-dev.workflow',
+          product_boundary_version: 1,
+          declared_platform: { os: 'darwin', architecture: 'arm64', node: '22.22.1' },
+          dependency_lock_sha256: 'b'.repeat(64),
+          artifact: { path: 'echo-brain.tgz', size: 1, sha256: 'a'.repeat(64) },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const draft = join(fixture, 'draft.json');
+    const created = await run(
+      process.execPath,
+      [
+        join(REPO_ROOT, 'tools/product/create-draft-report.mjs'),
+        '--artifact-manifest',
+        artifactManifest,
+        '--matrix',
+        join(REPO_ROOT, 'schemas/product/qualification-matrix.v1.json'),
+        '--output',
+        draft,
+        '--capability-id',
+        'team-meeting-to-brief',
+        '--spec-id',
+        '2026-07-13-132-product-graduation-foundation',
+        '--ci-run-id',
+        'forced-failure-run',
+        '--ci-run-attempt',
+        '1',
+        '--ci-workflow',
+        'product-qualification',
+        '--boundary-status',
+        'pass',
+        '--product-test-status',
+        'pass',
+        '--unexpected-skip-count',
+        '0',
+      ],
+      { cwd: REPO_ROOT },
+    );
+    expect(created.status, created.stderr).toBe(0);
+    const dependencies = join(fixture, 'dependencies.json');
+    writeFileSync(dependencies, '{"build":"success","target":"failure"}\n');
+    const finalReport = join(fixture, 'qualification-report.json');
+    const terminal = join(fixture, 'terminal-status.json');
+    const aggregated = await run(
+      process.execPath,
+      [
+        join(REPO_ROOT, 'tools/product/aggregate-evidence.mjs'),
+        '--draft-report',
+        draft,
+        '--dependency-results',
+        dependencies,
+        '--artifact-manifest',
+        artifactManifest,
+        '--schema',
+        join(REPO_ROOT, 'schemas/product/qualification-report.v1.schema.json'),
+        '--matrix',
+        join(REPO_ROOT, 'schemas/product/qualification-matrix.v1.json'),
+        '--output',
+        finalReport,
+        '--terminal-output',
+        terminal,
+      ],
+      { cwd: REPO_ROOT },
+    );
+    expect(aggregated.status, aggregated.stderr).toBe(0);
+    const report = JSON.parse(readFileSync(finalReport, 'utf8')) as {
+      maturity: string;
+      result: string;
+      cells: Array<{ id: string; status: string }>;
+    };
+    expect(report).toMatchObject({ maturity: 'DEV', result: 'incomplete' });
+    expect(report.cells.find((cell) => cell.id === 'clean-install')).toMatchObject({
+      status: 'fail',
+    });
+    const terminalResult = JSON.parse(readFileSync(terminal, 'utf8')) as {
+      ok: boolean;
+      dependency_failures: string[];
+      validation_errors: string[];
+    };
+    expect(terminalResult).toMatchObject({
+      ok: false,
+      dependency_failures: ['target:failure'],
+      validation_errors: [],
+    });
+
+    const validated = await run(
+      process.execPath,
+      [
+        join(REPO_ROOT, 'tools/product/validate-qualification.mjs'),
+        '--report',
+        finalReport,
+        '--artifact-manifest',
+        artifactManifest,
+      ],
+      { cwd: REPO_ROOT },
+    );
+    expect(validated.status, validated.stderr).toBe(0);
+    const gated = await run(
+      process.execPath,
+      [join(REPO_ROOT, 'tools/product/terminal-gate.mjs'), '--terminal-status', terminal],
+      { cwd: REPO_ROOT },
+    );
+    expect(gated.status).toBe(1);
+  });
+});
