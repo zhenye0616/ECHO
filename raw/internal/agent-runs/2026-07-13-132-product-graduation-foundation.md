@@ -123,7 +123,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC5: passing — independent private package metadata, exact root-lock-derived 43-package runtime shrinkwrap, Git-object staging/atomic artifact builder, exact-cache/header support producer, fail-before-install toolchain preflight, root-locked offline source-build install, installed config/selftest, and build-race tests
 - AC6: passing — versioned 24-cell matrix, strict standalone report-schema evaluator, controlled first-release N/A, authority/identity/skip/qualification validator, and DEV/incomplete draft generation
 - AC7: passing — exact-SHA single build, immutable bundle/support hashes, no-checkout macOS arm64 Node 22 target, two-prefix state isolation, always-run evidence uploads, standalone aggregation, and a final red-cell/dependency/identity/skip terminal gate
-- AC8: pending
+- AC8: passing — product README and qualification-workflow comments preserve the exact generic package/platform debt owners, deadlines, support boundary, and blocking-red/no-retry disposition
 - AC9: pending
 
 ## Test results
@@ -138,6 +138,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC5 product verification: PASS (6 files, 74 tests). The packaged-product test built one local scratch lineage from committed Git objects, prepared 285 hashed support/cache/header entries, installed the tarball into an empty external prefix using the exact 43-package root-derived lock and npm offline mode, compiled `better-sqlite3` from source, and ran installed `validate-config` plus `selftest`. The build-once test paused after the fence preflight, mutated a closure source and added an ignored file under `src/product/`, then proved neither worktree byte entered the artifact.
 - AC6 focused verification: PASS (1 file, 8 tests). A complete machine-cell CI draft validates while human cells remain pending; missing cells, CI-authored human passes, forbidden N/A, identity mismatch, unexpected skips, and premature QUALIFIED all fail. The only permitted N/A is `upgrade-from-previous` with both founder and independent-reviewer rationale.
 - AC7 focused verification: PASS (3 files, 31 tests). The bundled verifier, DEV-draft creator, schema validator, target evidence, aggregator, and terminal gate run without a checkout. Static workflow assertions find exactly one product builder, no downstream checkout/build/pack, checksum verification before install, always-run uploads, and the terminal gate last. A forced target dependency failure produces a valid DEV/incomplete report with explicit red cells while the terminal gate exits 1.
+- AC8 focused verification: PASS (1 file, 6 tests). A static contract requires the exact inherited-debt tool/failure names, owners, deadlines, macOS-only support claim, and blocking-red/no-retry language in both the product README and workflow comments; it also rejects a Windows qualification runner.
 
 ## Open questions for founder
 

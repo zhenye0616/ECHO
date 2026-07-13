@@ -46,9 +46,9 @@ permissions:
   contents: read
 
 # Explicit debt boundary (not waived by this product-only workflow):
-# - Generic release-doctor/install-echo-codex-skills omission stays with dev-platform packaging before its next tag/extraction.
-# - Windows EBUSY/filesystem-event failures stay with the platform maintainer; phase 1 makes no Windows claim.
-# - macOS Node 22 PID-lock and Ubuntu cleanup ENOTEMPTY races stay with QA; reproduction here is a blocking red cell, never a retry waiver.
+# - Generic release-doctor omission of tools/install-echo-codex-skills.sh is owned by the dev-platform package maintainer; it must be fixed before the next generic echoctl tag or the echo-dev-platform extraction, whichever comes first.
+# - Windows onboarding/validation EBUSY and filesystem-event failures are owned by the platform maintainer; they must be green before any Windows product support claim. Phase 1 remains macOS-only.
+# - The macOS Node 22 PID-lock/selftest race and Ubuntu Node 22 packaging-cleanup ENOTEMPTY race are owned by QA; if either reproduces here, it is a blocking red cell rather than a retry-based waiver.
 env:
   PRODUCT_NODE_VERSION: '22.22.1'
   PRODUCT_VERSION: 0.1.0-dev.${{ github.run_number }}

@@ -204,6 +204,29 @@ describe('qualification workflow build-once and terminal contracts', () => {
     expect(workflow).not.toMatch(/\b(?:tags|release):/);
   });
 
+  it('keeps inherited generic-package debt explicit and outside the product claim', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const readme = readFileSync(join(REPO_ROOT, 'product/README.md'), 'utf8');
+    const sharedDispositions = [
+      'tools/install-echo-codex-skills.sh',
+      'dev-platform package maintainer',
+      'before the next generic `echoctl` tag or the `echo-dev-platform` extraction, whichever comes first',
+      'Windows onboarding/validation `EBUSY` and filesystem-event failures',
+      'green before any Windows product support claim',
+      'macOS Node 22 PID-lock/selftest race and Ubuntu Node 22 packaging-cleanup `ENOTEMPTY` race',
+      'owned by QA',
+      'blocking red cell',
+      'retry-based waiver',
+    ];
+    for (const disposition of sharedDispositions) {
+      expect(readme, disposition).toContain(disposition);
+      expect(workflow.replaceAll('`', ''), disposition).toContain(disposition.replaceAll('`', ''));
+    }
+    expect(readme).toContain('`backlog/_followups.md` remains the owner');
+    expect(readme).toContain('does not imply that the repository is globally green');
+    expect(workflow).not.toContain('windows-');
+  });
+
   it('uploads a valid incomplete DEV report but leaves a forced dependency failure red', async () => {
     const fixture = join(temporaryRoot, 'forced-failure');
     mkdirSync(fixture);
