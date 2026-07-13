@@ -7,7 +7,7 @@ cursor_response: null
 codex-ops_response: codex-ops.md
 claude_response: null
 patch_commit_sha: a532c695f78d130b61214db28e5a4220244bda64
-next_round: null
+next_round: 3
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 ---
@@ -22,8 +22,6 @@ escalated_to_founder: false
 
 ## Divergent findings (single-reviewer or non-overlapping primary `where`)
 
-| # | Severity | Source | Where | Disposition | Patch SHA / rationale |
-|---|---|---|---|---|---|
 Reframe gate: all 12 findings target r1-patch mechanisms (sole prior patch commit 291870c3), so the mandatory fresh-context investigator ran (codex exec read-only). Verdict: `propagation_completion` — the r1 mechanisms implement accepted load-bearing rank-1 invariants; r2 exposes missing producer/enforcement/timeout/identity/terminal-gate edges, and removal would reopen r1 findings. Diagnostic check passed: reviewed spec blob identical at 291870c3 and request-pinned 41d2f17d (blob a8248d65). Strategist validation applied two nuances: row 1 is fixed by a corrective reorder of the r1 ordering bug (two-phase inventory — simpler, not deeper), and rows 5/7 are fixed by REMOVING the check-then-use cleanliness mechanism in favor of staging from Git objects at the SHA (bytes bound by construction). No finding warranted structural cut of an r1 invariant.
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
