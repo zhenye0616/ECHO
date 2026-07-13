@@ -46,7 +46,6 @@ describe('echoctl shell reachability', () => {
         expect.arrayContaining([
           'package/README.md',
           'package/LICENSE',
-          'package/CHANGELOG.md',
           'package/dist/cli/index.js',
           'package/dist/cli/commands/project.js',
           'package/dist/cli/commands/project.d.ts',

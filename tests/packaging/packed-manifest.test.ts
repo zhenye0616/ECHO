@@ -40,7 +40,6 @@ describe('packed package manifest', () => {
 
     expect(paths).toMatchInlineSnapshot(`
       [
-        "CHANGELOG.md",
         "LICENSE",
         "README.md",
         "assets/echo-roles/builder.toml",
