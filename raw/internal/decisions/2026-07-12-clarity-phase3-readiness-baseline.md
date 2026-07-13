@@ -21,7 +21,7 @@ The only product maturity vocabulary remains `DEV -> FOUNDER LIVE -> QUALIFIED -
 - The real text and binary reachable-history scan is complete and independently rerun.
 - The filter-repo rewrite is deliberately deferred with a founder-owned G4 trigger.
 - The GitHub settings audit is complete but VERIFIED RED.
-- The canonical closure register remains 1 resolved / 26 pending.
+- The founder-approved terminal package reconciles the canonical register to 11 resolved / 16 deferred-with-owner-and-trigger / 0 pending on the decision branch. It still requires landing and exact-SHA independent verification.
 - A different binding reviewed `c8ddd38b..a2c53cb9` and returned READY with no medium-or-higher findings. The final remediation delta still needs independent review at its exact candidate tip before landing.
 
 ## Non-negotiable boundaries
@@ -78,6 +78,8 @@ Work through `2026-07-11-phase2-founder-decision-packet.md` without reopening pr
 
 **Ready when:** all 27 canonical rows are exactly one of `resolved`, `accepted-risk`, or `deferred-with-owner-and-trigger`, with a real evidence or trigger reference.
 
+**Completed on the decision branch 2026-07-12:** the founder instruction `APPROVE TERMINAL PACK` approved `2026-07-12-g2-terminal-dispositions-and-repository-topology.md`. The reconciled register contains 11 resolved and 16 deferred-with-owner-and-trigger rows, with zero pending rows. Landing approval is separate.
+
 ### R6 — Independent mechanical G2-readiness check
 
 A different binding verifies the complete register at an exact main SHA: row count, allowed terminal states, owner/trigger requirements, cited-path existence, and consistency with the locked Team-product direction and four-stage maturity contract.
@@ -92,7 +94,7 @@ The first post-lift proposal remains the graduation foundation: product composit
 
 ## Current stop line
 
-**Superseding status 2026-07-12:** R1-R4 are complete and G1 is closed. The stop line is now R5: finish the remaining 25 register rows, perform the independent R6 mechanical check, and obtain the separate founder G2 signature. Product specs and maturity advancement remain halted.
+**Superseding status 2026-07-12:** R1-R5 are complete on the decision branch and G1 is closed. The stop line is now R6: independently verify the terminal register at the exact candidate tip, obtain founder approval to land it, recheck the exact landed SHA, and then obtain the separate founder G2 signature. Product specs and maturity advancement remain halted.
 
 **Historical pre-land stop line:** R2 remediation authority was granted by the founder's instruction to proceed with Phase 3. The next irreversible action then requiring authority was the R3 update of `main`.
 
