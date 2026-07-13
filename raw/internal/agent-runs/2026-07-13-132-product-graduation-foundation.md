@@ -120,7 +120,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC2: passing — strict schema/config, deepest-match filesystem probe, product-local paths, transactional runtime, bounded idempotent shutdown, and product-only CLI
 - AC3: passing — founder CLI brain isolated in lab adapter with explicit dispatch/brief injection and no product fallback
 - AC4: implementation passing — product-only Vitest config, shared environment/network/child-process guard, sanitized child sentinel, red fixtures, structural test scan, and renamed broad suite; CI scratch-artifact wiring completes with AC5
-- AC5: in progress — independent private package metadata, exact root-lock-derived 43-package runtime shrinkwrap, Git-object staging/atomic artifact builder, exact-cache/header support producer, fail-before-install toolchain preflight, and root-locked offline tarball installer are implemented; packaged/build-once contract tests remain
+- AC5: passing — independent private package metadata, exact root-lock-derived 43-package runtime shrinkwrap, Git-object staging/atomic artifact builder, exact-cache/header support producer, fail-before-install toolchain preflight, root-locked offline source-build install, installed config/selftest, and build-race tests
 - AC6: pending
 - AC7: pending
 - AC8: pending
@@ -135,6 +135,7 @@ External runtime closure: `better-sqlite3` only. Forbidden legacy paths `src/cap
 - AC3 focused verification: PASS (4 files, 68 tests); typecheck, lint, boundary check, and `git diff --check` PASS.
 - AC4 product verification: PASS (4 files, 56 tests); typecheck, lint, boundary check, formatting, and `git diff --check` PASS.
 - AC4 renamed broad-suite verification: FAIL (183 files passed, 1 file failed, 1 file skipped; 1,893 tests passed, 1 failed, 21 skipped, 1 todo). The only failure is the existing inline generic-package file-list snapshot in `tests/packaging/packed-manifest.test.ts`, which correctly observes the new compiled seam/product files. That test is outside this item's `files_to_modify`; no snapshot update or generic-package behavior change was made. This is a repository-suite expectation update, not a product-suite or AC1–AC4 functional failure. It currently blocks an all-green `test:repo` closeout unless the authorized scope is amended or the strategist updates the generic-package snapshot.
+- AC5 product verification: PASS (6 files, 74 tests). The packaged-product test built one local scratch lineage from committed Git objects, prepared 285 hashed support/cache/header entries, installed the tarball into an empty external prefix using the exact 43-package root-derived lock and npm offline mode, compiled `better-sqlite3` from source, and ran installed `validate-config` plus `selftest`. The build-once test paused after the fence preflight, mutated a closure source and added an ignored file under `src/product/`, then proved neither worktree byte entered the artifact.
 
 ## Open questions for founder
 

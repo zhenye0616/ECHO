@@ -141,6 +141,23 @@ function assertPackageHasNoRepositoryPath(packageFiles, forbiddenPaths) {
   }
 }
 
+function waitAtTestPreflightCheckpoint() {
+  if (process.env.NODE_ENV !== 'test') return;
+  const ready = process.env.PRODUCT_BUILD_TEST_PREFLIGHT_READY_FILE;
+  const resume = process.env.PRODUCT_BUILD_TEST_CONTINUE_FILE;
+  if (ready === undefined && resume === undefined) return;
+  if (!isAbsolute(ready ?? '') || !isAbsolute(resume ?? '')) {
+    throw new Error('product build test checkpoint paths must both be absolute');
+  }
+  writeFileSync(ready, 'ready\n');
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (existsSync(resume)) return;
+    Atomics.wait(sleeper, 0, 0, 20);
+  }
+  throw new Error('product build test checkpoint timed out');
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const version = args.version;
@@ -174,6 +191,7 @@ function main() {
       { cwd: source },
     );
     const closure = readJson(closurePath);
+    waitAtTestPreflightCheckpoint();
 
     mkdirSync(packageDir, { recursive: true });
     const buildConfigPath = join(work, 'tsconfig.product-build.json');

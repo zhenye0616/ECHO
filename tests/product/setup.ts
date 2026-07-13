@@ -20,6 +20,7 @@ declare global {
         intercepted: readonly string[];
       }
     | undefined;
+  var __ECHO_PRODUCT_ARTIFACT_DIR__: string | undefined;
 }
 
 type MutableRecord = Record<PropertyKey, unknown>;
@@ -42,6 +43,7 @@ function replaceFunction(
 
 const originalEnvironment = process.env;
 const environmentSnapshot = { ...originalEnvironment };
+globalThis.__ECHO_PRODUCT_ARTIFACT_DIR__ = originalEnvironment.ECHO_PRODUCT_ARTIFACT_DIR;
 for (const key of Object.keys(originalEnvironment)) {
   if (key.startsWith('ECHO_') || CREDENTIAL_KEY.test(key)) delete originalEnvironment[key];
 }
@@ -116,4 +118,5 @@ afterAll(() => {
   for (const key of Object.keys(originalEnvironment)) delete originalEnvironment[key];
   Object.assign(originalEnvironment, environmentSnapshot);
   delete globalThis.__ECHO_PRODUCT_HERMETICITY_GUARD__;
+  delete globalThis.__ECHO_PRODUCT_ARTIFACT_DIR__;
 });
