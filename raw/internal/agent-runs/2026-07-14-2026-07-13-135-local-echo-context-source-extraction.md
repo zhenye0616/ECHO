@@ -338,3 +338,76 @@ partition **144 ported / 8 rewritten / 65 excluded** (0 unresolved local imports
 ### Journal
 - 2× `search_memories` this run (both 0-match — siblings' artifacts not in the live
   db); journaled in-the-moment to the 2026-07 claude shard.
+
+---
+
+## Run 4 (2026-07-14 — AC7 install proof + exclusion rationales)
+
+Target advanced to HEAD `e5a34a357e1fcee8b142e85d4d37c06202f6ffb3` (tree
+`24ae1c2291106d580f7ba6d2b1060dd2395325af`), fsck clean, no remote. Still
+INCOMPLETE/UNACCEPTED.
+
+### AC7 clean-install lifecycle proof — VERIFIED under sandbox-exec deny-network
+
+Ran the full proof against a private clone of the accepted target OID:
+- `git clone --no-local --no-hardlinks --no-checkout` + hook-disabled detached
+  checkout of the accepted OID; origin removed; 0 remotes.
+- Online cache-fill phase: `npm ci --ignore-scripts` (exit 0) into a distinct
+  cache root; node_modules then discarded before the sandboxed install.
+- Network-denial probes inside `sandbox-exec -p '(version 1) (allow default)
+  (deny network*)'`: DNS `FAIL-ENOTFOUND`, direct-IP TCP `FAIL-EPERM`, https
+  `FAIL-ENOTFOUND`. Loopback control BOTH halves: outside profile `ACCEPT`,
+  inside profile `LISTEN-DENIED-EPERM`.
+- `npm ci --offline --ignore-scripts` under deny-network: **exit 0** (290 pkgs),
+  zero lifecycle scripts executed.
+- `npm rebuild better-sqlite3 --offline --foreground-scripts --build-from-source`
+  with `npm_config_nodedir=/usr/local/Cellar/node@22/22.22.1_1` under deny-network:
+  **exit 0**, node-gyp built from source. Only better-sqlite3 executed; esbuild +
+  fsevents also carry install scripts in the lock but were NOT executed (their
+  platform binaries ship as optional-dependency packages, not via scripts).
+- Native artifact `node_modules/better-sqlite3/build/Release/better_sqlite3.node`
+  sha256 `289ac2671fc501b275af7ce170ea2ef84e07be7e2a4a403aaa055cef02018557`
+  (1985384 bytes). Smoke: in-memory db open/insert/select OK under deny-network.
+- A hook attempting a secondary download fails at the socket (https `ENOTFOUND`
+  inside the profile) — the fixture requirement holds.
+
+Committed provenance: `provenance/lifecycle-expected.v1.json` (derived from
+package/lock: 3 install-script packages, only better-sqlite3 allowed to execute),
+`provenance/lifecycle-observed.v1.json` (ci + rebuild exits, scripts executed,
+produced-artifact hash, network-denial results), `provenance/native-toolchain.v1.json`
+(node 22.22.1, npm 10.9.4, clang 21.0.0, python 3.10.7, nodedir, artifact hash).
+The AC7 proof commands are recorded here for reviewer replay (no committed tool —
+AC7's proof is not one of the 38-path tools).
+
+Toolchain: node v22.22.1, npm 10.9.4, Apple clang 21.0.0, python3 3.10.7.
+
+### Exclusion rationales (reviewer heads-up addressed)
+
+All 65 `excluded` parity-matrix rows now carry a self-contained rationale citing
+the spec clause it rests on — one of: `[AC2 forbidden-capability + AC6]` (coord/
+product/loop MCP tools), `[AC2/AC5 forbidden-capability + AC6]` (product enrich
+workers), `[AC6 + outside-roots + AC2]` (onboarding wizard subtree),
+`[AC2 scope + outside-roots + sibling-reach]` (echo-home onboarding/config-sync
+layer), `[outside-roots + sibling-reach]` (brain-retrieval test → src/brain).
+
+### Remaining before acceptance (unchanged set minus AC7)
+- AC2: `provenance/runtime-inventory.v1.json` + `tools/check-runtime-inventory.mjs`
+  (closed edge grammar incl. repository_literal_process_launch);
+  `tests/migration/dependency-set.test.ts`.
+- AC3: `tests/fixtures/context-tool-parity.v1.json` (10 ordered cases) +
+  `tools/verify-context-tools.mjs` + stdio runner + `provenance/context-tool-parity.v1.json`
+  + schema; `tests/api/context-only-roster.test.ts`.
+- AC6 close-out: `target-only-policy.v1.json` (exact 38) + `source-extraction.v1.json`
+  + 9 provenance schemas + `check-parity.mjs`/`audit-pinned-extraction.mjs` + the 5
+  migration tests + exact-HEAD equality (gated on all 38 target-only files existing).
+- AC8: `schemas/service-api.v1.json` + `tools/verify-service-parity.mjs` +
+  `tests/integration/context-service.test.ts`; the migration record (which will bind
+  source SHA, target HEAD/tree, all provenance/lifecycle/tool hashes, AC3 aggregate,
+  service results, object-closure/no-remotes, authority:false/installed:false, the Q1
+  scratch-tsconfig bytes+SHA `7164ed93...`, and the Q2 + echo-home-exclusion
+  deviations citing Founder adjudication #2). NOT the codex-ops reviewer child leg.
+- lint (via scratch eslint config, Q1 pattern).
+
+### Journal
+- Zero `mcp__echo__*` calls this run (all filesystem/git/node/sandbox-exec). Per the
+  skip-rule, no journal entry owed.
