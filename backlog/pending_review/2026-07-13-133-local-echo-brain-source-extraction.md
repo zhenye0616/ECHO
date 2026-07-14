@@ -34,7 +34,7 @@ claimed_by: "fable-builder-133"
 claimed_at: "2026-07-14T05:46:05Z"  # reclaimed 2026-07-14 for founder-directed AC5/AC7 four-clone matrix (B0/B1/B2) continuation
 branch: "agent/133-echo-brain"
 worktree: "/Users/zhenye/Desktop/Project_echo--133-echo-brain"
-head_sha: "0caef8237c2aefba0d65c5f70000220654ee8f2e"
+head_sha: "d3f71b16c7c90e0178d7a10edaa76f8cd34f4d8a"
 pr_url: ""
 agent_notes: |
   Builder fable-builder-133 (Claude Code). Attended one-time extraction; no migration
@@ -55,10 +55,18 @@ agent_notes: |
     d8abbae572bac1a00c93522263d9e8f94112fe582aa7ef2ddf992267e39c970f (27 members) + offline clean-prefix install;
     source-independence (no symlink/submodule/remote/sibling-escape) green.
 
-  REMAINING (documented, not run): AC5/AC7 formal offline sandbox-exec 4-clone matrix (B0/B1/B2/R1 across
-  separate clones under '(deny network*)' with DNS/direct-IP probes + isolated cache fill) — determinism +
-  offline install demonstrated with B0/B1 but the four-clone sandbox matrix was not executed. AC8 codex-ops
-  reviewer leg is the reviewer's responsibility.
+  CONTINUATION (2026-07-14, founder-directed after adjudication): AC5/AC7 builder legs B0/B1/B2 now RUN GREEN.
+  Full four-clone offline matrix executed — isolated cache fill (no lifecycle) with distinct cache roots per run;
+  npm ci / build+pack / fresh-project tarball install / CLI smoke ALL offline under /usr/bin/sandbox-exec
+  '(version 1)(allow default)(deny network*)'; DNS + direct-IP probes fail before AND after every lifecycle-bearing
+  phase (pre/post-npm-ci/post-build/post-install/post-smoke); loopback control both halves per leg (accept outside /
+  deny inside); native better-sqlite3 built offline from source with bundled Node 22.22.1 headers; B0 in accepted
+  target, B1/B2 in sanitized AC1 clones (--no-local --no-hardlinks --no-checkout, detached checkout of 54259ef6,
+  origin removed). All three share ONE identity tuple: tarball SHA-256 d8abbae572bac1a00c93522263d9e8f94112fe582aa7ef2ddf992267e39c970f,
+  27-member manifest, tree e13b0cc57365acf9600f06882750982e02412c5a, lock 9ffc39fa013a67517d95399c80759a4fd359ce1ab1ccc5ee0e957504796ab296.
+  Accepted target 54259ef6 UNCHANGED and clean; evidence bound to migration record on feature head d3f71b16.
+  REMAINING: R1 + the AC8 codex-ops reviewer child-commit leg (reviewer's responsibility; explicitly not run per founder).
+  Schema-path AC3<->AC5 reconciliation ACCEPTED by founder (adjudication recorded in item main commit 27ad85b9).
 
   QUESTION FOR REVIEWER/FOUNDER — AC3<->AC5 schema path: byte-identical src/product/config.ts:55 + package.json
   files field reference schemas/product/runtime-config.v1.schema.json, but AC5 names schemas/runtime-config.v1.schema.json.

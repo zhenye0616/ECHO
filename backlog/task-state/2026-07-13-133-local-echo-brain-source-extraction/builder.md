@@ -1,6 +1,6 @@
 ## current_thesis
 
-Extraction complete and handed to pending_review. Accepted target `/Users/zhenye/Desktop/echo-brain` @ HEAD `54259ef67eb90b5a1412bf15bac716180e822c72` (tree `e13b0cc57365acf9600f06882750982e02412c5a`), branch `migration/2026-07-13-133`, no remote. Feature-branch handoff head (binds the migration record) is `0caef8237c2aefba0d65c5f70000220654ee8f2e`.
+Extraction complete AND the founder-directed AC5/AC7 builder legs B0/B1/B2 are run green; re-handed to pending_review. Accepted target `/Users/zhenye/Desktop/echo-brain` @ HEAD `54259ef67eb90b5a1412bf15bac716180e822c72` (tree `e13b0cc57365acf9600f06882750982e02412c5a`), branch `migration/2026-07-13-133`, no remote, UNCHANGED by the matrix. Feature-branch handoff head (binds the migration record incl. B0/B1/B2 evidence) is now `d3f71b16c7c90e0178d7a10edaa76f8cd34f4d8a` (supersedes 0caef823).
 
 ## locked_decisions
 
@@ -12,9 +12,9 @@ Extraction complete and handed to pending_review. Accepted target `/Users/zhenye
 
 ## open_questions
 
-- AC5/AC7 formal offline `sandbox-exec` 4-clone matrix (B0/B1/B2/R1 under `(deny network*)` with DNS/direct-IP probes + isolated cache fill) not executed this session; determinism + offline install demonstrated with B0/B1.
-- AC3<->AC5 schema-path reconciliation awaits reviewer confirmation or a direct to copy same-path.
-- AC8 codex-ops reviewer child-commit leg is the reviewer's responsibility.
+- AC5/AC7 builder legs B0/B1/B2 RUN GREEN under `sandbox-exec (deny network*)`: isolated cache fill (no lifecycle, distinct roots per run), npm ci / build+pack / tarball install / smoke all offline, DNS+direct-IP probes fail pre/post each lifecycle phase, loopback control both halves, native better-sqlite3 built offline from source, B1/B2 from sanitized AC1 clones. All three share one identity tuple (tarball d8abbae…, tree e13b0cc…, lock 9ffc39fa…, 27-member manifest). Bound to migration record on feature head d3f71b16.
+- AC3<->AC5 schema-path reconciliation ACCEPTED by founder (recorded in item main commit 27ad85b9).
+- REMAINING: R1 + AC8 codex-ops reviewer child-commit leg — reviewer's responsibility, explicitly not run by builder.
 
 ## dont_touch
 
@@ -25,5 +25,5 @@ Extraction complete and handed to pending_review. Accepted target `/Users/zhenye
 - decision: raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md
 - spec: backlog/pending_review/2026-07-13-133-local-echo-brain-source-extraction.md
 - migration_record: raw/internal/migrations/2026-07-13-133-echo-brain.md
-- handoff_head_sha: 0caef8237c2aefba0d65c5f70000220654ee8f2e
+- handoff_head_sha: d3f71b16c7c90e0178d7a10edaa76f8cd34f4d8a
 - reviews: backlog/reviews/2026-07-13-133-local-echo-brain-source-extraction/

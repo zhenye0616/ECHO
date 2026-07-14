@@ -19,14 +19,14 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| CLAIMED | HIGH | 2026-07-13 | [2026-07-13-133-local-echo-brain-source-extraction](../backlog/claimed/2026-07-13-133-local-echo-brain-source-extraction.md) | Local standalone echo-brain source extraction and parity proof | 4d | 2026-07-13-132-product-graduation-foundation |
+| CLAIMED | HIGH | 2026-07-13 | [2026-07-13-134-local-echo-loop-source-extraction](../backlog/claimed/2026-07-13-134-local-echo-loop-source-extraction.md) | Local standalone echo-loop source extraction and fixture proof | 5d | 2026-07-13-132-product-graduation-foundation |
+| CLAIMED | HIGH | 2026-07-13 | [2026-07-13-135-local-echo-context-source-extraction](../backlog/claimed/2026-07-13-135-local-echo-context-source-extraction.md) | Local standalone echo-context source extraction and synthetic parity proof | 5d | 2026-07-13-132-product-graduation-foundation |
 
 ## Pending Review
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| PENDING_REVIEW | HIGH | 2026-07-13 | [2026-07-13-134-local-echo-loop-source-extraction](../backlog/pending_review/2026-07-13-134-local-echo-loop-source-extraction.md) | Local standalone echo-loop source extraction and fixture proof | 5d | 2026-07-13-132-product-graduation-foundation |
-| PENDING_REVIEW | HIGH | 2026-07-13 | [2026-07-13-135-local-echo-context-source-extraction](../backlog/pending_review/2026-07-13-135-local-echo-context-source-extraction.md) | Local standalone echo-context source extraction and synthetic parity proof | 5d | 2026-07-13-132-product-graduation-foundation |
+| PENDING_REVIEW | HIGH | 2026-07-13 | [2026-07-13-133-local-echo-brain-source-extraction](../backlog/pending_review/2026-07-13-133-local-echo-brain-source-extraction.md) | Local standalone echo-brain source extraction and parity proof | 4d | 2026-07-13-132-product-graduation-foundation |
 
 ## Complete
 
