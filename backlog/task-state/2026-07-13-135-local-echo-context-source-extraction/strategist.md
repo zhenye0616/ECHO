@@ -17,18 +17,21 @@ Materialize capture, normalization, storage, retrieval, and context APIs as a so
 - Candidate inventory is exactly 211 paths (109 source, 102 test/fixture), pinned aggregate SHA-256 `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
 - Every source row has provenance and ported/rewritten/excluded disposition; standalone parity needs no source access.
 - A host-aware Node fetch runner validates lock URLs/TLS/redirects, quarantines and integrity-admits tarballs; npm is offline-only and separate sealed seeds feed installs.
-- JavaScript verification uses pinned Node plus absolute entries, never npm-run/.bin; native rebuilds pin Node headers plus the traced executable/SDK closure and reject unexpected execs.
+- Installs use direct offline npm-cli with `--ignore-scripts`; lifecycle commands run only from the plan after hostile `.npmrc`/postinstall denial tests.
+- Native rebuilds use a closed static executable/SDK/header manifest enforced by default-deny sandbox-exec plus readiness/denial probes; no unsupported unprivileged tracing claim remains.
 - Shared target stays read-only; verifier records exact HEAD/tree, clones that commit privately, detaches, removes origin, checks object independence, and rechecks shared HEAD/tree.
 - Stdio, service-server, and service-client profiles are distinct: server only binds/accepts loopback and reports readiness by FD; client connects only after readiness to that exact endpoint.
 - Retained one-shot operator runner owns named hostile fetch/native/capsule/signal/budget/handoff suites; it is non-shipping evidence, not migration product machinery.
-- After failures-dir bootstrap, finalizer uses exact descriptor-relative `RENAME_EXCL`, schema-bounded `<=` cap, collision/reentry handling, and stream hashes.
-- Handoff uses clean allowlisted commit, isolated network/auth runner, frozen literal endpoint, expected-absent lease, one OID probe, and external receipt; unknown never retries.
+- After O_CLOEXEC failures-dir bootstrap, every spawn has an FD allowlist; the exact schema/publisher/FD3 contract uses deterministic candidates, `RENAME_EXCL`, bounded capsule, and descriptor-inheritance tests.
+- Every command/probe owns a process group and descendant ledger; timeout/signal/exit-0 paths all require bounded TERM/KILL/wait and no detached/listener/writer survivor.
+- Handoff alone receives network/auth. It binds the frozen Project_echo parent/HEAD/tree/claim ref and literal HTTPS endpoint, pushes that exact commit once with expected-absent lease, and never publishes echo-context.
+- The outcome table treats every post-attempt zero-row/transport ambiguity as unknown; bounded create-new receipt fields cover all terminal cases and never retry.
 - Synthetic loopback service tests prove capture/retrieval behavior; no live state migration or service cutover.
 - The migration record pins only pre-commit-stable target/evidence fields; external handoff receipt owns commit OID and probe/push status.
 
 ## open_questions
 
-- R13 by independent `codex` and `codex-ops` must confirm bounded fetch/tracer, named operator suites, exact capsule algorithm/schema, mixed-source projection, fixed tracked universe, clean commit, isolated expected-absent handoff, exhaustive probes, and retained receipt.
+- R14 by independent `codex` and `codex-ops` must confirm no-script installs, exec prevention, FD containment, exact capsule oracle, all-command reap, exact Project_echo handoff invocation/HTTPS auth isolation, clean staged diff, outcome table, and bounded receipt.
 - Later cutover decides remote, install, live-state migration/rollback, and echo-brain's versioned read-only contract.
 
 ## dont_touch

@@ -15,15 +15,18 @@ Materialize the reviewed item-132 product closure as a source-independent local 
 - The target owns package/lock, config, state paths, build, artifact, boundary, tests, and provenance.
 - The exact eight pinned product tests remain byte-identical at identical paths with cross-manifest equality; a new synthetic meeting-to-manual-gate-to-brief test proves the standalone composition.
 - Target checker owns target partition/internal invariants; only operator audit reads pinned source and forward-replays rewrites, including Git modes.
-- Verification uses an exact plan schema plus sealed runner/audit/normalizer, separate baseline/hostile/rebuild roots, process-group quiescence, recursive Git check, and byte-identical artifacts.
-- There is no mutable receipt/reconciliation. Attempt metadata, exclusive streams, and no-replace intent/results are immutable; one create-only feature-branch push is the handoff, and no evidence is deleted.
-- Builder evidence is read-only after handoff; each reviewer owns a separate create-new attempt/ledger bound to accepted target HEAD/tree.
+- Verification uses an exact token vocabulary/expansion contract, fixed fetch/baseline/hostile/audit/rebuild roster, bounded normalizer fields, separate roots/manifests, recursive shared-target cleanliness, and byte-identical artifacts.
+- Source audit uses literal `ls-tree` plus raw `cat-file` blobs under a source-read-only profile; `git archive` transformation is not trusted.
+- The retained publisher has a pinned clang/SDK bootstrap, two-fsync no-replace state machine, sealed 0400 files/0500 dirs, and a canonical self-excluding attempt seal.
+- Every command, including exit 0, emits started identity and must pass bounded macOS descendant/listener/writer quiescence; blind-spot self-tests fail closed.
+- There is no mutable receipt/reconciliation. One exact allowlisted Project_echo commit is pushed as literal SHA to an expected-absent full ref; target remains local/no-remote.
+- Each reviewer revalidates the parent chain, binds item/round/request/artifact SHA plus the attempt seal, copies only hash-verified sealed inputs, and never writes builder evidence.
 - Npm uses pinned absolute Node plus npm-cli, a tool-bin/private-.bin-only PATH, pinned shell, immutable fetch seed, separate writable offline cache, and recorded executable probes.
 - Project_echo remains backup/authority; no remote, release, real data, or maturity advance.
 
 ## open_questions
 
-- R13 by independent `codex` and `codex-ops` must confirm source-audit responsibility/modes, no-replace evidence, retained phase installs, exact runner/normalizer/namespaces, recursive Git, process quiescence, reviewer evidence, and parent ownership.
+- R14 by independent `codex` and `codex-ops` must confirm template rendering, namespace roster, bootstrap/sealing, all-exit quiescence, raw-source audit, shared-target cleanliness, exact handoff SHA/ref, and request-bound reviewer evidence.
 - A later authority-transfer item decides remote creation, branch protection, and old-path freeze.
 
 ## dont_touch

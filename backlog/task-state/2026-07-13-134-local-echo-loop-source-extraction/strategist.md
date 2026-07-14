@@ -14,17 +14,21 @@ Materialize the internal orchestration protocol as a source-independent local `e
 - Loop APIs exclude retrieval MCP; loop state is private and tests preserve source transaction/order/role/deadline/idempotency behavior without promising external exactly-once effects.
 - Preserve proposed-review, ready seals, atomic claims, worktree isolation, reviewer independence, fresh eyes, and founder checkpoints.
 - Fixture Git runs only in scratch repos with explicit environment/config/object/index/transport containment.
-- Mode/OID-aware fixed-point traversal resolves transitive edges beyond roots with byte-sorted queue/cycle dedup and unknown-edge failure.
-- Dependency plan separates npm and toolchain classes; exact peer/optional/platform/bundled closure derives a no-extraneous offline-installable lock.
+- Mode/OID-aware fixed-point traversal bootstraps resolver config, uses literal Git pathspecs, keys binding context, and resolves transitive edges under multiple queue orders.
+- Dependency plan separates npm/toolchain classes and reconciles the final rewritten/authored/generated target tree; exact peer/optional/platform/bundled closure derives a no-extraneous offline lock.
+- `invokeRole` has deterministic invocation-event identity, atomically PENDING-or-PUBLISHED state, and synchronous retry recovery through the same public call; it never returns accepted/duplicate before publication.
+- Coordination init forces single-file SQLite DELETE mode, proves sidecar absence, validates before/after descriptor-relative no-replace publication, and covers every fsync crash boundary.
+- Watchers CAS a unique item/round/spec-SHA claim so two watcher ticks yield exactly one terminal repository action.
 - Builder-owned runner/vector/comparator files are sealed outside target; trusted parent captures subjects that cannot read baseline/evidence, with fixed volatile inputs and negative controls.
 - One-shot retained operator audit has an exact path/argv/result schema and invokes target-owned `verify:extraction`; migration record binds both.
-- `verify:extraction` runs the complete named matrix from unique private clones; install itself is sandboxed with scripts disabled/audited and hostile Git/npm/source sentinels.
+- `verify:extraction` runs from pinned clone cwd through distinct direct/npm outputs with a versioned success/failure schema and exact normalized equality.
+- Offline npm uses direct npm-cli with inherited/project config stripped and lifecycle scripts forbidden; every command has bounded streams, one shutdown latch, and fsynced survivor diagnostics.
 - The migration record pins target HEAD/tree, hashes, commands, tests, no-remotes, clean state, false authority, and not-installed.
 - Active Project_echo loop, launchd, user skills, remote state, and authority remain unchanged.
 
 ## open_questions
 
-- R13 by independent `codex` and `codex-ops` must confirm fixed-point closure, dependency classes/lock pruning, crash-safe invokeRole outbox, create-new init, full Git/npm closure, bounded process cleanup, exact verifier out, and pre-exec evidence hashes.
+- R14 by independent `codex` and `codex-ops` must confirm resolver bootstrap/literal paths, final-tree dependency reconciliation, public-call PENDING recovery, sidecar-free init, watcher CAS, lifecycle denial, bounded diagnostics, and verifier result equality.
 - Later cutover decides installation, per-repository queue state, and authority transfer.
 
 ## dont_touch
