@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-134-local-echo-loop-source-extraction"
+round: 16
+reviewer: "codex"
+artifact_sha: "8e233be7e2b643b8ebd502ac12b8b61ee5e67acc"
+completed_at: '2026-07-14T04:01:58Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "medium"
+    where: "AC2 — source-seed and edge-record paragraphs"
+    finding: "The reviewed artifact does not pin the literal seed rows, directory-rule expansion, edge-class enum, or resolution-precedence order. The builder would author both policy and verifier, allowing a self-consistent but incomplete extraction to pass. Patch the spec with exact canonical manifest/schema content or pinned reviewed artifacts and hashes, plus independent fixtures asserting those values."
+  - severity: "medium"
+    where: "AC3 — invokeRole payload and deadline paragraphs"
+    finding: "The immutable payload includes a normalized deadline while every call creates a new 2,000ms monotonic deadline, but the serialized deadline representation is undefined. A later retry could therefore hash differently and raise INVOCATION_CONFLICT. Specify the exact invokeRole input and canonical JSON, keep the per-call monotonic expiry outside the immutable payload or persist only the constant budget, and test retry after advancing the fake clock."
+  - severity: "medium"
+    where: "AC3 — PENDING/PUBLISHED invocation state"
+    finding: "The spec does not require the role.invoked event insertion and PUBLISHED transition to occur in one SQLite transaction or define reconciliation when PENDING coexists with an event. A crash between those writes can strand an invocation whose retry hits the unique event index. Define the transaction and CAS sequence, concurrent creator/retrier return semantics, and crash fixtures at each SQL boundary."
+  - severity: "medium"
+    where: "AC3 — linkSync SQLite initialization"
+    finding: "A crash after linking and fsyncing the final database but before unlinking the unique temporary name leaves a persistent second hard link, and no restart invariant or cleanup rule covers it. Define recognizable temporary naming and safe orphan disposition using lstat/inode checks, reject non-regular or symlink winners, and assert the complete state-directory inventory after every crash boundary."
+  - severity: "medium"
+    where: "AC5 — founder-approved watcher push"
+    finding: "The approval token binds only candidate, ref, and expected-old, not the authoritative remote identity. Repointing origin or applying URL rewrite configuration after approval could redirect the authorized push. Bind canonical fetch/push endpoint and repository identity plus the action/input digest into PREPARED and the token, revalidate them immediately before probe and push under explicit sanitized Git configuration, and add redirect/reconfiguration fixtures."
+  - severity: "medium"
+    where: "AC2 package scripts and AC7 route-equivalence workflow"
+    finding: "The direct and npm routes have no exact launcher paths or argv, while the required package scripts omit named entries for typecheck, lint, full tests, source-independence, fsck, and diff-tree checks. Define one committed ordered workload manifest, exact commands and offline install flags including lifecycle-script suppression, and require both launchers to execute that manifest so omission or reordering fails."
+  - severity: "medium"
+    where: "AC8 — independent migration review record"
+    finding: "The builder must stop at pending_review, but an unnamed later reviewer must create and publish a Project_echo file outside the stated normal handoff. Name the independent role or binding, define its checkout/commit/push ownership and exact commands, and specify that the record binds the immutable builder feature head while the reviewer-authored commit is a distinct descendant."
+---
