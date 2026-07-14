@@ -161,3 +161,21 @@ An independent `codex-ops` binding/session reviewer binds request bytes/`spec_co
 
 - Do not switch daemon/MCP or migrate live state.
 - Propose remote, installation, state migration/rollback, and authority transfer separately after local parity.
+
+## Founder adjudication #2 (2026-07-13, Run 2 escalation)
+
+**Q1 — tsconfig vs 38-path policy: ACCEPTED as check-time scratch config, never committed.**
+AC7 mandates that typecheck/lint pass, not a committed tsconfig; the sealed 38-path target-only
+exact set stays intact. The scratch tsconfig's exact bytes MUST be recorded in the migration
+record so the codex-ops reviewer reruns with byte-identical config from its own clone
+(pattern precedent: 133's uncommitted --no-save toolchain node_modules).
+
+**Q2 — AC4 `src/state/paths.ts`: ACCEPTED as recorded rewrite of the extracted
+`src/echo-home/state-paths.ts`.** AC4's literal path is a spec-authoring artifact neither the
+20 roots nor the 38-path set can produce; authoring a new src/state/paths.ts would break
+exact-HEAD equality. The binding requirement is the semantics: isolated mutable state under
+explicit `ECHO_CONTEXT_HOME` with a default distinct from echo-brain, echo-loop, and `~/.echo`
+— implemented in state-paths.ts as a parity-matrix `rewritten` row with byte diff + replay.
+Deviation recorded in the migration record citing this section.
+
+Reviewer + merge `review_notes` should cite both entries.
