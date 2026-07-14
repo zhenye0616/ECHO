@@ -30,10 +30,10 @@ spec_refs:
   - product/package.template.json                             # runtime identity and dependencies
   - product/npm-shrinkwrap.json                               # pinned runtime tree
   - product/README.md                                         # DEV commands and inherited debt
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "fable-builder-133"
+claimed_at: "2026-07-14T05:46:05Z"
+branch: "agent/133-echo-brain"
+worktree: "/Users/zhenye/Desktop/Project_echo--133-echo-brain"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
