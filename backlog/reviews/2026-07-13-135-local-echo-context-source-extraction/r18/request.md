@@ -19,7 +19,7 @@ focus_hints: FENCED VERIFICATION ROUND — verify only the r17 disposition patch
 
 # What to review
 
-Read `backlog/proposed/2026-07-13-135-local-echo-context-source-extraction.md` at commit `e1115daee4ad389bca1bed9b10a43e76df534c19`. Apply the canonical reviewer
+Read `backlog/proposed/2026-07-13-135-local-echo-context-source-extraction.md` at commit `19fe3ae2e9e41ac01ee5695959c3834b18038d49`. Apply the canonical reviewer
 loop (see `.claude/commands/review-queue-<reviewer>.md`). Embed any
 prior-round context inline below; do not rely on out-of-band atom
 lookups for the review itself.
