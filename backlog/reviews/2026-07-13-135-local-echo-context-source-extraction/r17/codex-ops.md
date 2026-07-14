@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 17
+reviewer: "codex-ops"
+artifact_sha: "e1115daee4ad389bca1bed9b10a43e76df534c19"
+completed_at: '2026-07-14T04:44:07Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC8 — independent reviewer verification"
+    finding: "The instruction to rerun AC1/AC7/AC8 is not executable as written: AC1 performs one-shot absence checking, mkdir, initialization, and commit at the already-existing accepted target, while AC8 recursively includes the reviewer handoff itself. Replace this with an explicit read-only verification list run against the private clone and isolated scratch fixtures, and prohibit reviewer mutation of the accepted target."
+  - severity: "high"
+    where: "AC8 — Project_echo reviewer worktree and push"
+    finding: "The builder worktree normally still owns the feature branch, so attaching that branch to another worktree will fail or disturb the builder worktree. Require a detached reviewer worktree at the immutable builder SHA, commit on detached HEAD, and push HEAD to the explicit branch ref with an exact expected-old lease. A lease mismatch must stop without fetch, rebase, autostash, or retry and durably record the expected and observed remote OIDs."
+  - severity: "high"
+    where: "AC3 and AC8 — MCP and service child I/O"
+    finding: "Only retained stderr is bounded. MCP stdout, service stdout/stderr, FD3 readiness framing, and HTTP response bodies have no literal byte ceilings or continuous-drain contract, so a faulty child can exhaust memory or block on a full pipe before timeout. Add per-frame, per-stream, and aggregate caps; overflow-as-failure; concurrent draining; bounded retained diagnostics naming the active case; and process-group termination and reaping on every error path."
+  - severity: "high"
+    where: "AC7 — cache fill, npm lifecycle, clone, and verification commands"
+    finding: "The cache-fill, npm ci, native rebuild, clone, and direct verification commands have no per-command or total deadlines, stdin policy, or descendant cleanup contract. A hung compiler, lifecycle hook, or test can stall the reviewer indefinitely. Add explicit deadlines, verified process-group ownership, stdin closure, TERM/KILL/reap sequencing, bounded logs, and a workflow-owned durable failure run record."
+  - severity: "high"
+    where: "AC3 — pinned-source installation and MCP launch"
+    finding: "Fresh synthetic state does not bind the source installation and mixed-source MCP to AC7's scratch HOME/XDG/TMP/cache/config, offline lifecycle policy, network sandbox, or live-state denial. Source hooks or runtime code can therefore access ambient state or network while producing accepted parity hashes. Specify the exact source install command and raw-object input closure, apply the minimal sandboxed environment, and add hook/network/live-state escape fixtures."
+  - severity: "medium"
+    where: "AC7 — sandbox enforcement probes"
+    finding: "DNS and direct-IP failures are negative-only evidence and can pass when the host is offline or the chosen endpoint is unreachable even if sandbox enforcement is ineffective. Require a deterministic positive control that succeeds outside the profile and is denied inside it, validate the denial error class, and abort if either half fails before or after lifecycle execution."
+  - severity: "medium"
+    where: "AC2 — runtime-inventory closed edge grammar"
+    finding: "The spec requires discovery of repository executables invoked by launchers and rejects computed repository process launches, but the closed grammar has no class for a literal repository-local process launch. Add and test a repository_literal_process_launch edge or explicitly forbid such launches and revise every affected package/service launcher contract."
+  - severity: "medium"
+    where: "AC7 — lifecycle observation replay"
+    finding: "Private-clone observations must equal committed lifecycle and toolchain projections, but the compared JSON pointers and normalization are undefined even though argv, working directories, and produced-file hashes can contain clone-local values. Define the exact projection, path normalization, volatile-field policy, and whether native artifact bytes must be reproducible so independent replay has one deterministic pass condition."
+---
