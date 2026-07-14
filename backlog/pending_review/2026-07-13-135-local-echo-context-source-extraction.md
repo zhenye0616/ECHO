@@ -37,12 +37,14 @@ worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
 head_sha: "8d5ae35e502fb6105f17ae9088b51f750f721cc2"
 pr_url: ""
 agent_notes: |
-  ESCALATION at capacity (Run 5, AC3 parity done; structural Q3 surfaced) — INCOMPLETE/UNACCEPTED target.
-  Target: /Users/zhenye/Desktop/echo-context @ HEAD 8d1252bb5a4dc05f2b007e2e2f675f7b2b3db0b6
-  (tree 28e60324edf6416105fd0ecb98fa04520ab259b5), branch migration/2026-07-13-135, no remote,
-  fsck clean, no unreachable. node_modules + scratch tsconfig NOT tracked. NOT accepted.
-  Run 5: AC3 context-tool parity DONE — roster test (exactly 8), 10-case fixture + provenance
-  (fixed-clock deterministic, aggregate 632a7b2f...), verify-context-tools projector. Full suite 66 files/942 tests green, tsc clean.
+  CHECKPOINT (Run 6, AC2 done — 7 of 8 ACs complete) — INCOMPLETE/UNACCEPTED target, green standalone build.
+  Target: /Users/zhenye/Desktop/echo-context @ HEAD 3733243ab09b1d4f0ba931ce0ec391bcfb4838dc
+  (tree 03322b8d6abc03b1be2c13f66e3cd5aa6a122ec0), branch migration/2026-07-13-135, no remote,
+  170 tracked files, fsck clean, no unreachable. node_modules + scratch tsconfig NOT tracked. NOT accepted.
+  Run 6: AC2 dependency provenance DONE — check-runtime-inventory.mjs (closed edge grammar, HEAD-independent manifest),
+  runtime-inventory.v1.json (3 tool entrypoints + 3 script CLIs), dependency-set migration test (3/3: checker passes,
+  grammar-closed, lock hygiene). Full suite 66 files/945 tests green, tsc clean.
+  7 of 8 ACs done: AC1/AC2/AC3/AC4/AC5/AC6-extraction/AC7. Remaining = the interlocking AC6 exact-HEAD closeout + AC8 + record + lint.
   NEW STRUCTURAL QUESTION Q3 (do not guess — shapes AC8/AC2/AC3-stdio): AC8's verify-service-parity.mjs + AC3's literal stdio
   runner are plain-node children that must launch the TS retrieval stack, but the target commits only .ts (no dist/, no tsx in the
   38-path policy/deps). Plain node can't import .ts. Options: (a) commit a build/dist to the policy; (b) add pinned tsx dep;
@@ -58,14 +60,13 @@ agent_notes: |
   Founder adjudication #2), + 5 test rewrites (roster 15→8, enable_deadlines drop, coord_emit→search_memories
   isError case, product-case excision, AC4 defaults). 65 excluded now also includes the echo-home
   onboarding/config-sync layer (not context substrate per AC2; reaches assets/ outside roots).
-  AC1 ✓. AC3 ✓ (Run 5). AC4 ✓ (per Q2). AC5 ✓. AC6 extraction + source-evidence/parity-matrix ✓. AC7 install proof ✓.
+  AC1 ✓. AC2 ✓ (Run 6). AC3 ✓. AC4 ✓ (per Q2). AC5 ✓. AC6 extraction + source-evidence/parity-matrix ✓. AC7 install proof ✓. (7 of 8 ACs)
   Q1 record: scratch tsconfig SHA-256 7164ed9356aa3bd1d9108283eee164053bc6f251418d0aa1dc4d4b02726bf78f (invoke typecheck/lint via --project <scratch>; not committed).
-  Remaining: AC2 runtime-inventory + check-runtime-inventory.mjs + dependency-set test (static edge analysis — Q3-independent);
-  AC6 close-out target-only-policy(38) + source-extraction + 9 schemas + check-parity/audit-pinned-extraction + 5 migration tests + exact-HEAD (git/provenance analysis — Q3-independent);
-  AC8 service-api schema + verify-service-parity + context-service test (shape gated on Q3); lint; AC8 migration record (binds all hashes/AC3-aggregate/AC7 results; cites Q1 + Founder-adjudication-#2 + AC3/Q3 deviations) — NOT the codex-ops reviewer leg.
+  Remaining (interlocking closeout): AC6 close-out target-only-policy(38, gated on all 38 files incl. AC8's) + source-extraction + 9 schemas + check-parity/audit-pinned-extraction + 4 migration tests (parity-matrix/committed-source-only/source-independence/object-closure) + exact-HEAD;
+  AC8 service-api schema + verify-service-parity + context-service test (shape per Q3 default (c) unless overridden); lint; AC8 migration record (binds all hashes/AC3-aggregate 632a7b2f/AC7 results; cites Q1 + Founder-adjudication-#2 + AC3/Q3 deviations) — NOT the codex-ops reviewer leg.
   head_sha is the Project_echo feature-branch head (no code by design — code lives in the standalone target repo; the
-  branch-advancing builder migration record is in the AC8 remaining set). Target HEAD above (8d1252bb) is the real deliverable pointer.
-  Why escalated: Q3 shapes the AC8/AC2/AC3-stdio harness form — surfaced before building the wrong shape (Q1/Q2 discipline). Q3-independent AC2+AC6 can proceed regardless. Full per-AC map in the Run 5 run log.
+  branch-advancing builder migration record is in the AC8 remaining set). Target HEAD above (3733243a) is the real deliverable pointer.
+  Why checkpointed: 7/8 ACs done + green build; the remaining is the interlocking AC6 exact-HEAD closeout (target-only-policy can only finalize after AC8 lands) + migration record — a coherent final batch. Q3 pick shapes the AC8 harness. Full per-AC map in the Run 6 run log.
 review_notes: ""
 ---
 

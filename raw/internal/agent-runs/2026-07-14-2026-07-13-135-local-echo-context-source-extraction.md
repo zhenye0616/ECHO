@@ -482,3 +482,68 @@ so a call is needed before building the plain-node vs in-process shape.
 
 ### Journal
 - Zero `mcp__echo__*` calls this run. Per the skip-rule, no journal entry owed.
+
+---
+
+## Run 6 (2026-07-14 — AC2 dependency provenance done; 7 of 8 ACs complete)
+
+Proceeded in-place (standing authorization). Target advanced to HEAD
+`3733243ab09b1d4f0ba931ce0ec391bcfb4838dc` (tree `03322b8d...`), 170 tracked
+files, fsck clean, no remote. Full suite 66 files / 945 tests pass, tsc clean.
+INCOMPLETE/UNACCEPTED.
+
+### AC2 — runtime dependency provenance: DONE
+- `tools/check-runtime-inventory.mjs` — enumerates the runtime entrypoints (the
+  executable tools under `tools/` + the package.json verification scripts) and
+  classifies every edge under the CLOSED grammar (repository_static_import /
+  _dynamic_literal_import / _commonjs_literal_require / _literal_read /
+  _literal_process_launch / node_builtin / npm_package / npm_javascript_cli /
+  native_or_system_helper). Local edges resolve to a tracked target blob; bare
+  imports/CLIs to exact locked npm rows; native helpers (git/node) to pinned
+  absolute paths. `--emit` regenerates the manifest; default verifies exact
+  equality and fails on missing/unused rows or edge drift. HEAD-independent (the
+  accepted OID is passed via `--commit`, not stored).
+- `provenance/runtime-inventory.v1.json` — 3 tool entrypoints
+  (emit-source-inventory, verify-context-tools, check-runtime-inventory) + 3
+  script CLIs (typecheck→typescript, test→vitest, lint→eslint). Re-emitted when
+  more tools land.
+- `tests/migration/dependency-set.test.ts` — runs the checker at HEAD (passes),
+  asserts every edge class is in the closed grammar, and asserts lock hygiene
+  (better-sqlite3 pinned; no path/git/workspace `link` deps; all resolved URLs
+  are https registry). 3/3 pass.
+- Documented interpretation: a process-launch whose first arg is a variable
+  pinned to a native-helper literal by an assert-equal guard (emit-source /
+  check-runtime launch `/usr/local/bin/git`) classifies as native_or_system_helper.
+  `check-runtime-inventory.mjs` is exempt from the dynamic-import/require token
+  scan (its body defines those tokens as detection patterns); it is verified
+  static-ESM by inspection. Both recorded for the reviewer.
+
+### Cumulative: 7 of 8 ACs done
+AC1 ✓ (repo). AC2 ✓ (dependency provenance). AC3 ✓ (context-tool parity). AC4 ✓
+(ECHO_CONTEXT_HOME). AC5 ✓ (Granola dedup). AC6 ✓ for extraction + source-evidence
++ parity-matrix (exclusion rationales cite spec clauses). AC7 ✓ (clean-install
+proof). Standalone build green: 945 tests, tsc clean.
+
+### Remaining — the AC6 exact-HEAD closeout ceremony + AC8 + record + lint
+- AC6 close-out: `provenance/target-only-policy.v1.json` (the exact 38-path set —
+  gated on all 38 files existing, incl. AC8's), `source-extraction.v1.json`
+  (partition of every non-target-only tracked blob), the 9 provenance schemas,
+  `tools/check-parity.mjs` + `tools/audit-pinned-extraction.mjs`, and the migration
+  tests `parity-matrix` / `committed-source-only` / `source-independence` /
+  `object-closure`; then exact-HEAD equality.
+- AC8: `schemas/service-api.v1.json`, `tools/verify-service-parity.mjs`,
+  `tests/integration/context-service.test.ts` — SHAPE per Q3 (defaulting to option
+  (c): service stood up under vitest in-process, verify-service-parity.mjs as a
+  JSON/HTTP validator, recorded deviation) unless the founder picks (a)/(b).
+- AC8 migration record (binds source SHA, target HEAD/tree, every provenance /
+  lifecycle / tool hash, the AC3 aggregate 632a7b2f..., AC7 results, the Q1
+  scratch-tsconfig SHA 7164ed93..., and the Q2/echo-home/AC3/Q3 deviations, with
+  authority:false / installed:false). NOT the codex-ops reviewer child leg.
+- lint (scratch eslint config, Q1 pattern).
+
+The remaining is the interlocking exact-HEAD closeout (target-only-policy can only
+finalize once every 38 target-only file exists, so AC8 must land first) plus the
+migration record that binds all of it. Q3's pick shapes the AC8 harness form.
+
+### Journal
+- Zero `mcp__echo__*` calls this run. Per the skip-rule, no journal entry owed.
