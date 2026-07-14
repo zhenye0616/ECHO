@@ -10,7 +10,7 @@ Materialize capture, normalization, storage, retrieval, and context APIs as a so
 - The builder creates local branch `migration/2026-07-13-135` under scrubbed Git/object/index/config environment with no remote or external object state.
 - Project_echo gains no extraction CLI, lifecycle state, lock/takeover, publication/recovery helper, committed sandbox profile, or migration-framework tests.
 - An interrupted target is incomplete/unaccepted and manually archived before a fresh assigned run; no automatic adoption/resume/delete.
-- Retrieval MCP has exactly eight pinned tools; canonical name/description/input/output/annotation descriptors and behavior bytes must match source, while loop/product tools are forbidden.
+- Source projector selects eight unique context tools from the mixed source roster; target has exactly those eight, with canonical descriptors/behavior matching.
 - Source MCP and target use exact request/seed bytes from sidecar-hashed per-tool fixtures, fresh processes/state, fixed volatile inputs, and equal per-case/aggregate hashes.
 - State uses distinct ECHO_CONTEXT_HOME; live `~/.echo`, credentials, daemon, and MCP config are never read/mutated.
 - Raw Granola capture may be copied generically; product decision/card/brief/approval logic stays out.
@@ -20,14 +20,15 @@ Materialize capture, normalization, storage, retrieval, and context APIs as a so
 - JavaScript verification uses pinned Node plus absolute entries, never npm-run/.bin; native rebuilds pin Node headers plus the traced executable/SDK closure and reject unexpected execs.
 - Shared target stays read-only; verifier records exact HEAD/tree, clones that commit privately, detaches, removes origin, checks object independence, and rechecks shared HEAD/tree.
 - Stdio, service-server, and service-client profiles are distinct: server only binds/accepts loopback and reports readiness by FD; client connects only after readiness to that exact endpoint.
-- After anchored failures-dir bootstrap, a single-entry finalizer uses descriptor-relative `RENAME_EXCL`, collision/reentry handling, byte-safe outer budgeting, and full stream hashes.
-- Project_echo handoff uses one bounded push, process-group reap, and one remote-OID probe; ambiguous probe becomes unknown with no retry.
+- Retained one-shot operator runner owns named hostile fetch/native/capsule/signal/budget/handoff suites; it is non-shipping evidence, not migration product machinery.
+- After failures-dir bootstrap, finalizer uses exact descriptor-relative `RENAME_EXCL`, schema-bounded `<=` cap, collision/reentry handling, and stream hashes.
+- Handoff uses clean allowlisted commit, isolated network/auth runner, frozen literal endpoint, expected-absent lease, one OID probe, and external receipt; unknown never retries.
 - Synthetic loopback service tests prove capture/retrieval behavior; no live state migration or service cutover.
-- The migration record pins target HEAD/tree, hashes, commands, tests, no-remotes, clean state, false authority, and no-live-state.
+- The migration record pins only pre-commit-stable target/evidence fields; external handoff receipt owns commit OID and probe/push status.
 
 ## open_questions
 
-- R12 by independent `codex` and `codex-ops` must confirm host-aware quarantine fetch, direct JS entries/traced native closure, anchored no-replace capsules and byte budgeting, plus single-push OID reconciliation.
+- R13 by independent `codex` and `codex-ops` must confirm bounded fetch/tracer, named operator suites, exact capsule algorithm/schema, mixed-source projection, fixed tracked universe, clean commit, isolated expected-absent handoff, exhaustive probes, and retained receipt.
 - Later cutover decides remote, install, live-state migration/rollback, and echo-brain's versioned read-only contract.
 
 ## dont_touch

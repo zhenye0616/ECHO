@@ -14,8 +14,8 @@ Materialize the internal orchestration protocol as a source-independent local `e
 - Loop APIs exclude retrieval MCP; loop state is private and tests preserve source transaction/order/role/deadline/idempotency behavior without promising external exactly-once effects.
 - Preserve proposed-review, ready seals, atomic claims, worktree isolation, reviewer independence, fresh eyes, and founder checkpoints.
 - Fixture Git runs only in scratch repos with explicit environment/config/object/index/transport containment.
-- Mode/OID-aware NUL inventory plus versioned binding/sink rules cover module aliases, TS/JS/CommonJS, Node runtime paths, Python, shell, schemas, templates, and scripts; unknown repository-capable edges fail.
-- Pinned source package/lock/tsconfig feed an exact dependency plan and deterministic target lock derivation before isolated source/target installs.
+- Mode/OID-aware fixed-point traversal resolves transitive edges beyond roots with byte-sorted queue/cycle dedup and unknown-edge failure.
+- Dependency plan separates npm and toolchain classes; exact peer/optional/platform/bundled closure derives a no-extraneous offline-installable lock.
 - Builder-owned runner/vector/comparator files are sealed outside target; trusted parent captures subjects that cannot read baseline/evidence, with fixed volatile inputs and negative controls.
 - One-shot retained operator audit has an exact path/argv/result schema and invokes target-owned `verify:extraction`; migration record binds both.
 - `verify:extraction` runs the complete named matrix from unique private clones; install itself is sandboxed with scripts disabled/audited and hostile Git/npm/source sentinels.
@@ -24,7 +24,7 @@ Materialize the internal orchestration protocol as a source-independent local `e
 
 ## open_questions
 
-- R12 by independent `codex` and `codex-ops` must confirm ordered mutation ownership, evidence/Git-attribute preflight, mode-aware resolver/dependency lock plan, versioned API/signals, baseline-read isolation, and exact audit/verifier entrypoints.
+- R13 by independent `codex` and `codex-ops` must confirm fixed-point closure, dependency classes/lock pruning, crash-safe invokeRole outbox, create-new init, full Git/npm closure, bounded process cleanup, exact verifier out, and pre-exec evidence hashes.
 - Later cutover decides installation, per-repository queue state, and authority transfer.
 
 ## dont_touch

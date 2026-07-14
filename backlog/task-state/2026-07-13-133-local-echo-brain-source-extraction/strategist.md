@@ -14,14 +14,16 @@ Materialize the reviewed item-132 product closure as a source-independent local 
 - No symlink, submodule, workspace, path/Git dependency, import, or runtime read may reach Project_echo or siblings.
 - The target owns package/lock, config, state paths, build, artifact, boundary, tests, and provenance.
 - The exact eight pinned product tests remain byte-identical at identical paths with cross-manifest equality; a new synthetic meeting-to-manual-gate-to-brief test proves the standalone composition.
-- Verification uses read-only target inspection plus attempt-root private clones, an exact retained command runner, sanitized/sandboxed install, byte-identical artifact rebuild, and a source/target partition audit.
-- There is no mutable receipt/reconciliation. Attempt metadata and per-command intent/result files are immutable; one create-only feature-branch push is the normal handoff signal, and all evidence is retained.
+- Target checker owns target partition/internal invariants; only operator audit reads pinned source and forward-replays rewrites, including Git modes.
+- Verification uses an exact plan schema plus sealed runner/audit/normalizer, separate baseline/hostile/rebuild roots, process-group quiescence, recursive Git check, and byte-identical artifacts.
+- There is no mutable receipt/reconciliation. Attempt metadata, exclusive streams, and no-replace intent/results are immutable; one create-only feature-branch push is the handoff, and no evidence is deleted.
+- Builder evidence is read-only after handoff; each reviewer owns a separate create-new attempt/ledger bound to accepted target HEAD/tree.
 - Npm uses pinned absolute Node plus npm-cli, a tool-bin/private-.bin-only PATH, pinned shell, immutable fetch seed, separate writable offline cache, and recorded executable probes.
 - Project_echo remains backup/authority; no remote, release, real data, or maturity advance.
 
 ## open_questions
 
-- R12 by independent `codex` and `codex-ops` must confirm disposition schemas/universes, immutable command evidence, create-only handoff, exact verification runner, parent prerequisites, byte-identical tests/artifact, and no cleanup.
+- R13 by independent `codex` and `codex-ops` must confirm source-audit responsibility/modes, no-replace evidence, retained phase installs, exact runner/normalizer/namespaces, recursive Git, process quiescence, reviewer evidence, and parent ownership.
 - A later authority-transfer item decides remote creation, branch protection, and old-path freeze.
 
 ## dont_touch

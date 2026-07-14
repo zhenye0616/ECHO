@@ -1,7 +1,7 @@
 # Local extraction is an attended build, not a product
 
 Date: 2026-07-13
-Status: locked for proposal R12
+Status: locked for proposal R13
 Applies to: items 133 (`echo-brain`), 134 (`echo-loop`), and 135 (`echo-context`)
 
 ## Decision
