@@ -177,3 +177,19 @@ the exact 21-path target-only set, and at DEV the packaged artifact is the opera
 contract (packaged smoke passes). Reviewer + merge `review_notes` should cite this section.
 The 8 product tests as unexecuted byte-parity leaves (they reach item-132 CI tooling via literal
 REPO_ROOT joins, not module edges) is likewise accepted for the DEV split.
+
+## Founder adjudication #2 (2026-07-13, AC8 Option B execution split)
+
+Recorded post-hoc per review finding F5 (the ruling predates this section; it was granted
+in-session before the reviewer leg ran and was previously bound only via the review request).
+
+**Option B split for the AC8 independent review — APPROVED by founder ("run option B").**
+The codex-ops binding runs as a read-only content-only session and cannot execute R1's
+write-heavy mechanics. Therefore: (1) a neutral executor agent (not the builder, not the
+verdict author) runs R1's deterministic commands and captures evidence; (2) the codex-ops
+binding independently inspects the evidence and authors the review record + verdict;
+(3) the orchestrating wrapper publishes the record as the one-path, sole-parent child of the
+immutable builder head with an expected-old lease push, binding the endpoint actually used.
+No builder self-certification occurs; builder, executor, and verdict-author are three parties.
+
+r19-era precedent: wrapper-owned publication is the queue's standing pattern for codex bindings.
