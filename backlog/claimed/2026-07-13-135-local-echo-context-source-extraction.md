@@ -185,3 +185,16 @@ explicit `ECHO_CONTEXT_HOME` with a default distinct from echo-brain, echo-loop,
 Deviation recorded in the migration record citing this section.
 
 Reviewer + merge `review_notes` should cite both entries.
+
+## Founder adjudication #3 (2026-07-14, Q3 — AC8 harness shape)
+
+**Q3 RESOLVED — option (b)-refined APPROVED.** The AC8 service-parity harness runs as a REAL
+child process: `tsx` added as a pinned devDependency (esbuild already in the lock; no lifecycle
+execution beyond the adjudicated better-sqlite3 rebuild), harness stays a plain `.mjs` child
+launched as `node --import tsx tools/verify-service-parity.mjs`, dynamically importing the TS
+service entry. This preserves AC8's load-bearing ceremony — loopback-only listener, exactly one
+canonical JSON-LF FD3 readiness record, process-group leadership and TERM/KILL sequencing.
+Options (a) committed dist/ (breaks the sealed 38-path exact set) and (c) in-process vitest
+(eliminates the child-process ceremony) are REJECTED. The exact invocation deviation from the
+spec's literal `node tools/verify-service-parity.mjs` argv is recorded in the migration record
+citing this section.

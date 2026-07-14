@@ -193,3 +193,22 @@ immutable builder head with an expected-old lease push, binding the endpoint act
 No builder self-certification occurs; builder, executor, and verdict-author are three parties.
 
 r19-era precedent: wrapper-owned publication is the queue's standing pattern for codex bindings.
+
+## Founder adjudication #3 (2026-07-14, post-REJECT fix cycle)
+
+**F1/lint — ACCEPTED as check-time scratch-config lint, never committed.** AC7's lint gate is
+satisfied by eslint provisioned out-of-band with RECORDED DIGESTS (binary/package integrity
+hashes in the migration record — answering review finding F2's out-of-band-integrity complaint)
+plus the scratch config's exact bytes recorded in the migration record, invoked via explicit
+--config in the recorded verification commands. Pattern precedent: item 135's Q1. The target's
+README/toolchain-manifest text must be corrected to describe this accurately (no phantom
+committed linter).
+
+**Fix cycle — APPROVED.** Builder corrects review findings F2 (check-dependencies must consume
+the helper/CLI partition with omission/evasion fixtures; dependency-toolchain manifest gains the
+clang++/xcode-select/xcrun edges and @types/* build inputs with digests), F3 (npm 10.9.4 pin in
+package.json), F4 (.DS_Store removal) — producing a NEW accepted target OID — then reruns
+B0/B1/B2 including the adjudicated lint leg, records exact argv/environment echoes (F6), the
+full manifest digest + canonical serialization (F7), and aligns the proxy-variable wording with
+observed practice. Executor R1 rerun + codex-ops re-judgment follow under the standing Option B
+split (adjudication #2).
