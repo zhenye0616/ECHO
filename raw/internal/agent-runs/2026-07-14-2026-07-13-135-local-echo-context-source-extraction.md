@@ -809,3 +809,147 @@ must bind the exact target OID/tree and feature head before any merge decision.
 ### Journal
 
 - Zero `mcp__echo__*` calls this run. No journal entry owed.
+
+---
+
+## Run 12 (resumed at 2026-07-14T22:43:21Z — R5 relocatable-proof remediation)
+
+### Previous state kept vs discarded
+
+- Kept the immutable independent rejection child
+  `ebad1fc944103b00fb8064b8bf545cf715ecf721` and fast-forwarded the builder
+  worktree from `caf4bdde2dc852357410264f00d5ccef20708a11` to that exact child
+  before making any remediation commit.
+- Kept all passing R4 implementation and proof bytes. The rejection was bounded
+  to a non-relocatable byte-bound ESLint config and a stale README AC3 aggregate.
+- Discarded no target or feature history. The target advanced by one ordinary
+  descendant commit containing exactly one README substitution.
+
+### What I implemented
+
+- Corrected the target README aggregate from the stale `2f0b28f6…` value to the
+  independently reproduced
+  `6569b0472372ad666404aa22bcf5b1e0e0c716b573dec35c4b9212864420bba2`.
+- Replaced the proof-only ESLint config with a relocatable 449-byte flat config
+  that retains `@typescript-eslint/eslint-plugin`'s recommended rules and uses
+  bare ESM imports resolved from the current private clone. The clean shared
+  target's `node_modules` remained absent throughout.
+- Replayed the full config-isolated private-clone lifecycle, focused and full
+  suites, direct proof tools, service-child ceremony, object closure, and final
+  cleanup at the new target OID.
+- Refreshed only the feature-branch migration record and stacked the new builder
+  commit directly on the immutable rejection child.
+
+### Files modified and immutable bindings
+
+- `/Users/zhenye/Desktop/echo-context/README.md`: one insertion / one deletion.
+  Target HEAD `0cf7b006eba665c0bf55e82ff04da70f19f01ebb`, tree
+  `70c5cf8352652b3c4c1dce68cd1a5e40d44e4b05`, parent
+  `c3882ec057d1f19dd729977730a87ac6e76e5714`; README blob
+  `4c8ebfd3d6fdba768735f8fdc002593ac204308f`, SHA-256
+  `9fea2b1886cca66fcfbc8dcf241a287075b6bee68328af16300eeee196df138f`.
+- `raw/internal/migrations/2026-07-13-135-echo-context.md`: 47 insertions / 30
+  deletions on `agent/135-echo-context`. Migration-record blob
+  `c5083bff4fbb15903022af66d3d080076a20b9b9`, SHA-256
+  `eed83d4ad6d6706a3b2b1a454716f4344016481ba6108257b9f46f9055b0cc28`.
+- Builder head `2956e1391b8b8708fbbd4c47fd9d12a1d7a28635`, tree
+  `50d50157f6b0e6227561c471df1e364b6afbde9b`, parent
+  `ebad1fc944103b00fb8064b8bf545cf715ecf721`. Its sole tree delta is the
+  migration record. The exact ref was lease-pushed and read back from
+  `refs/heads/agent/135-echo-context`.
+
+### Decisions
+
+- No dependency or target-rule change was required. The ESLint config stays
+  scratch-only, is placed at the private-clone root, and resolves the exact
+  lockfile packages from that clone.
+- Exact scratch bindings: tsconfig 472 bytes / SHA-256
+  `7164ed9356aa3bd1d9108283eee164053bc6f251418d0aa1dc4d4b02726bf78f`;
+  ESLint config 449 bytes / SHA-256
+  `45231febc2b3edcb250844f00741590b55c52bc994e3c3ac680a7285d9b90827`.
+- Passing remains local DEV evidence only: `authority:false`, `installed:false`.
+  It does not supersede the requirement for fresh independent review.
+
+### Acceptance status
+
+- AC1: PASS — target remains one clean local branch, with no remote, tag,
+  reflog, alternate, replace ref, shallow boundary, graft, or unreachable object.
+- AC2: PASS — six focused tests and direct recursive runtime inventory passed.
+- AC3: PASS — seven focused tests passed; source and target aggregates equal
+  `6569b047…`; README now names that exact aggregate.
+- AC4: PASS — prior isolated-state proof unchanged and full suite green.
+- AC5: PASS — prior Granola generic-duplication boundary unchanged and full
+  suite green.
+- AC6: PASS — fourteen focused tests, audit, parity, target hashes, inventory,
+  partition, and object/path closure passed.
+- AC7: PASS — fresh private clone, offline script-disabled install, isolated
+  better-sqlite3 rebuild, network denial, native smoke, exact configs, cleanup,
+  and fsck passed.
+- AC8: PASS — nine focused tests plus the direct child readiness/request/
+  teardown ceremony passed.
+
+### Test and proof output
+
+```text
+Test Files  4 passed (4)
+Tests       36 passed (36)
+
+Test Files  72 passed (72)
+Tests       987 passed | 17 skipped (1004)
+Duration    56.19s
+```
+
+```text
+runtime-inventory OK: 6 entrypoints, 92 module-visits, 236 edges, 3 script CLIs
+audit-pinned-extraction OK: 217 paths (110 src, 107 test), SHA 8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37; partition 144/7/1/65
+check-parity OK: 217 source-evidence rows; ported=144 rewritten=7 duplicated=1 excluded=65
+```
+
+- Exact 472-byte TypeScript config: exit 0, zero errors.
+- Exact 449-byte ESLint config: exit 0, zero findings. Readback resolved parser
+  and plugin under
+  `/private/tmp/echo-context-135-r5-0cf7b006/clone/node_modules/`.
+- All six `tools/*.mjs` syntax checks and `git diff --check`: clean.
+- `npm ci --offline --ignore-scripts --no-audit --no-fund`: exit 0, 291
+  packages; native artifact absent before the permitted rebuild.
+- Exact `npm rebuild better-sqlite3 --offline --foreground-scripts
+  --build-from-source`: exit 0. Native in-memory SQLite smoke passed. Resulting
+  `better_sqlite3.node`: 1,985,384 bytes, SHA-256
+  `289ac2671fc501b275af7ce170ea2ef84e07be7e2a4a403aaa055cef02018557`.
+- Network lifecycle: loopback accepted outside and failed EPERM inside the
+  deny-network profile; DNS ENOTFOUND, direct-IP EPERM, and HTTPS ENOTFOUND
+  before ci, after ci, and after rebuild. The secondary-download fixture failed
+  at the socket with `SECONDARY_DENIED:ENOTFOUND`, exit 42, with no accepted
+  observation.
+- Direct AC8 child ceremony: canonical 46-byte FD3 readiness from the matching
+  child PID; ping/capture/search/atoms/clusters/wait all returned HTTP 200;
+  stdout/stderr were zero bytes; SIGTERM exited 0; the process group was absent
+  after teardown.
+- All 33 migration-record target hashes and both embedded config hashes matched.
+
+### Final repository closure
+
+- Shared target: clean; sole ref
+  `refs/heads/migration/2026-07-13-135` at `0cf7b006…`; 510/510 reachable
+  objects; object-list SHA-256
+  `d92d3f614807907ac694e7c163dbba190c2f1fbef8198ab32c5b1f23abc6c1ee`;
+  190 tracked/filesystem paths; path-list SHA-256
+  `cb0516ae7a7b638925fee349464d74cccf5ab1c1ca3c03bc97701d72896ea64b`;
+  no node_modules, symlinks, gitlinks, or residue.
+- Proof clone: clean at the exact target HEAD/tree, no remote, node_modules, or
+  scratch configs; 510/510 reachable objects and 190/190 paths; fsck clean.
+- Feature worktree: clean at `2956e139…`; remote exact-ref readback matched.
+
+### Open questions
+
+- None for the builder. A fresh independent reviewer must bind this exact
+  feature head and target HEAD/tree before any merge decision.
+
+### Drift events
+
+- None. Work remained limited to the two rejected proof-contract findings and
+  the authorized migration-record refresh.
+
+### Journal
+
+- Zero ECHO MCP calls this run. No dogfooding journal entry owed.

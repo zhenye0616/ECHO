@@ -34,61 +34,18 @@ claimed_by: "codex-builder-135"
 claimed_at: "2026-07-14T19:24:50Z"  # founder-directed Codex takeover after independent review rejected the prior acceptance proof
 branch: "agent/135-echo-context"
 worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
-head_sha: "caf4bdde2dc852357410264f00d5ccef20708a11"
+head_sha: "2956e1391b8b8708fbbd4c47fd9d12a1d7a28635"
 pr_url: ""
 agent_notes: |
-  READY FOR FRESH INDEPENDENT REVIEW — codex-builder-135 remediated the AC2,
-  AC3, AC6, AC8, clean-target, and README gaps rejected by the prior review.
-  Current target is c3882ec057d1f19dd729977730a87ac6e76e5714 / tree
-  14ccf48df9155462efbbf798662cce7fd0f68b53: clean, one branch, no remote,
-  authority:false, installed:false, maturity:DEV. Focused remediation is 36/36;
-  exact-target and config-free private-clone suites are each 72/72 files, 987
-  passed, 17 intentionally skipped, 0 failed. Feature handoff
-  caf4bdde2dc852357410264f00d5ccef20708a11 is pushed; its sole delta from the
-  prior review child is the refreshed migration record. The historical ACCEPT
-  remains bound to the superseded target; a new independent reviewer must bind
-  this exact OID/tree and feature head.
-
-  COMPLETE — R3 F6 fix cycle resolves the codex-ops re-review's sole finding (F6) + RR-F1. All 8 ACs pass. Ready for codex-ops re-review.
-  Accepted target: /Users/zhenye/Desktop/echo-context @ HEAD c84b3edba7d96d327bbef4a4268da7bda71a05fd
-  (tree 7846166e674440007ae40867533bbaadbc1ab1a5), sole branch migration/2026-07-13-135, no remote,
-  190 tracked files (38 target-only + 152 source-derived, exact-HEAD), fsck clean. authority:false, installed:false.
-  Full suite 72 files / 973 tests pass, tsc clean, lint clean. AC7 spot re-verified against c84b3edb.
-  R3 fix (F6): added full 40-hex target_blob_oid to the parity-matrix + source-extraction schemas and all 7 rewritten + 1 duplicated rows (the 7 match the reviewer's F6 table); check-parity gained gitBlobOid() and now recomputes+verifies each row's target_blob_oid (rejects missing/non-40hex/mismatch) alongside the R2 replay execution + anti-whole-blob guard; 2 new mutation fixtures (missing/wrong OID FAIL). RR-F1: count corrected to exact 973 (971 + 2 F6 fixtures). No other churn — re-review confirmed everything else (config bytes, 7/7 replays, install, service, 19 hashes).
-  Prior R2 fixes stand (F5 executable replay + anti-whole-blob; F2 replay row; AC5 granola duplicated; F3 config bytes embedded; F4 72 files).
-  AC8 (adjudication #3): tsx pinned devDep; tools/verify-service-parity.mjs launched `node --import tsx …` — real child-process/FD3/
-  process-group/loopback ceremony; service-api.v1.json; context-service.test.ts 7/7. AC7 re-verified with tsx (291 pkgs, only better-sqlite3
-  rebuilds, artifact 289ac267 unchanged, network denial + loopback both halves). check-runtime-inventory now classifies literal dynamic imports.
-  MIGRATION RECORD (R2): raw/internal/migrations/2026-07-13-135-echo-context.md updated on the feature branch on top of the re-review child 45a24e3a; binds source SHA,
-  new target HEAD/tree, all 19 refreshed provenance/tool hashes, AC3 aggregate 632a7b2f, AC7 re-verify, AC8 service results, object-closure, authority/installed,
-  the exact scratch tsconfig + eslint BYTES verbatim (F3) + their SHAs, and adjudication-#2/#3 + AC5-duplication deviations.
-  head_sha = the FRESH R2 builder head e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c (parent = re-review child 45a24e3a; delta = exactly the updated migration record; pushed to origin).
-  This IS the immutable builder head the codex-ops reviewer RE-reviews (adds an updated 2026-07-13-135-echo-context-review.md child) — that reviewer leg is NOT my scope (same Option B ceremony as 133/134).
-  Prior structural questions Q1/Q2/Q3 all founder-adjudicated (item adjudication sections #2, #3 + Q1 record now byte-complete in the migration record). Full 9-run per-AC map in the run log.
-  NEW STRUCTURAL QUESTION Q3 (do not guess — shapes AC8/AC2/AC3-stdio): AC8's verify-service-parity.mjs + AC3's literal stdio
-  runner are plain-node children that must launch the TS retrieval stack, but the target commits only .ts (no dist/, no tsx in the
-  38-path policy/deps). Plain node can't import .ts. Options: (a) commit a build/dist to the policy; (b) add pinned tsx dep;
-  (c) run harnesses under vitest in-process (as AC3 parity does) + make verify-service-parity.mjs a JSON/HTTP validator. Recommend (c) or (b).
-  HEADLINE Run 3: standalone tsc = 0 errors; vitest = 64 files / 939 tests pass, 0 fail.
-  HEADLINE Run 4: AC7 clean-install proof VERIFIED — private clone, npm ci --offline --ignore-scripts (exit 0),
-  npm rebuild better-sqlite3 --build-from-source under sandbox-exec deny-network (exit 0, only better-sqlite3 executed),
-  DNS/IP/https denied inside + loopback control both halves, better_sqlite3.node sha256 289ac267..., module loads.
-  Committed lifecycle-expected/observed + native-toolchain provenance. All 65 exclusion rows now cite their spec clause.
-  Partition finalized (import-closed): 144 ported / 8 rewritten / 65 excluded, 0 unresolved.
-  8 rewrites (parity-matrix rows w/ target hashes + replay): server.ts (8-tool roster), granola-signals.ts
-  (AC5 generic duplicate), state-paths.ts (AC4: ECHO_HOME→ECHO_CONTEXT_HOME, ~/.echo→~/.echo-context per
-  Founder adjudication #2), + 5 test rewrites (roster 15→8, enable_deadlines drop, coord_emit→search_memories
-  isError case, product-case excision, AC4 defaults). 65 excluded now also includes the echo-home
-  onboarding/config-sync layer (not context substrate per AC2; reaches assets/ outside roots).
-  AC1 ✓. AC2 ✓. AC3 ✓. AC4 ✓ (per Q2). AC5 ✓. AC6 ✓ (extraction + full close-out: target-only-policy/source-extraction/9 schemas/check-parity/audit/4 migration tests). AC7 ✓. lint ✓.
-  Q1 record: scratch tsconfig SHA-256 7164ed9356aa3bd1d9108283eee164053bc6f251418d0aa1dc4d4b02726bf78f; scratch eslint config SHA-256 df912afc56372010d08414de6421d28fee931b908cdbbf0fd742ecf20e605bba (both scratch, not committed; record for the reviewer).
-  Remaining — ALL Q3-GATED (blocked on the founder's Q3 ruling; team-lead override says do NOT build until relayed):
-  AC8 service harness = schemas/service-api.v1.json + tools/verify-service-parity.mjs + tests/integration/context-service.test.ts (team-lead recommendation (b)-refined: pinned tsx devDep, `node --import tsx tools/verify-service-parity.mjs`, real child-process/FD3/process-group ceremony);
-  AC8 migration record (binds all hashes/AC3-aggregate 632a7b2f/AC7 results; cites Q1 tsconfig + eslint SHAs + Founder-adjudication-#2 + AC3/Q3 deviations) — best authored whole after AC8; NOT the codex-ops reviewer leg.
-  Exact-HEAD completeness (tracked==190, all 38 target-only present) auto-closes when AC8's 3 files land; the object-closure allowlist test already tolerates their absence.
-  head_sha is the Project_echo feature-branch head (no code by design — code lives in the standalone target repo; the
-  branch-advancing builder migration record is in the AC8 remaining set). Target HEAD above (f1f46167) is the real deliverable pointer.
-  Why checkpointed: ALL Q3-independent work is complete (7.5/8 ACs — everything except the Q3-gated AC8 harness). Awaiting the founder's Q3 pick to build AC8 + author the migration record in one final pass. Full per-AC map in the Run 7 run log.
+  R5 remediation completed by codex-builder-135. Target
+  0cf7b006eba665c0bf55e82ff04da70f19f01ebb corrects only the stale README
+  AC3 aggregate and remains clean, local-only, authority:false, installed:false,
+  and DEV. A relocatable byte-bound ESLint configuration was proven in a fresh
+  private clone without shared-target node_modules; focused 36/36 and full
+  72/72-file suites passed. Builder head
+  2956e1391b8b8708fbbd4c47fd9d12a1d7a28635 is a sole-parent child of rejection
+  record ebad1fc944103b00fb8064b8bf545cf715ecf721 and changes only the refreshed
+  migration record. Fresh independent review is required.
 review_notes: ""
 ---
 

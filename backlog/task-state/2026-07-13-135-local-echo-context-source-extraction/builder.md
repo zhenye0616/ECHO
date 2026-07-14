@@ -2,9 +2,9 @@
 task_id: 2026-07-13-135-local-echo-context-source-extraction
 role: builder
 writer: codex-builder-135
-last_updated: 2026-07-14T20:59:16Z
+last_updated: 2026-07-14T22:45:37Z
 handoff_branch: agent/135-echo-context
-handoff_head_sha: caf4bdde2dc852357410264f00d5ccef20708a11
+handoff_head_sha: 2956e1391b8b8708fbbd4c47fd9d12a1d7a28635
 handoff_run_log: raw/internal/agent-runs/2026-07-14-2026-07-13-135-local-echo-context-source-extraction.md
 ---
 
@@ -17,6 +17,10 @@ proofs are green, the target is clean and local-only, and feature handoff
 `caf4bdde2dc852357410264f00d5ccef20708a11` is pushed. Fresh independent review
 is the next action; no acceptance, authority transfer, installation, or product
 graduation is claimed.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 2956e1391b8b8708fbbd4c47fd9d12a1d7a28635.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -42,10 +46,5 @@ graduation is claimed.
 
 ## canonical_anchors
 
-- decision: raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md
 - spec: backlog/pending_review/2026-07-13-135-local-echo-context-source-extraction.md
-- migration_record: raw/internal/migrations/2026-07-13-135-echo-context.md
-- handoff_head_sha: caf4bdde2dc852357410264f00d5ccef20708a11
-- target_head: c3882ec057d1f19dd729977730a87ac6e76e5714
-- target_tree: 14ccf48df9155462efbbf798662cce7fd0f68b53
 - reviews: backlog/reviews/2026-07-13-135-local-echo-context-source-extraction/
