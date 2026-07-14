@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 8
+reviewer: "codex"
+artifact_sha: "0f4063700b43a79b7f6f1b6375a5502bcd186bc3"
+completed_at: '2026-07-14T00:07:26Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC3 — context-tool-parity.v1.json"
+    finding: "A manifest cannot literally pin a digest over bytes containing that digest, and the request, seed, normalization, and aggregate byte framing are otherwise unspecified. Require either a sidecar digest or a rule that excludes/nulls the digest field, plus exact UTF-8, final-LF, ordering, encoding, and aggregate-framing rules."
+  - severity: "high"
+    where: "AC7 — source and target installation and sandbox verification"
+    finding: "The isolation sandbox applies only to MCP fixture checks, leaving npm lifecycle scripts able to read live or sibling paths, write externally, or use the network. Require `npm ci --ignore-scripts`, or execute every required lifecycle/build script inside a committed fail-closed sandbox; also reject escaping `file:`, workspace, and path dependencies."
+  - severity: "medium"
+    where: "AC1 — target creation"
+    finding: "The single-lane rule does not make initial target ownership atomic: `git init <path>` can adopt an existing or interrupted directory despite the no-adopt contract. Require the first mutation to be an atomic plain `mkdir /Users/zhenye/Desktop/echo-context` that aborts on `EEXIST`, and permit later writes only when that invocation created the directory."
+  - severity: "medium"
+    where: "AC3 — eight-tool source/target parity"
+    finding: "The oracle does not define how a source `tools/list` containing non-context tools is projected onto the eight-tool surface, and its universal bounded/cap/timeout case requirement is not meaningful for tools such as `echo_ping` or `get_atom`. Add an explicit per-tool case matrix, fail on missing or duplicate source descriptors, require the target roster to have no extras, canonicalize only named volatile JSON pointers, and use a fresh MCP child process per case."
+  - severity: "medium"
+    where: "AC7 and AC8 — macOS isolation and service smoke"
+    finding: "No committed sandbox profiles, availability preflight, allowlisted roots, or negative denial probes make the isolation claim independently rerunnable. Name target-local stdio and loopback-service verification commands, fail if enforcement is unavailable, probe every forbidden path/network class, and have the already-listening server report its exact `127.0.0.1` or `::1` port through a dedicated readiness channel."
+  - severity: "medium"
+    where: "AC7 — exported-HEAD verification"
+    finding: "`git diff --check` is required to run from exported HEAD, but a normal archive export has no Git metadata. Specify a clone/worktree export that preserves a usable repository, or run the commit/tree whitespace check in the target repository before export and keep exported-tree checks repository-independent."
+  - severity: "medium"
+    where: "AC2 — runtime inventory"
+    finding: "Runtime reads, scripts, and child executables are required to be inventoried, but no artifact path, schema, or exact test makes that claim falsifiable. Require a committed runtime inventory and a test that compares discovered imports, dynamic reads, package scripts, and spawned executable names against it."
+---
