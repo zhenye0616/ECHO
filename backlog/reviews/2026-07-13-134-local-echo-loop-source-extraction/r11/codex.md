@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-134-local-echo-loop-source-extraction"
+round: 11
+reviewer: "codex"
+artifact_sha: "b6095d0265b6a6fce2386cd20d98e9965a65359d"
+completed_at: '2026-07-14T01:27:47Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC2, AC3, AC7, and AC8 — resolver and operator audit"
+    finding: "The repeatedly referenced named/operator audit has no owning path, executable command, flags, environment contract, result schema, or defined relationship to verify:extraction. AC1 also forbids reusable extraction machinery while AC7 and AC8 require independently rerunning it. Assign the one-shot resolver/audit and target-owned verifier to explicit paths and lifecycles, define exact invocations and outputs, and wire both into the package scripts and migration record."
+  - severity: "high"
+    where: "AC2 — source-universe enumeration and deterministic resolver"
+    finding: "The prescribed git ls-tree -r --name-only inventory is not NUL-delimited or mode-aware, while the resolver's applicable-edge rule is circular and omits repository-capable forms such as exec, synchronous child-process APIs, import maps, workspace aliases, and TypeScript path aliases. Require a NUL-delimited mode/type/OID inventory, preserve and reconcile executable modes, publish a versioned binding-aware sink and resolution table, and fail on every unknown or unparsed repository-capable edge."
+  - severity: "high"
+    where: "AC2 and AC7 — dependency and lockfile provenance"
+    finding: "Bare packages are classified as external, but source package manifests, lockfiles, and workspace metadata are outside the source universe, so no authoritative dependency/version set exists. The target lockfile creation step is also absent even though npm ci cannot create it, and the pre-target source-oracle install/build procedure is undefined. Add pinned source dependency metadata, deterministic import-to-lock reconciliation and lockfile derivation, plus exact isolated source and target install/build commands under the prescribed sandbox and npm environment."
+  - severity: "high"
+    where: "AC3 and AC7 — sealed oracle and parity isolation"
+    finding: "Read-only oracle files do not prevent target code from reading source-result.v1.json or other baseline evidence, and the sandbox contract restricts writes and network without an explicit read allowlist. Exact equality is also unstable for generated IDs, timestamps, and distinct absolute roots. Execute the subject in a separate constrained child that cannot read the baseline, comparator, or source export; let a trusted parent create result files; define deterministic clock/entropy or a precise invariant-preserving projection; and add constant-runner, baseline-read, and behavioral-mutation negative controls."
+  - severity: "medium"
+    where: "AC3 — public API and CLI contracts"
+    finding: "TaskStateSnapshot, QueueStatus, EchoLoopError.details, identifier grammars, sequence scope, duplicate keys, deadline transaction points, command success documents, and diagnostic documents are unspecified. The optional --json flag on validate also conflicts with the statement that every success emits canonical JSON. Add versioned schemas and concurrency tables, define path/ref containment and token validation, and specify both validate modes or remove the flag so implementation-authored tests cannot bless arbitrary behavior."
+  - severity: "medium"
+    where: "AC3 — total CLI exit and diagnostic table"
+    finding: "The requirement that every failure emits one diagnostic cannot hold for an uncatchable direct signal such as SIGKILL, and the signal row does not distinguish direct CLI termination from child termination. Enumerate handled signals, define the diagnostic exception and shell-observed status for uncatchable signals, specify child-signal and cleanup-error precedence, and test each condition explicitly."
+  - severity: "medium"
+    where: "AC1, AC3, and AC7 — mutation ordering and ownership"
+    finding: "AC1 calls target mkdir the builder's first mutation and says only that invocation may write inside, while AC3 and AC7 require the operator to create and seal evidence before target creation and later materialization necessarily writes inside the target. State that mkdir is the first mutation under the target path, identify the builder lane as owner of the pre-target evidence steps, replace the invocation wording with the single-writer rule, and provide one consistent ordered sequence."
+---
