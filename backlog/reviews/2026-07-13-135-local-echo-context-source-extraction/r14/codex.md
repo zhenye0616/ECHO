@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 14
+reviewer: "codex"
+artifact_sha: "58870d8c6dca1ed230cd3af8f9262cd36bc1087c"
+completed_at: '2026-07-14T03:08:04Z'
+verdict: "pushback"
+findings:
+  - severity: "high"
+    where: "AC1/AC3/AC6/AC7 — pinned-source Git envelope"
+    finding: "The pinned SHA is not forced to raw object bytes: source reads do not disable or reject replacement objects, and the export mechanism does not exclude checkout/archive filters. A replacement commit or export-subst rule can therefore alter source and lock bytes while the fixed path hash and self-consistent evidence still pass. Require a config-free Git envelope with replacement objects disabled, verify the source commit/tree/blob object identities and types, materialize raw blobs without filters, and add replacement/export-subst fixtures."
+  - severity: "high"
+    where: "AC7 — no-script installs and native executable closure"
+    finding: "The prescribed prevention mechanism is circular. The native manifest depends on generated gyp/Makefile commands, but monolithic node-gyp rebuild generates and executes those files before they can be inspected; later rescans and path-only process-exec rules cannot enforce exact argv for allowed interpreters, shells, or compilers. Specify a zero-child process-exec profile for both npm ci runs, then split native configure, inspect/freeze, and build under separately pinned bootstrap and exact-argv closures, with direct-Node, non-Node, and allowed-tool/wrong-argv rejection fixtures."
+  - severity: "high"
+    where: "AC8 — process-watch and all-command reap"
+    finding: "Polling KERN_PROC_ALL cannot prove the claimed complete descendant ledger: a child can double-fork, setsid, and reparent between samples, leaving a dormant survivor with no listener or writer evidence. PID start tokens only protect identities after observation. Require a race-free kernel event or containment mechanism, or enforceably prohibit detachment, and add an immediate double-fork survivor fixture that cannot pass through sampling luck."
+  - severity: "high"
+    where: "AC8 — Project_echo staging and commit"
+    finding: "The checks freeze allowed path names but not the staged tree and blob modes. A hook or concurrent index mutation can alter an allowed file and still produce a clean commit whose changed paths satisfy the allowlist. Freeze the index with git write-tree, disable or contain hooks and signing, require the commit tree to equal that frozen tree, require exactly one parent equal to the frozen expected parent, verify symbolic HEAD and the claimed full ref resolve exactly to the commit, and enumerate both task-relocation paths in the NUL allowlist."
+  - severity: "high"
+    where: "AC8 — HTTPS endpoint and credential isolation"
+    finding: "No immutable authority supplies the expected GitHub owner/repository: the endpoint and its hash arrive from the same caller. Additionally, env -i, GIT_CONFIG_NOSYSTEM, and an empty global config do not neutralize repository/worktree URL rewrites, proxies, headers, SSL settings, or credential helpers, while FD 4 has no replay contract across preprobe, push, and postprobe. Pin the literal endpoint identity and hash before credential access, define and verify the exact effective Git configuration, require credential.useHttpPath and helper-side host/port/path validation, specify a replay-safe seekable descriptor protocol, and prove per-child FD closure."
+  - severity: "medium"
+    where: "AC8 — exhaustive handoff outcome table"
+    finding: "The table omits preflight failure, probe spawn/exec failure, signal termination, push launch failure, and termination before a postprobe exists; it also leaves push_attempted undefined at the fork/exec boundary. Define a finite terminal-state algebra with mutually exclusive exit, signal, timeout, and spawn-failure kinds, map every valid transition to status and nullable receipt fields, and exercise it through a production-inaccessible fake Git/transport seam so the suite remains network-denied."
+  - severity: "medium"
+    where: "AC8 — bounded handoff receipt"
+    finding: "Six streams can each retain 262,144 raw bytes, whose base64 alone totals about 2 MiB and exceeds the 1,048,576-byte receipt cap. No deterministic global allocator specifies which evidence is truncated. Define raw-versus-encoded accounting, metadata reserve and stream priority, iterative reserialization, and an all-streams-at-cap fixture. Also specify FD 3 directory creation and tuple validation plus descriptor-relative temp naming, collision behavior, fsync, reopen, inode, and hash checks."
+  - severity: "medium"
+    where: "AC7/AC8 — failure-capsule oracle and reserve"
+    finding: "The hash-pinned publisher is required to atomically write stdin but is not explicitly responsible for validating schema, canonical encoding, serialized size, or equality between the JSON attempt and argv attempt, so a broken finalizer can publish invalid evidence. The quarantine byte cap also does not actually reserve 536,870,912 bytes against caches, installs, builds, clones, or logs. Make validation part of the contained publisher or an equally trusted validator, enforce a real disk reservation or quota with bounded expanded outputs, and add malformed-input and disk-exhaustion fixtures."
+---
