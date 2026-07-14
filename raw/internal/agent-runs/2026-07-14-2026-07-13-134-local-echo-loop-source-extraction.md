@@ -346,3 +346,61 @@ capability is unimplemented.
 
 None. Three authorized operations only; no sibling/wiki/holdout touching; no MCP
 calls this run.
+
+---
+
+## Run 6 (A–E campaign checkpoint — Findings D, A, B landed)
+
+### Outcome
+
+**INCOMPLETE checkpoint; re-handoff to pending_review.** Second codex-ops review
+(child c2a33138) confirmed F1/F3/F4/F5 and raised findings A–E. This run lands
+the anchor Phase 1 (D) + Phases 2 (A) + 3 (B); C + E remain. 112 tests / 21 files
+green; tsc clean; dual-route full roster byte-identical + envelope-invariant.
+
+### Landed (committed to target, HEAD 3fe5383b)
+
+- **Finding D** — real resolver `tools/lib/source-plan.mjs` + CLI: sealed policy
+  loaded by OID, whole-tree scan (TS/shell/python), full 14-class edge model,
+  binding contexts (tsconfig paths, package.json #imports/exports, workspaces),
+  precedence, fail-closed computed/unknown rejection, repo edges → path@blob-oid
+  (== git's real OID). Closure 516 edges / 9 classes (was 3/78). Sealed fixture
+  roster in tests/migration/source-plan.test.ts (all classes + alias/shell/python
+  /metachar/queue-order/transitive/cycle/computed-reject/unknown-reject).
+- **Finding A** — `--check` verifies committed record vs HEAD closure, never
+  writes (fail-closed); workload source-plan row uses --check; test validates the
+  committed artifact + asserts clean tree.
+- **Finding B** — run-verification tokenizes absolute roots (<HOME>/<TMPDIR>) in
+  the inner projection; envelope-invariant hash (two HOMEs → identical inner).
+
+### Remaining map (next run)
+
+- **Finding C** — seven watcher gaps: (1) group-directed TERM-then-KILL via
+  kill(-pgid) + PID/PGID + termination evidence; (2) recovery fixture spawns a
+  REAL descendant + asserts full-group termination (not elapsed time); (3)
+  expired-lease takeover requires prior-owner group-termination evidence before
+  attemptPush; (4) candidate.ts must use gitEnv() config-free env (no ambient
+  process.env in private-index git add/write-tree/commit-tree); (5) APPLYING
+  takeover revalidates approval token + row.repoIdentity + row.fullRef vs sealed
+  project; (6) enforce next_attempt_at + escalate repeated identical failures +
+  ESCALATE (not APPROVED) on ambiguous post-push; (7) delete prepared/ + -base
+  refs on terminal state.
+- **Finding E** — new immutable migration record with full AC8 bindings (exact
+  commands + exit results, target path/branch, target-policy-copy OID/SHA,
+  truthful clean-status, corrected fixed point, envelope-invariant dual-route
+  hash).
+
+### Notes for successor/reviewer
+
+- Resolver is a testable library (tools/lib/source-plan.mjs) + thin CLI; the
+  fixture suite feeds synthetic file sets. Test-file bodies are gated OUT of the
+  closure (a test's edges are its module imports; its body is scaffolding).
+- Committing the lib changes its blob, which changes build-source-plan.mjs's
+  import row → regenerate + commit the edge-record AFTER committing the lib, else
+  --check fails. (Documented so the next run doesn't trip on it.)
+- node here is x86_64 (Rosetta); python-invoking tests run under arch -arm64.
+
+### Drift events
+
+None. Three authorized operations only; no sibling/wiki/holdout touching; no MCP
+calls this run.

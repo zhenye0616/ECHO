@@ -35,28 +35,30 @@ claimed_by: "fable-builder-134"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "ee3bc0e9616a2ea9699ad673856518e8ba90744c"
+head_sha: "7f89b291bb76086bb011575899a67d54043b1704"
 pr_url: ""
 agent_notes: |
-  FIX CYCLE complete (codex-ops REJECT ca82e523 addressed); re-handoff for
-  re-review, not a completion claim. All four HIGH + one MEDIUM resolved with
-  green tests: 97 tests / 21 files, tsc clean, dual-route 14-row roster
-  byte-identical (8c81ece2) verdict pass.
-  F1: tests/task-state/ + tests/review-queue/ substantive suites (test:task-state
-  and test:review-queue exit 0). F2: verification-workload.v1.json = full sealed
-  roster, recursion solved via vitest.workload.config.ts. F3:
-  source-seed-fixture.test.ts with independent oracle. F4: AC5 recovery fixtures
-  (crash-before/after-push, gc-anchor-survival, both-orders,
-  mismatched-digest-after-transition) + own-pgid isolation (detached spawn +
-  deadline-bound reap). F5: npm route binds outer launcher argv + npm banner.
-  Portability: python-invoking tests run under arch -arm64 (node here is
-  x86_64/Rosetta; jsonschema wheel is arm64).
-  Target /Users/zhenye/Desktop/echo-loop UNACCEPTED pending re-review, no remote,
-  not installed; HEAD 2aeb1ede, tree a56fe5e0, 14 commits, fsck clean. head_sha
-  above is the fix-cycle builder head (agent/134-echo-loop), rebased onto the
-  reviewer child ca82e523. Non-blocking design note (not a residual): lock is
-  npm-generated (no drift/extraneous), not hand-minimized. Reviewer child-commit
-  ceremony is the independent reviewer's leg.
+  INCOMPLETE checkpoint of the A-E campaign (second codex-ops review c2a33138);
+  re-handoff for continuation, not a completion. LANDED + green (112 tests / 21
+  files, tsc clean, dual-route full-roster byte-identical + envelope-invariant):
+  Finding D (real 14-class resolver: sealed policy by OID, whole-tree TS/shell/
+  python scan, binding contexts, precedence, fail-closed computed/unknown reject,
+  repo edges -> path@blob-oid; closure 516 edges/9 classes vs old 3/78; sealed
+  fixture roster); Finding A (--check verify-not-overwrite, fail-closed on drift,
+  workload row + test use it, tree stays clean); Finding B (envelope-invariant
+  inner hash via <HOME>/<TMPDIR> tokenization).
+  REMAINING (next run): Finding C — 7 watcher gaps (group-directed kill(-pgid) +
+  termination evidence; recovery fixture with a real descendant; takeover needs
+  prior-owner group-termination before attemptPush; candidate.ts must use
+  gitEnv() not ambient env; APPLYING revalidates token+repoIdentity+fullRef;
+  enforce next_attempt_at + escalate ambiguous post-push; delete prepared/-base
+  refs on terminal state). Finding E — new immutable AC8 migration record
+  (commands/exits, path/branch, policy-copy OID/SHA, clean-status, corrected
+  fixed point 6a8f6a61, envelope-invariant dual-route hash).
+  Target /Users/zhenye/Desktop/echo-loop UNACCEPTED, no remote, not installed;
+  HEAD 3fe5383b, tree 95754d74, 22 commits, fsck clean, tree clean. head_sha above
+  is the checkpoint builder head (agent/134-echo-loop), rebased onto reviewer
+  child c2a33138. Remaining map + successor notes in run log Run 6.
 review_notes: ""
 ---
 
