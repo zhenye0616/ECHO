@@ -34,7 +34,7 @@ claimed_by: "fable-builder-133"
 claimed_at: "2026-07-14T05:46:05Z"  # reclaimed 2026-07-14 for founder-directed AC5/AC7 four-clone matrix (B0/B1/B2) continuation
 branch: "agent/133-echo-brain"
 worktree: "/Users/zhenye/Desktop/Project_echo--133-echo-brain"
-head_sha: "d3f71b16c7c90e0178d7a10edaa76f8cd34f4d8a"
+head_sha: "e64bfb8071097af9156e79e7a6ffc7d437a7be60"
 pr_url: ""
 agent_notes: |
   Builder fable-builder-133 (Claude Code). Attended one-time extraction; no migration
@@ -65,8 +65,27 @@ agent_notes: |
   origin removed). All three share ONE identity tuple: tarball SHA-256 d8abbae572bac1a00c93522263d9e8f94112fe582aa7ef2ddf992267e39c970f,
   27-member manifest, tree e13b0cc57365acf9600f06882750982e02412c5a, lock 9ffc39fa013a67517d95399c80759a4fd359ce1ab1ccc5ee0e957504796ab296.
   Accepted target 54259ef6 UNCHANGED and clean; evidence bound to migration record on feature head d3f71b16.
-  REMAINING: R1 + the AC8 codex-ops reviewer child-commit leg (reviewer's responsibility; explicitly not run per founder).
   Schema-path AC3<->AC5 reconciliation ACCEPTED by founder (adjudication recorded in item main commit 27ad85b9).
+
+  FIX CYCLE (2026-07-14, post codex-ops REJECT; founder adjudication #3): NEW accepted target OID
+  493b558f30d0e7b24dd2ebef883c10285f835f48 (tree 98d8549b55cdfd4f10d9452c840c006fa2c7a693), single root, fsck clean,
+  object-set==reachable-set (78 objs). Fixes:
+  - F4: .DS_Store removed; accepted tree literally clean.
+  - F3: package.json pins npm 10.9.4 in engines -> relocated-with-transform row; sole entry in policy transform_allowlist
+    (authority: founder adj #3), operator audit verifies the transform semantically; exclusion_allowlist empty.
+  - F2: check-dependencies now enforces the helper/CLI partition (scans spawn/exec command invocations incl tuple-dispatch);
+    dependency-toolchain.v1.json gains clang++/xcode-select/xcrun helpers, @types build_inputs, and real integrity digests
+    for typescript/vitest/eslint/typescript-eslint/@types; dependency-set.test.ts adds omission+evasion fixtures (all pass).
+  - F1: AC7 lint gate = eslint provisioned out-of-band via explicit --config against a scratch flat config (NOT committed;
+    bytes+sha256 eb0562e6... recorded in migration record; named in dependency-toolchain.lint); README corrected.
+  Re-verified: check-provenance/boundary/dependencies exit 0; transform-aware operator audit PASS (0 errors); vitest 18/18
+  (5 files, incl 3 new F2 fixtures). Re-ran full B0/B1/B2 matrix WITH a lint leg under sandbox-exec deny-network (DNS+IP probes
+  fail pre/post every lifecycle phase incl post-lint; loopback both halves; distinct cache roots; B1/B2 sanitized clones of
+  493b558f). All three share ONE tuple: tarball 72a32d2dcf34625856512b82f914596a77f5c62b1220b4ef96c9757e20a1922b, 27 members,
+  canonical manifest digest 1f9dbd66932a6120e9cfad90b1c820faf5052ca9cb8e481772744289460467ae (serialization spelled out in
+  migration record F7), tree 98d8549b, lock 9ffc39fa. F6 argv/env echoes recorded per leg; proxy wording aligned (poisoned
+  proxy present, not absent). Accepted target UNCHANGED by matrix. New builder head e64bfb8071097af9156e79e7a6ffc7d437a7be60.
+  REMAINING: R1 rerun + AC8 codex-ops re-judgment (reviewer's responsibility; explicitly not run per founder).
 
   QUESTION FOR REVIEWER/FOUNDER — AC3<->AC5 schema path: byte-identical src/product/config.ts:55 + package.json
   files field reference schemas/product/runtime-config.v1.schema.json, but AC5 names schemas/runtime-config.v1.schema.json.

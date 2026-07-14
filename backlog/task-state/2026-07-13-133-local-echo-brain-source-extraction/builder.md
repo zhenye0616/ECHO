@@ -1,6 +1,6 @@
 ## current_thesis
 
-Extraction complete AND the founder-directed AC5/AC7 builder legs B0/B1/B2 are run green; re-handed to pending_review. Accepted target `/Users/zhenye/Desktop/echo-brain` @ HEAD `54259ef67eb90b5a1412bf15bac716180e822c72` (tree `e13b0cc57365acf9600f06882750982e02412c5a`), branch `migration/2026-07-13-133`, no remote, UNCHANGED by the matrix. Feature-branch handoff head (binds the migration record incl. B0/B1/B2 evidence) is now `d3f71b16c7c90e0178d7a10edaa76f8cd34f4d8a` (supersedes 0caef823).
+Fix cycle after codex-ops REJECT complete (F1-F7, founder adjudication #3); re-handed to pending_review. NEW accepted target `/Users/zhenye/Desktop/echo-brain` @ HEAD `493b558f30d0e7b24dd2ebef883c10285f835f48` (tree `98d8549b55cdfd4f10d9452c840c006fa2c7a693`), branch `migration/2026-07-13-133`, single root, no remote, clean, UNCHANGED by the re-run matrix. Feature-branch handoff head (binds the fix-cycle migration record) is now `e64bfb8071097af9156e79e7a6ffc7d437a7be60` (supersedes d3f71b16). New artifact tuple: tarball `72a32d2d…`, canonical manifest digest `1f9dbd66…`, tree `98d8549b`, lock `9ffc39fa`.
 
 ## locked_decisions
 
@@ -12,9 +12,9 @@ Extraction complete AND the founder-directed AC5/AC7 builder legs B0/B1/B2 are r
 
 ## open_questions
 
-- AC5/AC7 builder legs B0/B1/B2 RUN GREEN under `sandbox-exec (deny network*)`: isolated cache fill (no lifecycle, distinct roots per run), npm ci / build+pack / tarball install / smoke all offline, DNS+direct-IP probes fail pre/post each lifecycle phase, loopback control both halves, native better-sqlite3 built offline from source, B1/B2 from sanitized AC1 clones. All three share one identity tuple (tarball d8abbae…, tree e13b0cc…, lock 9ffc39fa…, 27-member manifest). Bound to migration record on feature head d3f71b16.
-- AC3<->AC5 schema-path reconciliation ACCEPTED by founder (recorded in item main commit 27ad85b9).
-- REMAINING: R1 + AC8 codex-ops reviewer child-commit leg — reviewer's responsibility, explicitly not run by builder.
+- Fix cycle F1-F7 (post codex-ops REJECT, founder adj #3) COMPLETE: F4 .DS_Store removed; F3 package.json npm-pin transform (sole transform_allowlist entry, operator-audit-verified); F2 check-dependencies enforces helper/CLI partition + omission/evasion fixtures + completed dependency-toolchain (clang++/xcode-select/xcrun, @types build_inputs, real digests); F1 scratch-config eslint lint gate (out-of-band, bytes+digest recorded, not committed). Re-verified: 3 checkers exit 0, transform-aware operator audit PASS, vitest 18/18, fsck clean, object-set==reachable-set.
+- Re-ran full B0/B1/B2 matrix WITH lint leg under sandbox-exec deny-network; all three share one tuple (tarball 72a32d2d…, canonical manifest digest 1f9dbd66…, tree 98d8549b…, lock 9ffc39fa…). F6 argv/env echoes + F7 canonical serialization recorded in migration record. Accepted target 493b558f UNCHANGED by matrix.
+- REMAINING: R1 rerun + AC8 codex-ops re-judgment — reviewer's responsibility, explicitly not run by builder.
 
 ## dont_touch
 
@@ -25,5 +25,5 @@ Extraction complete AND the founder-directed AC5/AC7 builder legs B0/B1/B2 are r
 - decision: raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md
 - spec: backlog/pending_review/2026-07-13-133-local-echo-brain-source-extraction.md
 - migration_record: raw/internal/migrations/2026-07-13-133-echo-brain.md
-- handoff_head_sha: d3f71b16c7c90e0178d7a10edaa76f8cd34f4d8a
+- handoff_head_sha: e64bfb8071097af9156e79e7a6ffc7d437a7be60
 - reviews: backlog/reviews/2026-07-13-133-local-echo-brain-source-extraction/
