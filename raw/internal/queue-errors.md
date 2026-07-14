@@ -50,3 +50,4 @@
 2026-06-19T18:19:42Z QUEUE-ERROR: reviewer=codex failure=spec_sha_unreachable spec=backlog/proposed/2026-06-18-103-ceo-context-loop-n2.md@03f761d0c2abb99360061fc88275f050e343be62
 2026-06-19T18:19:53Z QUEUE-ERROR: reviewer=codex failure=spec_sha_unreachable spec=backlog/proposed/2026-06-18-103-ceo-context-loop-n2.md@03f761d0c2abb99360061fc88275f050e343be62
 2026-06-27T22:24:37Z PROMOTE_CONTENT_IDENTITY_MISMATCH: 2026-06-27-108-slack-linear-intake-gate r3 reviewed=ea4ff5012054dbe4914d3b70c8b68cce3c47ca6b4d49bb55dc9abf46d5dbcbf5 current=66c9ff6b3b0679d5bba7ef1e7036ed084f906638df79bbe2ddd5bb423a608fdf
+2026-07-14T00:45:46Z QUEUE-ERROR: reviewer=codex-ops failure=spec_sha_unreachable spec=backlog/proposed/2026-07-13-133-local-echo-brain-source-extraction.md@8327efe7d291f2dbe431000773c5782f13a88b76
