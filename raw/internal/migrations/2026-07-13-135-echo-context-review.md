@@ -1,161 +1,270 @@
-# Independent AC8 third review — echo-context (item 2026-07-13-135)
+# Independent AC8 remediation review — echo-context (item 2026-07-13-135)
 
-This record supersedes the prior `codex-ops` REJECT records published at review children `f5596ab3a69658b0ce7946e22a289949035bbd98` and `45a24e3a844deeec8ae226b75647198460bad478`.
+**Verdict: REJECT.** The remediated target behavior and the AC2/AC3/AC6/AC8
+proof batteries pass, but the accepted reviewer contract is not reproducible
+from an independent private clone. The byte-bound ESLint configuration embedded
+in the migration record imports both TypeScript ESLint modules from the clean,
+read-only shared target's absent `node_modules/`. Exact-config lint therefore
+exits 2 unless a reviewer performs the forbidden mutation of the accepted
+target. A relocatable equivalent config linted the same source with zero
+findings, so this is a proof/independence defect rather than a code lint defect.
+
+Passing evidence below still proves only a local DEV split. It grants no
+installation, publication, authority transfer, release, or maturity advance:
+`authority:false`, `installed:false`, maturity remains **DEV**, and
+Project_echo remains authoritative.
 
 ## Reviewer identity and independence
 
-- **Judgment author:** `codex-ops`, acting as the independent AC8 reviewer.
-- **Builder:** `fable-builder-135`; neither this reviewer nor the neutral executor built the target.
-- **Option B disclosure:** a neutral executor performed the deterministic reviewer-side mechanics and captured the third-pass evidence. This `codex-ops` session independently inspected the sealed contract, R3 builder record, accepted target, implementation, evidence summary, and selected raw evidence before authoring the judgment. The wrapper alone publishes this record.
-- This reviewer performed no writes, Git mutations, commits, pushes, target changes, or live-state access. No builder self-certification occurred.
+- Judgment and mechanical execution: `codex-ops`, in a fresh independent
+  reviewer session. The remediation builder was `codex-builder-135`; this
+  reviewer did not build the target or its migration record.
+- No task-state pointer was read or written. No ECHO MCP call was made. No live
+  database, credential, daemon, MCP endpoint, user config, Keychain, install,
+  authority, maturity, wiki, sibling repository, or item 133/134 state was read
+  or changed.
+- The shared target, main checkout, and builder worktree were strictly
+  read-only. All dependency installation, native build, synthetic state,
+  mutation fixtures, and service processes lived under the reviewer's private
+  scratch and config-isolated private clone.
+- The only Project_echo write is this review record in a fresh detached
+  reviewer worktree at the immutable builder head. Publication is an explicit
+  one-path child pushed with an exact expected-old lease.
 
-## Bindings
+## Immutable bindings
 
-- **Item:** `2026-07-13-135-local-echo-context-source-extraction`
-- **ready_content_sha:** `aa9fa9d89c30b2ba2823d6b3eecdc32e389120bb9f3bc46538b9335a301c8392`
-- **Pinned source commit:** `2971310441b69735cbe759293abd8c4d044bf347`
-- **Immutable R3 builder head:** `e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c`
-- **R3 builder tree:** `c529dba198c244cc7eda850b9af8083072859b12`
-- **Builder-head parent / second REJECT child:** `45a24e3a844deeec8ae226b75647198460bad478`
-- **R3 builder delta:** exactly `raw/internal/migrations/2026-07-13-135-echo-context.md`
-- **Migration-record Git blob:** `c95dd880adc3ac60948868a318539589d1c69b48`
-- **Migration-record SHA-256:** `7be30a57b8e07634a3846f75a3d0165f97026a6cc2e789a287a43b3aa68a9f32`
-- **Accepted target:** `/Users/zhenye/Desktop/echo-context`
-- **Target HEAD:** `c84b3edba7d96d327bbef4a4268da7bda71a05fd`
-- **Target tree:** `7846166e674440007ae40867533bbaadbc1ab1a5`
-- **Target parent:** `86a5c40386250a3c87313f39f65273be914b3b93`
-- **Target branch:** `migration/2026-07-13-135`
-- **Project_echo feature branch:** `agent/135-echo-context`
-- **Project_echo review endpoint:** `https://github.com/zhenye0616/ECHO.git`
-- **Tracked partition:** `190 = 38 target-only + 152 source-derived`
-- **Source-derived partition:** `152 = 144 ported + 7 rewritten + 1 duplicated`
-- **Full source disposition:** `217 = 144 ported + 7 rewritten + 1 duplicated + 65 excluded`
-- **Mechanical evidence execution:** `2026-07-14T17:45Z`
-- **Evidence directory:** `/private/tmp/claude-501/-Users-zhenye-Desktop-Project-echo/f96bfcee-3199-472c-adf2-9b7367d03b4d/scratchpad/r1-evidence-135-rerun2`
-- **State:** `authority:false`, `installed:false`, maturity **DEV**.
+- Item: `2026-07-13-135-local-echo-context-source-extraction`
+- Reviewed main intake HEAD: `e113592c199058f32621c06551bcaab18227d603`
+- Pending-review item blob / SHA-256:
+  `0a286ed27154fba6c096427a3a45f633825ffd0e` /
+  `9a3c8b73a953e4a62ab697e6e4e1aa2328a82e98237ddc85bfc2d0e134abeaf3`
+- Redo sidecar blob / SHA-256:
+  `db72ed751de91f503218da212e5761091910a922` /
+  `cadd2b88357ec0a7c584123f048f89a9da162c3e6bdb04b5963378f2d746dba1`
+- Reviewed proposal promotion/spec commit:
+  `294a05093ccfc760ea49f25091ddefd72139953f`
+- `ready_content_sha`:
+  `aa9fa9d89c30b2ba2823d6b3eecdc32e389120bb9f3bc46538b9335a301c8392`
+- Pinned source commit: `2971310441b69735cbe759293abd8c4d044bf347`
+- Immutable remediation builder head:
+  `caf4bdde2dc852357410264f00d5ccef20708a11`
+- Builder parent / tree:
+  `7b58ebf04068b13e24b1c0187eaacb3bce4b6226` /
+  `9f587f620788d6a52241d8aa54ad2de604f1af47`
+- Builder delta: exactly
+  `raw/internal/migrations/2026-07-13-135-echo-context.md`
+- Migration-record blob / SHA-256:
+  `2ebdb48977df70b25c0ceb09adb0bf74d2f85e0a` /
+  `81f8ad89ba42f04d03ba517a31046cddee23b4874505a2944692d24719bb9359`
+- Accepted target: `/Users/zhenye/Desktop/echo-context`
+- Target HEAD / tree:
+  `c3882ec057d1f19dd729977730a87ac6e76e5714` /
+  `14ccf48df9155462efbbf798662cce7fd0f68b53`
+- Target parent: `022864ce33a77e5a0f7fb5f1930b59c498acec46`
+- Target sole branch: `migration/2026-07-13-135`
+- Target remote: none
+- Review endpoint / full ref:
+  `https://github.com/zhenye0616/ECHO.git` /
+  `refs/heads/agent/135-echo-context`
+- Expected-old remote OID before publication:
+  `caf4bdde2dc852357410264f00d5ccef20708a11`
 
-### Prior REJECT #1 binding
+## Independent verification results
 
-- **R1 builder head:** `f8607d2b6b30da111231aa0cfce322db8f794b3d`
-- **R1 builder tree:** `3c76d8ddd8623e8b2eddce4f4bd179ad0ff0806d`
-- **R1 migration-record Git blob:** `d6cfcc4c1310160e94ac9a3b07740252bf7285ba`
-- **R1 migration-record SHA-256:** `c49438f80f0220fb4daae3241069cd88fad12b288e9cd5e18dab6e0c2fa980b5`
-- **R1 target HEAD/tree:** `aabf144e156bc6582f4a094b9c668c83aaac935b` / `899d769ae72e16e940d3879c828ef1a35c3010fc`
-- **Review child:** `f5596ab3a69658b0ce7946e22a289949035bbd98`
-- **Review-child tree and sole parent:** `da3ef1c288ba1f36b17317f77de3c862cef9ca7f` / `f8607d2b6b30da111231aa0cfce322db8f794b3d`
-- **Review-record Git blob:** `60081f04f047d8ea63e45212064e76704d633df0`
-- **Review-record SHA-256:** `09c091471bda25121a5dea158ed020d8f38685ee82d219f9fe92ba0d85929d6c`
-- **Verdict:** **REJECT** for F2, F3, and F5; F1 was benign and F4 was LOW.
-
-### Prior REJECT #2 binding
-
-- **R2 builder head:** `ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf`
-- **R2 builder tree:** `26bd9c5159d626bc6df5eeed28a8fe0f54ab4979`
-- **R2 migration-record Git blob:** `6b5ed61b0fbb07b29a2fa744527b64320746b325`
-- **R2 migration-record SHA-256:** `0c4d7cb9c74ada6c47b691739367c53a40983f4f820554484671653017ccd42e`
-- **R2 target HEAD/tree:** `86a5c40386250a3c87313f39f65273be914b3b93` / `a933781cf669ae6cbdf0c3f240ade248bf90afed`
-- **Review child:** `45a24e3a844deeec8ae226b75647198460bad478`
-- **Review-child tree and sole parent:** `6f6a638f1124bee5664dc007461286329aa91d1f` / `ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf`
-- **Review-record Git blob:** `4ce4754e1e7e8d8e3c44bd90187cb39e34a40334`
-- **Review-record SHA-256:** `d9631dd689914ef1d6d048ed16edbac4b66ec19e98ed1166cdc85c4fae10662f`
-- **Verdict:** **REJECT solely on F6**. F1 was benign; the load-bearing portions of F2–F5 were resolved; residual descriptive drift and RR-F1 were recordable LOWs that would not block a local DEV split.
-
-The Project_echo lineage is linear:
-
-`f8607d2b… (R1 builder) → f5596ab3… (REJECT #1) → ca70b7f2… (R2 builder) → 45a24e3a… (REJECT #2) → e8bd2440… (R3 builder)`
-
-## Founder adjudications applied
-
-1. **Option B execution split:** the neutral executor owns deterministic mechanics, `codex-ops` owns the independent judgment, and the wrapper owns publication.
-
-2. **Adjudication #2 — Q1/Q2:** the scratch tsconfig and eslint configurations remain uncommitted, but their verbatim bytes are embedded in the migration record and reproduce their recorded hashes. The accepted AC4 implementation remains `src/echo-home/state-paths.ts`, using `ECHO_CONTEXT_HOME` and `~/.echo-context`.
-
-3. **Adjudication #3 — Q3:** the AC8 harness uses pinned `tsx` and the approved real-child invocation `node --import tsx tools/verify-service-parity.mjs`, preserving FD3 readiness, process-group, teardown, and loopback-only requirements.
-
-4. **Founder-authorized final cycle:** commit `41b54a5ec597ad825d200c181557504fb9560e52` authorized item 135’s final F6 target-OID-binding cycle. The accepted target delta is confined to the six expected files; the Project_echo builder delta is confined to the migration record.
-
-## Third-pass outcomes
-
-| Step | Outcome | Review result |
+| Contract | Result | Independent observation |
 |---|---|---|
-| R3 scope and lineage | **PASS** | Builder `e8bd2440…` is the sole-parent child of second REJECT `45a24e3a…` and changes only the migration record. Target `c84b3edb…` is the child of R2 target `86a5c403…` and changes exactly the two provenance documents, two schemas, parity test, and parity verifier. |
-| RR2-S1 — shared-target pre-audit | **PASS** | HEAD/tree/branch matched; 379 objects equaled 379 reachable objects; fsck and unreachable checks were clean; no remotes, reflogs, alternates, promisor, replace, shallow, or graft state; exact `38 + 152 = 190` partition. |
-| RR2-S2 — source closure and F6 | **PASS** | Inventory reproduced at exactly 217 paths with the bound hash; 144 ported rows were byte-identical, 65 exclusions were absent, seven replay patches reproduced their targets, and the deliberate duplicate remained distinct. All eight target OIDs matched the parity row, source-extraction row, recomputation from target bytes, and committed `HEAD:path` blob. |
-| RR2-S3 — reviewer private clone | **PASS** | Config-isolated `--no-local --no-hardlinks` clone, detached checkout of `c84b3edb…`, origin removal, clean tracked state, clean fsck, and 190 tracked files reproduced. |
-| RR2-S4 — AC7 installation and native proof | **PASS** | Offline `npm ci --ignore-scripts` installed 291 packages under network denial; only `better-sqlite3` rebuilt; DNS/IP/HTTPS denial and loopback controls passed; the native artifact loaded and matched its bound hash. |
-| RR2-S5 — verification battery | **PASS** | Embedded scratch configurations reproduced byte-for-byte; typecheck and lint passed; Vitest ran 72 files with **973 passed, 17 skipped, 0 failed**; runtime inventory, extraction audit, parity, AC3 aggregate, exact roster, and six Node syntax checks passed. |
-| RR2-S6 — AC8 service parity | **PASS** | The adjudicated tsx child produced exactly one 46-byte canonical JSON-LF FD3 readiness record, emitted no stdout/stderr, listened only on `127.0.0.1`, passed the integration cases, and left no surviving process-group member. |
-| RR2-S7 — bound hashes | **PASS** | All 19 target-file hashes, inventory hash, AC3 aggregate, native artifact, both scratch configurations, and all eight target blob OIDs reproduced exactly. |
-| RR2-S8 — shared-target post-audit | **PASS** | HEAD/tree and the 379-object set remained unchanged; pre/post object lists and digest were identical; fsck remained clean; no remote or reflog appeared; only untracked `node_modules/` remained. |
-| F6 fail-closed probes | **PASS** | Positive rewritten and duplicated controls verified. Missing, non-40-hex, and mismatched rewritten OIDs were rejected; missing and mismatched duplicated OIDs were rejected. The two committed F6 mutation fixtures passed. |
+| Ground truth and feature lineage | **PASS** | Main, builder, target, target tree, and literal-endpoint feature ref matched their expected OIDs before work. Builder is a sole-parent child of the historical review child and changes only the refreshed migration record. |
+| AC1 accepted-repository invariants | **PASS** | Reviewer correctly did not rerun builder-only absence/mkdir/init. Shared target has one branch, no remote/tag/reflog/alternate/promisor/replace/shallow/graft state, clean status and fsck, and no symlink or gitlink. Raw-object audit uses pinned Git 2.37.3 with isolated config. |
+| AC2 recursive runtime closure | **PASS** | Direct final-object checker: `6 entrypoints, 92 module-visits, 236 edges, 3 script CLIs`. Six committed tests passed, including omission of every edge class, unknown/omitted entrypoints, computed and aliased reads/imports/launches, textual spoofing, tsx traversal, and missing transitive integrity. |
+| AC3 raw-pinned stdio parity | **PASS** | Source install/rebuild and both real stdio peers ran from scratch. Source roster 15 with 7 classified ignores projected to target roster 8; 10 ordered full JSON-RPC envelopes matched at aggregate `6569b0472372ad666404aa22bcf5b1e0e0c716b573dec35c4b9212864420bba2`. Source and target clock hashes both reproduced `26610e85f551bfb275ce8133384a2ec5de4ef44f481eca3ed7b9a47dfe53c29d`. All 7 AC3 tests and protocol/evidence/fixture mutations passed. |
+| AC4 isolated state | **PASS** | Synthetic tests and direct service state used scratch homes only. `ECHO_CONTEXT_HOME` / `~/.echo-context` behavior passed; no live state was accessed. |
+| AC5 Granola overlap | **PASS for local DEV** | The deliberate generic duplicate remains distinct and is bound as `duplicated`; product-owned post-meeting behavior remains excluded. |
+| AC6 source closure and dispositions | **PASS** | Canonical inventory reproduced 217 paths (110 source, 107 tests), SHA-256 `8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37`; partition `144/7/1/65`. Both real CLIs passed. All same-path source OIDs/hashes, ready seal, policy digest, seven replay patches, eight target OIDs, exclusions, and negative mutation fixtures passed. |
+| AC7 private clone and native lifecycle | **REJECT** | Clone, offline install, network denial, native artifact, typecheck, full tests, and closure all passed. The exact embedded ESLint config is not independently runnable from the clone; details in RR4-F1 below. |
+| AC8 service behavior | **PASS** | Nine integration tests passed: strict request/response schemas, body/result/ID/deadline bounds, cancellation, poisoned-env/non-loopback rejection, readiness-failure cleanup, forced teardown rejection, and graceful process-group cleanup. Direct child ceremony also passed. Overall handoff remains rejected because AC7/AC8 requires a reproducible independent reviewer record. |
 
-## Hash results
+## Repository, object, and filesystem closure
 
-### Bound target-file hashes
+Shared target and private clone reproduced the same values before verification:
 
-| Path | SHA-256 — recorded and reproduced | Result |
-|---|---|---|
-| `package.json` | `99efa7b4bd754cf5b6794267da136aa85820577e7ec53d619a91c7127fcb8ce2` | MATCH |
-| `package-lock.json` | `4c5639f08feb5d64a7659e154fbe9c0f4f44deaa5c91ff5f1edee8aacf8568e5` | MATCH |
-| `context-tools.v1.json` | `db6eab7d3046f6925ac9a58bf4ff13bf321547c2b74903acde71821f4c09ce37` | MATCH |
-| `schemas/service-api.v1.json` | `ff4e2f2aec002e39a776279f3ca4c9d8f530d50eaee3420a83c5b01360144540` | MATCH |
-| `provenance/target-only-policy.v1.json` | `4f075fcaee338aaf66a79bb61c95200ff2802d470d7bac2383e577159705df77` | MATCH |
-| `provenance/runtime-inventory.v1.json` | `05ef704bdbdc834f3872db916917cb70b4ca5a59bf35443a834cec7b522f3840` | MATCH |
-| `provenance/source-evidence.v1.json` | `bc3094d81b47f22ff27422644b40893eb3f5a050c12e3aa5d049b40394fc6279` | MATCH |
-| `provenance/parity-matrix.v1.json` | `54cf3ee3fbd97f6458751178313c22572d0c9e6a7f84dbdd724758ecbf1fdfe1` | MATCH |
-| `provenance/source-extraction.v1.json` | `be79e3a9e7a593cc35913ea79d414ab3caeb64a3b87cf676e15421f3759c0565` | MATCH |
-| `provenance/lifecycle-expected.v1.json` | `be8f50ec9be562201616845a47e5990722cd1aaeb0140104a474067178b58151` | MATCH |
-| `provenance/lifecycle-observed.v1.json` | `ed3b7eb844239a98e83189462cdfe3beedc07e06f02ac93c716f5c3d19135697` | MATCH |
-| `provenance/native-toolchain.v1.json` | `4341f8703999c60c570c89c34abe7d6955477477aac4c743afba740dab9b5c7d` | MATCH |
-| `provenance/context-tool-parity.v1.json` | `1aa7ae620208120d42a60f070355bf303d9675811e147f258ec7c9806234dcc4` | MATCH |
-| `tools/emit-source-inventory.mjs` | `8aea6b7acd6aacdb2629c6b345ad8d6de08a61779aa90a190634dd08f989904c` | MATCH |
-| `tools/check-runtime-inventory.mjs` | `1a37c1eb849fc4f82629793fb46cc3588f88e27b977ba7b7ce56a041ba2d7d31` | MATCH |
-| `tools/check-parity.mjs` | `22353e1dfbd7c3ef8b3506fe996caad19913656e9fda9206d8af4b7c1d6fa240` | MATCH |
-| `tools/audit-pinned-extraction.mjs` | `26972d9cbd45ca0a0ecaa53dddd9e019faf7cba1ceaffbc96bdb774eee4028ec` | MATCH |
-| `tools/verify-context-tools.mjs` | `3c21ca81b908cb63addbbfb25181d262d6ac78b9cb96c4ad5827974a2058a6a2` | MATCH |
-| `tools/verify-service-parity.mjs` | `ee6e6973c59eb8ed785df3f039f232f23ee3dbe743540f8535933c89a66f688c` | MATCH |
+- HEAD/tree:
+  `c3882ec057d1f19dd729977730a87ac6e76e5714` /
+  `14ccf48df9155462efbbf798662cce7fd0f68b53`
+- all objects / sole-branch reachable objects: `507 / 507`
+- both sorted object-list SHA-256 values:
+  `6c9bf63de3f88386a392d5b30f2935133837bdf61db8c85e430f823d36c4a165`
+- tracked paths / no-follow filesystem files: `190 / 190`
+- both sorted path-list SHA-256 values:
+  `cb0516ae7a7b638925fee349464d74cccf5ab1c1ca3c03bc97701d72896ea64b`
+- tracked partition: `190 = 38 target-only + 152 source-derived`
+- source-derived partition: `152 = 144 ported + 7 rewritten + 1 duplicated`
 
-### Target Git blob OID bindings
+After removing private `node_modules` and reviewer scratch configs, the private
+clone again had zero status bytes, the same 507-object and 190-file closures,
+clean fsck, no remote, and exact HEAD/tree. Shared-target post-audit also stayed
+clean at the same HEAD/tree with no `node_modules`.
 
-| Disposition | Path | Recorded and independently recomputed `target_blob_oid` | Result |
-|---|---|---|---|
-| rewritten | `src/echo-home/state-paths.ts` | `c81342401b31e2a89eb4d76e344e355d7c2790af` | MATCH |
-| duplicated | `src/enrich/granola-signals.ts` | `ebfd98816f23729192c20230e582351d94f4e587` | MATCH |
-| rewritten | `src/mcp/server.ts` | `5182cc601d3be54bfbf1bae80217955f553001af` | MATCH |
-| rewritten | `tests/echo-home/paths.test.ts` | `f842aee9645aca4f266e3273943cdee602485a55` | MATCH |
-| rewritten | `tests/mcp/recent-calls-endpoint.test.ts` | `119dc15c08f72891255679235646e19cd276ed17` | MATCH |
-| rewritten | `tests/mcp/server.test.ts` | `645fc78de697fbf1c84e08fa8a0aa019d3c5efd6` | MATCH |
-| rewritten | `tests/mcp/tools/recent-work-context.test.ts` | `d4ffb9e47495a44bf8610709afde8b66cb8aac02` | MATCH |
-| rewritten | `tests/mcp/tools/search-memories.test.ts` | `fbd739babe6dc33a1ac910d3e0f17767132d260c` | MATCH |
+All 33 SHA-256 bindings parsed from the remediation record matched the exact
+target files. All eight rewritten/duplicated target Git blob OIDs matched both
+the record and `HEAD:path`.
 
-### Ceremony and record hashes
+## Offline native lifecycle
 
-| Object | Reproduced value | Result |
-|---|---|---|
-| R3 migration record | `7be30a57b8e07634a3846f75a3d0165f97026a6cc2e789a287a43b3aa68a9f32` | MATCH; evidence copy byte-identical to builder-head blob |
-| 217-path inventory | `8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37` | MATCH |
-| AC3 aggregate | `632a7b2f2515a68d92e819fcedfa5d26f3960bb631995046ccf3d23de245da90` | MATCH |
-| `better_sqlite3.node` | `289ac2671fc501b275af7ce170ea2ef84e07be7e2a4a403aaa055cef02018557` | MATCH |
-| Scratch tsconfig | `7164ed9356aa3bd1d9108283eee164053bc6f251418d0aa1dc4d4b02726bf78f` | MATCH FROM EMBEDDED BYTES |
-| Scratch eslint config | `df912afc56372010d08414de6421d28fee931b908cdbbf0fd742ecf20e605bba` | MATCH FROM EMBEDDED BYTES |
-| Shared-target object set | `86d85edc58d6dea40e26265b2bd0b0cbb6a56f2c530cd0ddbe453a223b3a621b` | MATCH PRE/POST |
+- Reviewer cache fill was script-disabled and separate from acceptance install:
+  target lock 291 packages; pinned-source lock 299 packages.
+- Private target install under
+  `sandbox-exec '(version 1) (allow default) (deny network*)'`:
+  `npm ci --offline --ignore-scripts --no-audit --no-fund`, exit 0, 291 packages.
+  `better_sqlite3.node` was absent immediately afterward.
+- Immediately before/after install and rebuild, DNS and HTTPS failed
+  `ENOTFOUND`, direct-IP TCP failed `EPERM`, and loopback accepted outside the
+  profile but failed `EPERM` inside it.
+- Exact rebuild under the same profile:
+  `npm rebuild better-sqlite3 --offline --foreground-scripts --build-from-source`
+  with `npm_config_nodedir=/usr/local/Cellar/node@22/22.22.1_1`, exit 0.
+- Native artifact: 1,985,384 bytes, x86_64 Mach-O bundle, SHA-256
+  `289ac2671fc501b275af7ce170ea2ef84e07be7e2a4a403aaa055cef02018557`;
+  in-memory SQLite smoke passed under network denial.
+- Secondary-download install fixture failed at the socket with
+  `SECONDARY_DENIED:ENOTFOUND`, exit 42, and produced no accepted observation.
+- AC3 independently repeated the pinned-source offline install/rebuild and
+  reproduced its bound source native lifecycle.
 
-## Cumulative F1–F6 and RR-F1 dispositions
+## AC8 direct child ceremony
 
-| Finding | Third-judgment disposition | Blocking? |
-|---|---|---|
-| **F1 — untracked `node_modules/`** | **CONFIRMED BENIGN.** Installation residue remains untracked; HEAD, tree, tracked partition, and object set were unchanged. | No |
-| **F2 — inaccurate recent-calls replay** | **RESOLVED FOR ACCEPTANCE.** The executable `replay_patch` includes the complete transformation and reproduces the committed target exactly. The ignored legacy descriptive fields remain recordable LOW drift but are not enforcement inputs. | No |
-| **F3 — scratch-config bytes absent** | **RESOLVED.** Both configurations are embedded verbatim, reproduce `7164ed93…` and `df912afc…`, and passed byte-identical typecheck/lint replay. | No |
-| **F4 — incorrect test-file count** | **RESOLVED.** The accepted target and third pass both bind and execute exactly 72 test files. | No |
-| **F5 — replay and anti-whole-blob enforcement absent** | **RESOLVED.** The verifier executes all seven replay patches, requires committed-target byte equality, rejects whole-blob substitution, validates the duplicate separately, and retains the fail-closed mutation fixtures. | No |
-| **F6 — rewritten rows omit target Git blob OIDs** | **RESOLVED.** Both provenance documents contain full 40-hex bindings for all seven rewritten rows and the duplicated row. The seven rewritten values match the second judgment’s table exactly. The verifier recomputes Git blob OIDs from target bytes and rejects missing, malformed, or mismatched values; the two new committed mutation fixtures pass. | No |
-| **RR-F1 — stale aggregate test count** | **RESOLVED.** The R3 record states and the third pass reproduces exactly 72 files, 973 passed, 17 skipped, and 0 failed. | No |
+The reviewer launched the adjudicated real child with `node --import tsx`,
+detached as process-group leader, on a fresh synthetic home:
 
-## Verdict
+- FD3 readiness was one canonical 46-byte JSON-LF record, exact keys
+  `host,port,pid`, host `127.0.0.1`, and `pid == child.pid`; no extra FD3 bytes.
+- Direct ping, capture, search, atoms, clusters, and wait requests each returned
+  HTTP 200; search and atoms returned the synthetic capture and wait timed out
+  as specified.
+- Child stdout/stderr were both zero bytes.
+- SIGTERM produced exit `0` with no signal inside the five-second bound; the
+  negative process-group probe returned `ESRCH` afterward.
+- The committed 9-test AC8 battery separately proved schema violations, body
+  and result limits, the five-second slow-body deadline, inherited-environment
+  and non-loopback rejection, readiness-failure cleanup, uncooperative-group
+  SIGKILL fallback with rejected success, and graceful-only success.
 
-**Verdict: ACCEPT**
+## RR4-F1 — blocking: byte-bound lint config depends on the clean shared target
 
-The founder-authorized R3 cycle closes F6 to the second judgment’s stated remedy. All seven rewritten rows now bind their exact target Git blob OIDs, the duplicated row carries the same uniform binding, the verifier enforces those bindings from target bytes, and the fail-closed fixtures pass. RR-F1 is corrected, every prior finding remains resolved or benign, all bound hashes reproduce, and the accepted target remained invariant throughout the third pass.
+The migration record binds these exact scratch configurations:
 
-This acceptance proves only the sealed local DEV split. It grants no authority transfer, installation, release, or maturity advancement: `authority:false`, `installed:false`, maturity remains **DEV**, and Project_echo remains the active daemon/MCP and live-state authority.
+- tsconfig SHA-256:
+  `7164ed9356aa3bd1d9108283eee164053bc6f251418d0aa1dc4d4b02726bf78f`
+- ESLint config SHA-256:
+  `df912afc56372010d08414de6421d28fee931b908cdbbf0fd742ecf20e605bba`
+
+The exact tsconfig, placed at the private-clone root, produced zero TypeScript
+errors. The exact ESLint config contains:
+
+```js
+import tsParser from '/Users/zhenye/Desktop/echo-context/node_modules/@typescript-eslint/parser/dist/index.js';
+import tsPlugin from '/Users/zhenye/Desktop/echo-context/node_modules/@typescript-eslint/eslint-plugin/dist/index.js';
+```
+
+The redo contract requires `/Users/zhenye/Desktop/echo-context/node_modules` to
+be absent, and the reviewer confirmed it was absent before lint. Therefore this
+exact command from the private clone:
+
+```text
+/usr/local/bin/node node_modules/eslint/bin/eslint.js \
+  --config .reviewer-eslint.config.mjs 'src/**/*.ts' 'tests/**/*.ts'
+```
+
+exited 2 with:
+
+```text
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+'/Users/zhenye/Desktop/echo-context/node_modules/@typescript-eslint/parser/dist/index.js'
+```
+
+Creating that directory or a symlink would mutate the accepted target, violate
+its exact 190-file filesystem closure, and violate this review's strict
+read-only target contract. Rewriting the two imports to the private clone made
+a diagnostic config with SHA-256
+`eebecf37f29b1b5bff7fa7f7a13f3fcdce1524ad039befaf788bd8f3a45d8c76`;
+that equivalent lint exited 0 with zero findings. It does not satisfy the
+founder-adjudicated requirement to replay the byte-identical recorded config.
+
+**Disposition: blocking.** Replace the embedded ESLint bytes with a relocatable
+configuration that resolves dependencies from the reviewer's current clone,
+bind the new bytes/hash, and prove the exact config from a clean independent
+clone without any accepted-target write.
+
+## RR4-F2 — low: README names a stale AC3 aggregate
+
+Tracked `README.md` says the source/target aggregate is
+`2f0b28f6b62d31682db30b63139e21cc42977713500a1655f65213f69d7f427e`.
+The real source/target stdio replay, committed provenance, and remediation
+record all reproduce
+`6569b0472372ad666404aa22bcf5b1e0e0c716b573dec35c4b9212864420bba2`.
+
+This is descriptive drift, not evidence-verifier drift, and is non-blocking by
+itself. Correct it in the required redo so the tracked status/evidence summary
+does not contradict the accepted proof. Because README is tracked, correcting
+it will require a new target HEAD/tree and refreshed target hashes.
+
+## Test counts observed
+
+- Final config-isolated private-clone full suite: **72/72 files passed; 987
+  passed, 17 intentionally skipped, 0 failed (1,004 total)**.
+- Focused remediation files within that run: **4 files / 36 passed** — AC2 6,
+  AC3 7, AC6 14, AC8 9.
+- Separate direct AC3 run: **1 file / 7 passed**, including real raw-source and
+  target peers plus all mutation/protocol probes.
+- TypeScript exact-config check: **0 errors**.
+- ESLint exact-config check: **1 command failed, exit 2** (RR4-F1).
+- ESLint relocatable-equivalent diagnostic: **exit 0, 0 findings**.
+- Tool syntax: **6/6 `tools/*.mjs` passed `node --check`**.
+- Commit whitespace check: **pass**.
+- Direct runtime/source/parity tools: **3/3 pass** plus the canonical
+  217-line inventory digest.
+- AC8 direct service endpoints: **6/6 HTTP 200**, clean graceful teardown.
+
+The first full-suite invocation used a valid isolated cache at a nonstandard
+scratch path while the committed AC3 test defaults to `$HOME/.npm`; that single
+AC3 case correctly rejected the missing path. Pointing the same scratch HOME's
+`.npm` at the already script-disabled cache fixed reviewer setup, after which
+the final full suite above passed. This was not a candidate failure and is not
+included in the final failed-test count.
+
+## Design-choice judgments and deferred risks
+
+- **Accepted:** the identical hash-bound scratch registrar on raw pinned source
+  and target is a reasonable implementation of the founder-adjudicated AC3
+  mapping because the pinned source server is HTTP-only. Full-roster,
+  initialize/tools-list envelopes, ignored IDs, per-case envelopes, virtual
+  clock, lifecycle, and aggregate are independently bound.
+- **Accepted:** the source-valid `timeout:1` plus exact 1,000 ms virtual advance
+  inside the literal 10 ms wall budget is enforced and mutation-tested.
+- **Accepted:** the adjudicated pinned-`tsx` real AC8 child preserves FD3,
+  loopback, process-group, and forced-teardown semantics.
+- **Deferred, not a blocker for local DEV:** residual onboarding/task-state,
+  coord/product vocabulary and the byte-ported Project_echo default capture
+  path remain qualification risks already dispositioned by the redo sidecar.
+  They must be removed or explicitly adjudicated before any qualification or
+  authority claim.
+
+## Suggested fixups
+
+1. Make the embedded ESLint configuration relocatable while retaining the same
+   rule set; bind its exact new bytes and SHA-256 in the migration record.
+2. From a new config-isolated private clone, prove byte-identical typecheck and
+   lint without reading or writing shared-target `node_modules`.
+3. Correct README's AC3 aggregate to `6569b047…`, creating a new target
+   HEAD/tree and refreshing every affected target/hash/object binding.
+4. Publish a new immutable builder head and request another fresh independent
+   codex-ops child. Do not install, publish, transfer authority, or advance
+   maturity during this proof repair.
+
+## Merge-conflict preview
+
+Against current main `e113592c199058f32621c06551bcaab18227d603`, no textual
+conflict is expected: main does not contain either item-135 migration record,
+and the feature's net contribution is confined to the migration record and this
+review record. Preserve current-main backlog, task-state, generated-index,
+run-log, journal, and sidecar state; apparent two-dot reversions from the older
+feature ancestry are not merge inputs. This rejection is not merge approval.
