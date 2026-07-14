@@ -8,19 +8,19 @@ Materialize the internal orchestration protocol as a source-independent local `e
 - Source is raw Git objects at `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; dirty/replacement/filter/external-object inputs fail.
 - One builder creates absent `/Users/zhenye/Desktop/echo-loop`, local branch `migration/2026-07-13-134`, fixed identity, and no remote; EEXIST aborts.
 - No dedicated evidence tree, migration controller, publisher, capsule, process watcher, or custom handoff/recovery is built.
-- Source fixed point bootstraps variant configs/workspaces by raw-tree enumeration and keys traversal by canonical binding context.
+- Reviewed source-seed and edge-record schemas independently cover raw directory expansion, variant configs/workspaces, Node builtins, repository/npm/toolchain, shell, and Python edges.
 - Final HEAD dependencies partition local blobs, npm rows, and toolchain rows; product/context/history sources are excluded.
-- `role.invoked` is reserved to `invokeRole`; deterministic invocation identity and bounded synchronous PENDING publication/retry never return false success.
-- SQLite init is sidecar-free DELETE mode and no-replace; stale final sidecars fail BUSY.
-- Watcher actions use PREPARED/APPLIED/ESCALATED data, candidate commit, exact Git ref CAS, and same-digest crash reconciliation.
-- Direct/npm verifier envelopes are route-local; canonical inner roster projections must match.
+- `role.invoked` is reserved to `invokeRole`; canonical payload hash is immutable across PENDING/PUBLISHED and one 2s entry-to-return budget controls retry.
+- SQLite init uses same-directory hard-link no-replace, fsync ordering, winner reconciliation, DELETE mode, and final sidecar checks.
+- Watcher actions build in ephemeral/private index, require founder approval token, serialize APPLYING leases, non-force push expected-parent candidate, and reconcile authoritative remote state.
+- Direct/npm routes own separate roots/envelopes but synthesize one scrubbed canonical workload environment and inner projection.
 - Install/test environments are allowlisted and all real workflow tests use only disposable repos/remotes.
 - Normal Project_echo builder workflow owns handoff; independent review reruns from a fresh clone.
 - Active Project_echo loop remains installed/authoritative; target is local and not installed.
 
 ## open_questions
 
-- R15 by `codex` and `codex-ops` must confirm the simplified migration boundary plus resolver, invokeRole, SQLite, watcher-CAS, and verifier semantics.
+- R16 by `codex` and `codex-ops` must confirm source/edge schemas, payload/budget rules, init publication, remote-aware watcher recovery, route isolation, and named review handoff.
 - Later cutover decides installation, remote, per-repo state, and authority transfer.
 
 ## dont_touch

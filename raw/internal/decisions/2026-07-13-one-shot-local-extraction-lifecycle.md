@@ -1,7 +1,7 @@
 # Local extraction is an attended build, not a product
 
 Date: 2026-07-13
-Status: locked for proposal R15
+Status: locked for proposal R16
 Applies to: items 133 (`echo-brain`), 134 (`echo-loop`), and 135 (`echo-context`)
 
 ## Decision
@@ -9,6 +9,8 @@ Applies to: items 133 (`echo-brain`), 134 (`echo-loop`), and 135 (`echo-context`
 The three local source splits are one-time, operator-attended repository builds. They will not ship or leave behind a generic extraction CLI, lifecycle state machine, lock/takeover protocol, publication transaction, recovery daemon, committed sandbox profile, or migration-framework tests in Project_echo.
 
 They also do not create a dedicated `.echo-migration-evidence` tree, native evidence publisher, failure capsule, custom descendant supervisor, credential transport, or second Git handoff protocol. Those mechanisms made the proposal harder to implement and review without improving the standalone repositories. Normal Project_echo builder workflow owns claim, run log, commit, feature-branch push, and review publication.
+
+For items 133–135, the founder explicitly overrides the default cross-vendor proposal roster with two independent Codex bindings: `codex` and `codex-ops`. Independence is binding/session separation, not vendor diversity; both responses remain required in every verification round.
 
 Each assigned builder owns one absent, disjoint target path and materializes it directly from pinned Project_echo commit objects. The durable outputs are only:
 

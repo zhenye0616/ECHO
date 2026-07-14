@@ -12,6 +12,7 @@ requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/**                      # NEW standalone context repository; local only
   - raw/internal/migrations/2026-07-13-135-echo-context.md     # NEW Project_echo provenance/parity record
+  - raw/internal/migrations/2026-07-13-135-echo-context-review.md # independent same-host review record
   - raw/internal/agent-runs/**                                 # workflow-owned failure/completion run log
   - backlog/task-state/2026-07-13-135-local-echo-context-source-extraction/builder.md # workflow continuity pointer
   - backlog/ready/2026-07-13-135-local-echo-context-source-extraction.md # workflow claim source
@@ -23,7 +24,8 @@ spec_refs:
   - raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md # context remains internal substrate
   - raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md # product maturity remains separate
   - raw/internal/decisions/2026-07-12-g2-terminal-dispositions-and-repository-topology.md # source topology/provenance
-  - src/mcp/tools.ts                                         # current mixed tool registry
+  - src/mcp/server.ts                                        # current mixed tool registry
+  - src/mcp/tools/                                           # current context/loop/product tool implementations
   - src/storage/interface.ts                                 # storage contract
   - tests/mcp/                                               # retrieval/API behavior
   - tests/storage/                                           # storage behavior
@@ -43,9 +45,11 @@ review_notes: ""
 
 `echo-context` owns generic capture, normalization, storage, clustering/retrieval, permissions/health, and context APIs. This item materializes that closure from Project_echo commit `2971310441b69735cbe759293abd8c4d044bf347` into `/Users/zhenye/Desktop/echo-context` and proves it only on synthetic state. Project_echo remains the active daemon/MCP, backup, and authority. Live-state migration, installation, remote creation, and cutover are later checkpoints.
 
+## Acceptance Criteria
+
 ### AC1 — Create one ordinary local repository from raw pinned Git objects
 
-One builder owns `/Users/zhenye/Desktop/echo-context`; sibling lanes never touch it. It verifies absence, performs one non-recursive mkdir that fails on EEXIST, and initializes `migration/2026-07-13-135` with fixed local identity, hooks/signing/templates disabled, and no remote. The accepted target is clean with one branch/root history, no alternates/promisor/replace state, and passing `git fsck --full`.
+One builder owns `/Users/zhenye/Desktop/echo-context`; sibling lanes never touch it. It verifies absence, performs one non-recursive mkdir that fails on EEXIST, and initializes `migration/2026-07-13-135` with fixed local identity, hooks/signing/templates disabled, `core.logAllRefUpdates=false`, and no remote. The accepted target is clean with one branch/root history, no reflogs, no alternates/promisor/replace state, and passing `git fsck --full`.
 
 Source reads use `/usr/local/bin/git` 2.37.3 with explicit `--git-dir`, `GIT_CONFIG_NOSYSTEM=1`, empty global config, `GIT_NO_REPLACE_OBJECTS=1`, and no alternates. The builder rejects replace/graft refs, partial-clone/promisor config, filters, export-subst attributes, symlinks, and submodules; verifies pinned commit/tree/blob types; and materializes raw bytes through literal `ls-tree` plus `cat-file --batch`. Dirty checkout, replacement-object, and export-subst fixtures cannot change source, package, lock, or test bytes.
 
@@ -61,7 +65,9 @@ This is a trusted attended build, not a crash-atomic or supply-chain containment
 
 `context-tools.v1.json` registers exactly `echo_ping`, `echo_resolve_mru`, `find_clusters`, `get_atom`, `get_atoms`, `get_recent_work_context`, `search_memories`, and `wait_for_new_turns`. Target exposes those eight and no product/loop extras.
 
-Before target finalization, builder exports raw pinned source blobs to scratch, installs from the pinned lock, launches source MCP over stdio on fresh synthetic state, and runs the committed per-tool fixture matrix. Source may expose a mixed roster; projector requires the eight IDs exactly once, byte-projects only them, and classifies ignored non-context IDs. Canonical descriptor and response bytes use fixed time/random/IDs, recursively sorted object keys, preserved arrays, and named volatile pointers. Target runs the same cases; per-case and aggregate SHA-256 must match. Descriptor-only and semantic mutations fail.
+Before target finalization, builder exports raw pinned source blobs to scratch, installs from the pinned lock, launches source MCP over stdio on fresh synthetic state, and runs `tests/fixtures/context-tool-parity.v1.json`. The immutable case order is `ping-empty`, `resolve-mru-granola`, `find-empty`, `find-seeded`, `get-atom-present`, `get-atom-missing`, `get-atoms-mixed`, `recent-seeded`, `search-seeded`, `wait-timeout`; requests use fixed UUID atoms, timestamps, sources, repo path `/fixture/repo`, query `alpha`, limit 10, and wait timeout 10ms defined literally in that file. Seed state is one empty DB plus three byte-pinned atoms/sources and one cluster. Fixed clock/random/IDs make the exhaustive volatile-pointer allowlist empty; adding a pointer requires a new reviewed spec.
+
+Source may expose a mixed roster; projector requires the eight IDs exactly once, byte-projects only them, and classifies ignored non-context IDs. Canonical descriptor/response bytes are UTF-8 JSON with recursively byte-sorted object keys, arrays preserved, no insignificant whitespace, and LF. Aggregate framing in case order is `case-id + NUL + lowercase response SHA-256 + LF`, including final LF. The source-run aggregate and each case hash are recorded before target materialization and must equal target/reviewer runs. Descriptor-only, omitted-case, reordered-case, masked-field, and semantic mutations fail.
 
 ### AC4 — Own isolated context state and migrations
 
@@ -73,9 +79,11 @@ Before target finalization, builder exports raw pinned source blobs to scratch, 
 
 ### AC6 — Preserve capture, storage, and retrieval behavior
 
-The pinned inventory is the LF-sorted raw-tree output for `src/capture`, `src/normalize`, `src/storage`, `src/trace`, `src/echo-home`, `src/enrich`, `src/logging`, `src/mcp`, `src/util` and matching test roots: exactly 211 paths (109 source, 102 test/fixture), SHA-256 `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
+The exhaustive roots are `src/{capture,normalize,storage,trace,echo-home,enrich,logging,mcp,util}` and `tests/{capture,normalize,storage,trace,echo-home,enrich,logging,mcp,util}`. Canonical inventory command is `env -i LC_ALL=C PATH=/usr/local/bin:/usr/bin:/bin GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 /usr/local/bin/git --git-dir=<project-git-dir> ls-tree -rz --full-tree --name-only 2971310441b69735cbe759293abd8c4d044bf347 -- <18-literal-roots> | /usr/local/bin/node tools/emit-source-inventory.mjs`; the script parses NUL paths, selects exact root-or-descendant membership, rejects invalid UTF-8/NUL/LF, sorts raw UTF-8 bytes, and emits each path plus LF including final LF. Output is exactly 211 paths (109 source, 102 test/fixture), SHA-256 `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
 
-`provenance/source-evidence.v1.json` records source path/mode/blob/content hash. `parity-matrix.v1.json` gives each source row one target assertion and `ported`, `rewritten`, or `excluded` rationale, with exact allowlists for product/loop exclusions. Production/context tests cannot be excluded; rewrites record exact before/after bytes and replay. `source-extraction.v1.json` also partitions every regular tracked target blob except itself; target-only files are limited to package/lock/README, provenance/check tools, and standalone tests named here. Omission, authored replacement of excluded behavior, whole-blob rewrite, and target-only extra fixtures fail.
+`provenance/source-evidence.v1.json` records source path/mode/blob/content hash. `parity-matrix.v1.json` gives each source row one target assertion and `ported`, `rewritten`, or `excluded` rationale, with exact product/loop exclusion policy bound to eventual `ready_content_sha`. Production/context tests cannot be excluded; rewrites record exact before/after bytes and replay.
+
+The exhaustive target-only policy is: `package.json`, `package-lock.json`, `README.md`, `context-tools.v1.json`, `schemas/service-api.v1.json`; `provenance/{target-only-policy,runtime-inventory,source-evidence,parity-matrix,source-extraction,lifecycle-expected,lifecycle-observed,native-toolchain}.v1.json`; the eight correspondingly named schemas under `provenance/schemas/`; `tools/{check-runtime-inventory,check-parity,audit-pinned-extraction,verify-context-tools,verify-service-parity,emit-source-inventory}.mjs`; `tests/fixtures/context-tool-parity.v1.json`; `tests/api/context-only-roster.test.ts`; `tests/integration/context-service.test.ts`; and `tests/migration/{parity-matrix,context-tool-evidence,dependency-set,committed-source-only,source-independence,object-closure}.test.ts`. `target-only-policy.v1.json` copies this exact list and ready SHA; accepted HEAD equality is exact. `source-extraction.v1.json` partitions every other regular tracked blob. Omission, authored replacement, whole-blob rewrite, and extra-path fixtures fail.
 
 Target tests prove capture allow/reject, normalization determinism/identity, SQLite/memory conformance, migrations, append ordering, metadata/current-source matching, clustering/open-loop hints, search pagination, source/session resolution, newest-first body retrieval, caps/truncation, wait semantics, and stateless MCP transport.
 
@@ -83,17 +91,19 @@ Target tests prove capture allow/reject, normalization determinism/identity, SQL
 
 After target HEAD is committed, builder and reviewer each create a private `git clone --no-local --no-hardlinks`, detach the accepted OID, remove origin, and verify clean/no-remotes/no-alternates/no-promisor/no-replace state. A minimal environment uses scratch HOME/XDG/TMP/cache/config and contains no live-state, credential, Project_echo, or sibling path.
 
-Dependency fetch/install follows the exact committed lock. The threat model trusts those pinned dependency packages; it does not claim hostile lifecycle containment. `provenance/lifecycle-plan.v1.json` records every root/transitive automatic hook and native build, including `better-sqlite3`, with package/version/integrity, command, working directory, toolchain inputs, and outputs. Unexpected hooks, unpinned downloads, mutable path/Git/workspace dependencies, or closure differences fail. Builder records Node/npm and actual native compiler/SDK/header hashes used; reviewer repeats install independently.
+Before final target commit, `provenance/lifecycle-expected.v1.json` is derived solely from raw package/lock/package-tarball manifests and lists every root/transitive hook, exact package/version/integrity, working directory, allowed command, expected outputs, and toolchain inputs; only the pinned `better-sqlite3` rebuild may execute. Cache fill admits only lock URL/integrity tarballs. Installs use absolute Node/npm-cli `ci --offline --ignore-scripts --no-audit --no-fund` with empty configs and deny-all network, then exact `npm rebuild better-sqlite3 --offline --foreground-scripts` with `npm_config_nodedir=/usr/local/Cellar/node@22/22.22.1_1`, build-from-source, and deny-all network. Unknown hooks, secondary downloads, path/Git/workspace dependencies, or output/closure drift fail.
 
-From the private clone, direct-Node tools run runtime-inventory, source evidence/parity/extraction, context-tool fixtures, typecheck, lint, capture/normalize/storage/retrieval tests, stdio/service parity, whitespace, source-independence, `git fsck --full`, and recursive diff-tree checks. The read-only operator audit alone accesses pinned Project_echo objects and recomputes the exact 211-path raw closure/dispositions. Shared target HEAD/tree, refs/config/status, and filesystem-versus-HEAD enumeration are checked before and after. Any failure stops; no adversarial descendant-containment claim is made.
+That pre-commit draft install writes `provenance/lifecycle-observed.v1.json` and `native-toolchain.v1.json` with invoked script, process argv, produced files/hashes, Node/npm/compiler/SDK/header hashes, and network-denial result; then final HEAD is committed. Each post-commit builder/reviewer private install writes scratch observation and must equal committed expected/observed/toolchain projections. Fixtures cover transitive hook, secondary download, wrong tool, and output drift.
+
+From the private clone, direct-Node tools run runtime-inventory, source evidence/parity/extraction, context-tool fixtures, typecheck, lint, capture/normalize/storage/retrieval tests, stdio/service parity, whitespace, source-independence, fsck, and recursive diff-tree. Operator audit alone accesses pinned source objects and recomputes the 211-path closure/dispositions. Shared target checks also require sole branch `migration/2026-07-13-135`, no tags/other refs/reflogs, and exact equality between all OIDs from `git cat-file --batch-all-objects --batch-check='%(objectname)'` and reachable OIDs from `git rev-list --objects --no-object-names refs/heads/migration/2026-07-13-135`; `git fsck --full --no-reflogs --unreachable` must emit nothing. Amended/deleted staged-blob fixtures fail. HEAD/tree, refs/config/status, object set, and filesystem-versus-HEAD are checked before/after.
 
 ### AC8 — Prove local service parity and record the normal builder handoff
 
-`tests/integration/context-service.test.ts` launches with synthetic `ECHO_CONTEXT_HOME`, binds loopback port 0, reports readiness through a dedicated FD, and proves ping, capture, search, clustering, body fetch, wait, bounded startup/request/shutdown, and ordinary process-group cleanup. It never reads live state or exposes a non-loopback listener.
+The eight MCP tools remain read-only retrieval. Capture is a separate service-only `POST /v1/capture` operation, never a ninth MCP tool. `schemas/service-api.v1.json` pins `GET /v1/ping` and POST `/v1/{capture,search,clusters,atoms,wait}` request/response JSON with unknown-field rejection. `tests/integration/context-service.test.ts` runs `/usr/local/bin/node tools/verify-service-parity.mjs --home <scratch> --host 127.0.0.1 --port 0 --ready-fd 3`; the child is process-group leader and writes exactly one canonical JSON-LF readiness record `{host:"127.0.0.1",port:<1..65535>,pid:<int>}` to FD3. Startup is 10s, each request 5s, wait case 100ms, graceful shutdown 5s then group TERM 5s/KILL 5s. It proves ping, service capture, search, clustering, body fetch, wait, and no non-loopback listener/live-state read.
 
-The builder follows `docs/AGENT_INSTRUCTIONS.md` for Project_echo claim, run log, migration record, backlog move, commit, and feature-branch push; this spec defines no endpoint, credential, receipt, or second handoff protocol. The record contains source SHA, target path/branch/HEAD/tree, package/lock/runtime/provenance/parity/tool hashes, exact commands/exits, context-tool aggregate, service results, no-remotes/clean checks, differences, `authority:false`, and `installed:false`. Target history remains unchanged and has no remote.
+The builder follows `docs/AGENT_INSTRUCTIONS.md` and stops at pending_review. The immutable feature-head migration record contains source SHA, target HEAD/tree, package/lock/runtime/provenance/parity/lifecycle/tool hashes, commands/exits, context-tool aggregate, service results, object-closure/no-remotes/clean checks, differences, `authority:false`, and `installed:false`. Target history remains unchanged and has no remote.
 
-Independent review binds the review request bytes/`spec_commit_sha`, accepted target HEAD/tree, and migration-record commit, then reruns AC1 object-state and AC7/AC8 verification from its own clone/synthetic state. Passing proves only a local source split; Project_echo daemon/MCP/live state remain authoritative.
+An independent same-host reviewer binds request bytes/`spec_commit_sha`, pending-review feature commit, migration-record hash, and target HEAD/tree; reruns AC1/AC7/AC8 from its own clone/synthetic state; and writes `raw/internal/migrations/2026-07-13-135-echo-context-review.md` with identity/independence, commands, result hashes, object closure, and verdict. Passing proves only a local split; Project_echo daemon/MCP/live state remain authoritative.
 
 ## Out of Scope (Don't Drift)
 
@@ -119,6 +129,7 @@ Independent review binds the review request bytes/`spec_commit_sha`, accepted ta
 - `/Users/zhenye/Desktop/echo-context/tests/migration/dependency-set.test.ts` — final-HEAD edges, lock, lifecycle, and toolchain record.
 - `/Users/zhenye/Desktop/echo-context/tests/migration/committed-source-only.test.ts` — dirty/replacement/filter bytes excluded.
 - `/Users/zhenye/Desktop/echo-context/tests/migration/source-independence.test.ts` — no source/sibling/live-state escape.
+- `/Users/zhenye/Desktop/echo-context/tests/migration/object-closure.test.ts` — no reflog-only, dangling, unreachable, or extra target object.
 - Independent migration-record review — accepted HEAD/tree, rerun commands, no remote, and false authority/live-state evidence.
 
 ## After Completion (Strategist Notes)

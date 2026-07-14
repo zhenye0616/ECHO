@@ -12,6 +12,7 @@ requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - /Users/zhenye/Desktop/echo-brain/**                         # NEW standalone client-product source repository; local only
   - raw/internal/migrations/2026-07-13-133-echo-brain.md       # NEW Project_echo provenance/parity record
+  - raw/internal/migrations/2026-07-13-133-echo-brain-review.md # independent same-host review record
   - raw/internal/agent-runs/**                                 # workflow-owned failure/completion run log
   - backlog/task-state/2026-07-13-133-local-echo-brain-source-extraction/builder.md # workflow continuity pointer
   - backlog/ready/2026-07-13-133-local-echo-brain-source-extraction.md # workflow claim source
@@ -44,11 +45,13 @@ review_notes: ""
 
 Item 132 defined the complete client-facing Team decision product. This item materializes that closure from exact Project_echo commit `2971310441b69735cbe759293abd8c4d044bf347` as a separate local repository at `/Users/zhenye/Desktop/echo-brain`. Project_echo remains source, backup, and authority. Remote creation, cutover, and maturity advancement are later founder checkpoints.
 
+## Acceptance Criteria
+
 ### AC1 — Create one ordinary local repository from raw pinned Git objects
 
-One builder owns `/Users/zhenye/Desktop/echo-brain`; sibling lanes never touch it. The builder verifies the target is absent, then its first target write is one non-recursive `mkdir`; EEXIST aborts. It initializes local branch `migration/2026-07-13-133` with identity `ECHO Migration Agent <migration@echo.local>`, hooks/signing/templates disabled, and no remote. The accepted target is clean with exactly that branch, one committed root history, no alternates/promisor/replace state, and `git fsck --full` passing.
+One builder is the sole target writer; sibling lanes never touch `/Users/zhenye/Desktop/echo-brain`. The builder-only creation gate verifies absence, performs one non-recursive mkdir that fails on EEXIST, and initializes local branch `migration/2026-07-13-133` with fixed identity, hooks/signing/templates disabled, and no remote. The accepted target is clean with exactly that branch, one committed root history, no alternates/promisor/replace state, and passing fsck. After handoff, an independent same-host reviewer is explicitly authorized read-only access and may create its own clone outside the target.
 
-All source reads use `/usr/local/bin/git` 2.37.3 with explicit `--git-dir`, `GIT_CONFIG_NOSYSTEM=1`, empty global config, `GIT_NO_REPLACE_OBJECTS=1`, and no alternates. The builder rejects replace/graft refs, partial-clone/promisor config, filters, export-subst attributes, symlinks, and submodules. It validates the pinned commit/tree/blob types and reads raw bytes with literal `ls-tree` plus `cat-file --batch`; checkout/archive filters and dirty worktree bytes are never inputs. Fixtures prove a dirty checkout, replacement object, and export-subst attribute cannot affect the target.
+All source reads use one launcher: `env -i HOME=<scratch> LC_ALL=C TZ=UTC PATH=/usr/local/bin:/usr/bin:/bin GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 /usr/local/bin/git --git-dir=<project-git-dir> ...`. It rejects `commondir`, `objects/info/alternates`, graft/replace refs, partial-clone/promisor config, config includes, filters/export-subst, and any inherited `GIT_DIR`, `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, or `GIT_CONFIG_COUNT/KEY/VALUE`. It validates commit/tree/blob types, enumerates `ls-tree -rz --full-tree`, parses NUL paths without quoting, and reads exact declared blob lengths through `cat-file --batch`. Fixtures cover hostile paths, dirty checkout, replacement objects, commondir/alternate/config redirection, and export-subst.
 
 This is a trusted, attended local build—not a crash-atomic migration system. Do not create a migration controller, evidence publisher, capsule, process watcher, lock/takeover protocol, or custom Git handoff. Ordinary command output is summarized in the Project_echo run/migration records. An interrupted target is unaccepted and founder-archived before a fresh attempt.
 
@@ -60,11 +63,11 @@ This is a trusted, attended local build—not a crash-atomic migration system. D
 
 ### AC3 — Preserve deterministic file-level provenance
 
-The source closure starts from the two entry points and allowed paths in pinned `product/source-boundary.v1.json`, the package template/shrinkwrap/README/runtime schema, and exactly the eight `tests/product/**` files established by item 132. A byte-sorted fixed-point resolver follows static TS/JS imports, dynamic literal imports/reads, package exports, schemas, fixtures, and literal child executables using raw pinned blobs. Unknown/computed repository-capable edges fail. The committed source plan records every reached path, Git mode, blob OID, and SHA-256.
+The reviewed policy is committed as `provenance/extraction-policy.v1.json` with `reviewed_spec_sha` equal to this item's eventual `ready_content_sha`. Its source seeds are exactly the two entry points and allowed-path expansion in pinned `product/source-boundary.v1.json`, raw `product/package.template.json -> package.json`, raw `product/npm-shrinkwrap.json -> npm-shrinkwrap.json`, `product/README.md -> README.md`, the runtime schema, and the eight literal paths returned by the pinned item-132 `tests/product` inventory. A byte-sorted fixed-point resolver follows static/dynamic literal imports/reads, package exports, schemas, fixtures, and literal child executables using raw blobs. Unknown/computed repository-capable edges fail. The source plan records every reached path, Git mode, blob OID, and SHA-256.
 
-Every source row appears exactly once as `copied`, `relocated`, `rewritten`, or `excluded`. Copied/relocated rows preserve bytes and mode. Production TypeScript and the eight product tests may not be rewritten or excluded. Rewrites are limited to exact package/import-name literals and generated package/README metadata, with before/after bytes, occurrence counts, and replay hash; whole-blob replacement is forbidden. Exclusions are limited to boundary-forbidden product-external behavior and may not be replaced by an authored equivalent. Target-only rows are limited to `package.json`, lockfile, README, provenance schemas/manifests/checkers, and new standalone tests/tools named by this spec.
+Every source row appears exactly once as `copied` or `relocated`; reviewed rewrite and exclusion allowlists are empty. Production TypeScript and all eight tests remain byte/mode identical. Boundary-forbidden behavior is outside the source closure, not excludable. The exhaustive target-only set is: `provenance/extraction-policy.v1.json`, `provenance/source-plan.v1.json`, `provenance/source-extraction.v1.json`, `provenance/test-parity.v1.json`, their four correspondingly named files under `provenance/schemas/`, `tools/check-provenance.mjs`, `tools/check-boundary.mjs`, `tools/check-dependencies.mjs`, `tools/audit-pinned-extraction.mjs`, and `tests/product/end-to-end-synthetic.test.ts`. Exact set equality is required. Relocated shrinkwrap bytes are identical and npm recognizes it as the sole lock; `package-lock.json` is forbidden.
 
-`provenance/source-extraction.v1.json` partitions every regular tracked target blob other than itself. Target-local `check:provenance` validates schemas, target hashes/modes, transform replay, exact allowlists, and full target partition. A read-only operator audit independently recomputes the pinned source closure/raw blob hashes and rejects omitted files, disposition evasion, authored replacements, or target-only extras.
+`provenance/source-extraction.v1.json` partitions every regular tracked target blob other than itself. Target-local `check:provenance` validates schemas, target hashes/modes, reviewed policy SHA, empty transform/exclusion sets, and full target partition. Read-only `tools/audit-pinned-extraction.mjs` is invoked exactly as `/usr/local/bin/node tools/audit-pinned-extraction.mjs --source-git-dir <project-git-dir> --source-sha 2971310441b69735cbe759293abd8c4d044bf347 --target-git-dir <clone>/.git --target-commit <accepted-oid> --policy provenance/extraction-policy.v1.json --out <absent-json>`. It independently runs AC1's object envelope and emits a versioned policy/spec/source-tree/target-tree/sorted-row/target-only/verdict result. Omission, policy mismatch, disposition evasion, hash/mode drift, or extra blob exits nonzero.
 
 ### AC4 — Enforce the product boundary natively
 
@@ -72,9 +75,9 @@ Every source row appears exactly once as `copied`, `relocated`, `rewritten`, or 
 
 ### AC5 — Own configuration, state, build, and artifact identity
 
-`schemas/runtime-config.v1.schema.json` preserves the client-local config contract using secret references only. `src/runtime/paths.ts` owns state distinct from Project_echo and siblings. `npm ci` from the committed lock, `npm run build`, `npm pack`, installation of the produced tarball into a fresh scratch project, CLI smoke/config/selftest, and artifact member-manifest hashing all succeed without Project_echo access.
+`schemas/runtime-config.v1.schema.json` preserves the client-local config contract using secret references only. `src/runtime/paths.ts` owns state distinct from Project_echo and siblings. Verification uses `/usr/local/bin/node` 22.22.1 and absolute npm-cli 10.9.4 under `env -i` with only scratch HOME/XDG/TMP, `LC_ALL=C`, `TZ=UTC`, umask 0022, `SOURCE_DATE_EPOCH`, `PATH=/usr/local/bin:/usr/bin:/bin`, empty npm user/global configs, and explicit cache/registry flags; `NODE_OPTIONS`, `NODE_PATH`, proxy, shell-startup, DYLD/LD, and inherited npm/Git variables are absent. Network is allowed only for lock-authorized registry fetch during first cache fill; later installs are offline. Root/dependency lifecycle scripts and resolved executables must match the reviewed dependency/toolchain plan. `npm ci`, build, pack, fresh-project tarball install, CLI smoke/config/selftest, and member-manifest hashing all succeed without Project_echo access.
 
-Two clean scratch clones of the same target commit build with `SOURCE_DATE_EPOCH` equal to the verified target commit time and produce identical tarball SHA-256/member manifests. The root README states `authority:false`, `maturity:DEV`, source SHA, item ID, and later-cutover requirement.
+Builder artifact, two builder clean-clone rebuilds, and reviewer rebuild use the accepted commit time and must share one tarball SHA-256, ordered member `{path,mode,size,sha256}` manifest, HEAD/tree, and lock hash; migration and review records bind that tuple. The README states `authority:false`, `maturity:DEV`, source SHA, item ID, and later-cutover requirement.
 
 ### AC6 — Preserve product behavior at the pinned boundary
 
@@ -82,15 +85,15 @@ Two clean scratch clones of the same target commit build with `SOURCE_DATE_EPOCH
 
 ### AC7 — Prove source independence from fresh clones
 
-After committing target HEAD, the builder and later reviewer each create their own `git clone --no-local --no-hardlinks`, detach the exact accepted OID, remove origin, and verify clean/no-remotes/no-alternates/no-promisor/no-replace state. From a minimal allowlisted environment with scratch HOME/XDG/TMP and no Project_echo/sibling paths, they run dependency, boundary, provenance, test-parity, typecheck, lint, full tests, synthetic end-to-end, clean build/package/install/smoke, source-independence, `git fsck --full`, and `git diff-tree -r --check --root HEAD`.
+After committing target HEAD, builder and reviewer each create a `git clone --no-local --no-hardlinks`, detach the accepted OID, remove origin, and verify clean/no-remotes/no-alternates/no-promisor/no-replace state. Under AC5's environment they run dependency, boundary, provenance, test-parity, typecheck, lint, full tests, synthetic end-to-end, clean build/package/install/smoke, source-independence, fsck, recursive diff-tree, and AC3's exact operator audit.
 
 The operator audit alone receives read-only access to the pinned Project_echo Git object database; target tests and runtime do not. Shared target status, refs, config, no-follow filesystem-versus-HEAD enumeration, and HEAD/tree are checked before and after clone verification. Any command failure stops the attended build; no claim is made that hostile child processes or local concurrent actors are contained.
 
 ### AC8 — Record the normal builder handoff and stop at DEV
 
-The builder follows `docs/AGENT_INSTRUCTIONS.md` for Project_echo claim, run log, migration record, backlog move, commit, and feature-branch push; this spec adds no second publication protocol. The migration record contains source SHA, target path/branch/HEAD/tree, package/lock/provenance/parity hashes, exact verification commands/exits, artifact SHA-256/member manifest, no-remotes/clean checks, differences, `authority:false`, and `maturity:DEV`. The target repo receives no remote and its history is not changed after the record is written.
+The builder follows `docs/AGENT_INSTRUCTIONS.md` for claim, run log, migration record, backlog move, commit, and feature-branch push. At the immutable pending-review feature head, `raw/internal/migrations/2026-07-13-133-echo-brain.md` binds source SHA, target path/branch/HEAD/tree, package/lock/provenance/parity hashes, commands/exits, artifact tuple, shared-target audit, differences, `authority:false`, and `maturity:DEV`. Target has no remote and history is unchanged afterward.
 
-An independent reviewer binds the review request path/bytes, `spec_commit_sha`, reviewer roster/membership, accepted target HEAD/tree, and migration-record commit. It reruns the full AC1 object-state/shared-target checks and AC7 verification from its own clone, then records its commands/results in the review response. Passing proves only a local DEV source split.
+An independent same-host reviewer binds request path/bytes, `spec_commit_sha`, roster/membership, pending-review feature commit, migration-record hash, and accepted target HEAD/tree. Builder-only mkdir/init is not rerun; reviewer-rerunnable pre/post audit is status/refs/config/object-state/fsck plus no-follow filesystem-versus-HEAD enumeration. It runs AC7 from its own clone and writes `raw/internal/migrations/2026-07-13-133-echo-brain-review.md` with reviewer identity/independence, commands/results, accepted tuple, artifact tuple, and verdict. Passing proves only a local DEV split.
 
 ## Out of Scope (Don't Drift)
 
@@ -114,6 +117,7 @@ An independent reviewer binds the review request path/bytes, `spec_commit_sha`, 
 - `/Users/zhenye/Desktop/echo-brain/tests/migration/dependency-set.test.ts` — local/npm/toolchain edge partition.
 - `/Users/zhenye/Desktop/echo-brain/tests/migration/source-independence.test.ts` — no source/sibling/path/symlink/submodule escape.
 - `/Users/zhenye/Desktop/echo-brain/tests/migration/packaged-product.test.ts` — clean build, identical artifacts, install, and smoke.
+- Exact operator-audit command from AC3 — policy/source closure/target partition result and nonzero omission/evasion fixtures.
 - Independent migration-record review — accepted HEAD/tree, clean shared target, rerun commands, artifact, and false authority.
 
 ## After Completion (Strategist Notes)

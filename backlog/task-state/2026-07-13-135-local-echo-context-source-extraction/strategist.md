@@ -8,18 +8,19 @@ Materialize capture, storage, retrieval, and context APIs as a source-independen
 - Source is raw Git objects at `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; dirty/replacement/filter/external-object inputs fail.
 - One builder creates absent `/Users/zhenye/Desktop/echo-context`, local branch `migration/2026-07-13-135`, fixed identity, and no remote; EEXIST aborts.
 - No evidence tree, capsule, process watcher, credential transport, endpoint protocol, or custom handoff is built; normal Project_echo workflow owns handoff.
-- Source projector selects eight unique context tools from mixed source; target exposes exactly those eight with equal canonical descriptors/cases.
+- Source projector selects eight unique context tools from mixed source; ten literal cases, fixed synthetic state, empty volatile allowlist, canonical framing, and source baseline hashes govern parity.
 - State uses distinct `ECHO_CONTEXT_HOME`; live `~/.echo`, credentials, daemon, and MCP config are never read or mutated.
 - Raw Granola capture may remain generic; decision/card/brief/approval product logic stays out.
-- Raw source inventory is exactly 211 paths (109 source, 102 tests), aggregate `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
-- Exact disposition/target-only allowlists and full target partition prevent omission, authored replacement, or whole-blob rewrite evasion.
-- Final-HEAD edges partition local/npm/toolchain; pinned dependency lifecycle (including better-sqlite3) is recorded and independently repeated without claiming hostile supply-chain containment.
-- Builder and reviewer use private clones and synthetic state for tool, storage, retrieval, stdio, and loopback service parity.
+- A canonical NUL-input/LF-output command over 18 literal roots yields exactly 211 paths and hash `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
+- Exact disposition and literal target-only ready-SHA policy plus full target partition prevent omission/relabeling.
+- Pre-commit expected/observed lifecycle and native-toolchain records constrain offline ignore-scripts install plus the sole better-sqlite3 rebuild; post-commit/reviewer observations match.
+- Accepted target object database equals sole-branch reachable closure with no reflogs/dangling/unreachable extras.
+- Service capture is separate from the eight MCP tools and uses a versioned loopback HTTP/readiness/timeouts protocol.
 - Project_echo daemon/MCP/live state remains authoritative; target is local, no remote, not installed.
 
 ## open_questions
 
-- R15 by `codex` and `codex-ops` must confirm the simplified final-repo proof, raw source envelope, dependency lifecycle record, exact tool roster, and synthetic service parity.
+- R16 by `codex` and `codex-ops` must confirm the founder-overridden roster, canonical 211 inventory, pinned fixture bytes, lifecycle expected/observed split, object closure, service protocol, and named review record.
 - Later cutover decides remote, installation, live-state migration/rollback, and echo-brain's versioned context contract.
 
 ## dont_touch
