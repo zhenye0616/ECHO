@@ -644,3 +644,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** source_breakdown codex 5 / git 55 / claude_code 13 (window total codex 47 / git 55 / claude_code 13); ground-truth git commits show 133+135 claimed, 134 still ready, all three sealed at R19 terminal bytes 0276fed4.
 - **Verdict:** ✅ right — pinned the exact live state I needed (siblings mid-claim, 134 unclaimed, R19 seal converged) with no confabulation; truncation warning honest.
 - **Note:** get_recent_work_context is deprecated (migrate to find_clusters+get_atoms) but still returns; the 18-dropped-cluster warning is the highest-signal part — this window is dense with the parallel review/claim burst. No open loop for 134 itself yet (it is the work I am about to start).
+
+### 2026-07-14 00:04 PDT — fable-builder-135 Run 3 sibling-pattern lookup (2× search_memories, both empty)
+
+- **Trigger:** Run 3 of item 135 needs AC2 runtime-inventory + AC7 sandbox-exec install-proof shapes; queried ECHO to mirror how siblings 133/134 structured those artifacts for cross-lane consistency before authoring my own.
+- **Query inputs:** (1) `search_memories({query:"runtime-inventory.v1.json check-runtime-inventory", limit:8})`; (2) `search_memories({query:"sandbox-exec deny network better-sqlite3 rebuild lifecycle-observed", limit:8})`.
+- **Returned:** (1) 0 matches, no warnings. (2) 0 matches, no warnings.
+- **Sources:** none — empty result sets; no source_breakdown. (Absence itself is the signal: the sibling 133/134 runtime-inventory / install-proof artifacts are not in the live prod db at :38478 — either not yet captured/indexed, or they live only in the standalone target repos which ECHO does not watch.)
+- **Verdict:** 🟡 partial — queries executed cleanly but returned nothing actionable; literal-token search over exact filenames found no captured atom. Falling back to authoring from the item spec (AC2/AC7 prose) directly.
+- **Note:** The standalone extraction targets (/Users/zhenye/Desktop/echo-{brain,loop,context}) are outside ECHO's watched roots, so sibling-lane build artifacts won't surface via search_memories; the item spec + founder adjudication remain the only sources for these shapes.

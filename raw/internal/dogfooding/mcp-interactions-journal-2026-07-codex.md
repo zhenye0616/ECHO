@@ -1391,3 +1391,273 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** Codex JSONL `fs:/Users/zhenye/.codex/sessions/2026/07/13/rollout-2026-07-13T12-03-48-019f5cdd-335c-7ae2-89bc-f42890fa0115.jsonl` (turns 12, 13, and 15) plus `git:/Users/zhenye/Desktop/Project_echo`; timestamps `2026-07-13T10:25:22Z` to `2026-07-13T21:23:25.533Z`.
 - **Verdict:** right - ECHO recovered the missing founder-originated context and resolves the intended ordering: local standalone repo parity comes before FOUNDER LIVE, while remote creation and authority cutover remain later gates.
 - **Note:** The intent is clear cross-tool, but canonical repo documents such as `product/README.md` and the shipped 132 handoff still state the superseded order; the repository needs an explicit ratification/update to remove that documentation conflict.
+
+### 2026-07-13 22:58 PDT - discover three active Claude builders for live monitoring
+
+- **Trigger:** Founder reported all three Claude builders in motion and asked Codex to monitor them through ECHO.
+- **Query inputs:** `find_clusters({view:"rich", format:"skeleton"})` machine-scoped, default four-hour lookback.
+- **Returned:** 46 untruncated clusters covering 259 atoms, no warnings. Rank 1 was a generic `work on project_echo` cluster with 139 atoms, rank reasons `recent_activity`, `has_open_loop`, `code_session_anchor`, `dense`, and `cross_tool`, spanning `2026-07-14T02:02:06Z` to `2026-07-14T05:58:03Z`. The other high-ranked clusters were mostly old Codex reviewer sessions; no separate generated label identified the three builder lanes.
+- **Sources:** rank-1 `source_breakdown={git:118, codex:5, claude_code:16}`; machine scope also returned one unrelated Claude-only `hdc_det` cluster and many Codex review clusters.
+- **Verdict:** partial - ECHO shows fresh Claude and git activity in the Project_echo thread through 22:58 PDT, but clustering coalesces the three builders and prior review history, so per-lane session/source discovery is still required.
+- **Note:** Narrow next by exact lane names and source/session metadata, then use `wait_for_new_turns` against the resolved Claude sources rather than treating the generic rank-1 cluster as three-builder proof.
+
+### 2026-07-13 22:59 PDT - exact-lane searches for brain, loop, and context builders
+
+- **Trigger:** The discovery cluster coalesced all work, so each builder lane needed an exact-token tail.
+- **Query inputs:** Three parallel calls: `search_memories({query:"echo-brain", since:"2026-07-13T22:30:00-07:00", limit:12})`, and the same shape for `echo-loop` and `echo-context`, machine-scoped.
+- **Returned:** Each query hit a dense mix of current Git/backlog atoms and Claude orchestrator/session atoms; the combined client output exceeded its display budget. The visible newest evidence included `87dffd4` at `2026-07-14T05:58:03Z`, moving item 135 to `pending_review` as `BLOCKED (incomplete attended build)`, item 133's claim commit `4d85b6c` at `05:46:15Z`, and the orchestrator's builder-launch turn naming `builder-133-brain`, `builder-134-loop`, and `builder-135-context`. Individual contents carried truncation markers; no ECHO warnings were shown.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo` plus Claude Code session `f96bfcee-3199-472c-adf2-9b7367d03b4d`; older Codex orientation/review atoms also matched the broad lane tokens.
+- **Verdict:** partial - exact names confirmed launch and exposed a material state change (135 already escalated), but broad token overlap and output truncation prevent a trustworthy three-lane snapshot from this call alone.
+- **Note:** Use exact claim IDs/personas and compact source-filtered tails next; monitor must now distinguish active 133/134 from escalated 135 rather than assume all three remain running.
+
+### 2026-07-13 22:59 PDT - compact per-persona builder baseline
+
+- **Trigger:** Broad lane tokens were noisy; exact `fable-builder-13x` identities were used to separate claim and handoff events.
+- **Query inputs:** Three parallel `search_memories` calls for `fable-builder-133`, `fable-builder-134`, and `fable-builder-135`, each `since:"2026-07-13T22:40:00-07:00"`, `limit:10`, machine-scoped.
+- **Returned:** 133 returned one complete git atom: claim `4d85b6c`, persona `fable-builder-133`, worktree `Project_echo--133-echo-brain`. 134 returned three atoms: claim `84c1550`, initial builder pointer `0b8d8ff`, and its preflight journal; the pointer's open question says the novel AC1–AC8 build may not fit one attended session. 135 returned three atoms: claim `8d5ae35`, subagent session atom `agent-abuilder-135-context-b834dbbba12e0955`, and escalation `87dffd4` to pending review. No warnings; several 134/135 bodies were content-truncated.
+- **Sources:** Git atoms in `git:/Users/zhenye/Desktop/Project_echo`; 135 also resolved to Claude subagent JSONL under the orchestrator session's `subagents/` directory.
+- **Verdict:** right for stage truth - 133 and 134 are claimed with no terminal handoff yet; 135 is terminally escalated/incomplete, with its target unaccepted.
+- **Note:** Persona literal search does not expose the 133/134 Claude session sources; locate their subagent JSONLs with source-app-filtered exact task text, then live-wait those sources.
+
+### 2026-07-13 23:00 PDT - source-filtered builder-task lookup
+
+- **Trigger:** Needed concrete Claude subagent sources for live waits rather than Git-only persona matches.
+- **Query inputs:** Three parallel Claude-only `search_memories` calls for exact phrases `Build item 133 echo-brain extraction`, `Build item 134 echo-loop extraction`, and `Build item 135 echo-context extraction`, since 22:40 PDT, limit 10.
+- **Returned:** 133: 0 matches. 134: 0 matches. 135: 1 match, the known subagent source `agent-abuilder-135-context-b834dbbba12e0955`, whose preserved terminal body says the attended build exceeded one-session scope, item was escalated, and founder must inspect/archive incomplete `/Users/zhenye/Desktop/echo-context` before a continuation. No warnings.
+- **Sources:** Claude Code source filter; only 135's subagent JSONL resolved.
+- **Verdict:** partial - 135 source and terminal state are explicit, but 133/134 source discovery failed because the literal task summaries differ or their turns have not yet been captured.
+- **Note:** Apply the skill fallback: reduce to exact item-ID/name tokens, then inspect source paths from any matches; do not infer stalled builders from zero literal hits.
+
+### 2026-07-13 23:01 PDT - reduced exact item-ID fallback for active Claude sources
+
+- **Trigger:** Full task-summary phrases returned zero for 133/134, so retrieval was reduced to the canonical item IDs.
+- **Query inputs:** Claude-only `search_memories` for `2026-07-13-133-local-echo-brain-source-extraction` and `2026-07-13-134-local-echo-loop-source-extraction`, since 22:40 PDT, limit 10.
+- **Returned:** 0 matches for both, no warnings.
+- **Sources:** No Claude Code sources returned.
+- **Verdict:** wrong for source discovery - ECHO has Git claims but no searchable Claude turns for the two exact item IDs.
+- **Note:** This is a capture/discovery gap, not evidence that builders stopped. Inspect the orchestrator's local subagent source directory to recover literal source paths, then pass those paths back into ECHO's live-wait API.
+
+### 2026-07-13 23:01 PDT - resolve exact Claude subagent sources
+
+- **Trigger:** Local filename-only discovery found all three builder JSONLs; ECHO needed to confirm which had captured atoms before live waiting.
+- **Query inputs:** `echo_resolve_mru({sources:[exact fs sources for agent-abuilder-133-brain-12706f356d4275f6, agent-abuilder-134-loop-1849444b0b196c3a, agent-abuilder-135-context-b834dbbba12e0955], repo_path:"/Users/zhenye/Desktop/Project_echo"})`.
+- **Returned:** 134 and 135 resolved to their exact fs sources with Project_echo repo filters; 133 returned `null`; no warnings.
+- **Sources:** Exact Claude subagent JSONL paths under orchestrator session `f96bfcee-3199-472c-adf2-9b7367d03b4d/subagents/`.
+- **Verdict:** partial - ECHO can tail 134 and 135 directly, but has not indexed a non-filesystem atom for the existing 133 source.
+- **Note:** Monitor 134 via its resolved source, keep 135 as terminal, and use Git/stage evidence plus a machine-scoped wait for 133 until its source first becomes indexable.
+
+### 2026-07-13 23:02 PDT - direct Claude tails for loop and context builders
+
+- **Trigger:** Resolved exact sources enabled a body-level status check for 134 and confirmation of 135's terminal state.
+- **Query inputs:** Parallel source-exact `search_memories` tails for the 134 and 135 subagent JSONLs, Project_echo repo filter, since 22:40 PDT, limit 10.
+- **Returned:** One atom per source, no warnings. 134's `06:00:52Z` terminal turn says it built a deterministic/verifiable foundation but escalated because AC1–AC8 would require roughly 8–10k lines plus green verification beyond one attended session; target `/Users/zhenye/Desktop/echo-loop` is incomplete/unaccepted and should be founder-inspected then manually archived. 135's `05:59:05Z` turn confirms the analogous incomplete/unaccepted escalation for `/Users/zhenye/Desktop/echo-context`. Both bodies were content-truncated but retained their conclusions and action requests.
+- **Sources:** Claude subagents `agent-abuilder-134-loop-1849444b0b196c3a` and `agent-abuilder-135-context-b834dbbba12e0955`.
+- **Verdict:** right - both 134 and 135 have terminated via the sanctioned no-fake-green escalation path; neither remains an active builder.
+- **Note:** Continue only on 133 and Project_echo Git events. Quiet 133 source remains an indexing gap until its first captured turn.
+
+### 2026-07-13 23:02 PDT - live wait for brain builder or Git handoff
+
+- **Trigger:** With 134/135 terminal, monitor only exact 133 subagent source plus Project_echo Git for a live turn or handoff.
+- **Query inputs:** `wait_for_new_turns({sources:[exact 133 fs source,"git"], repo_path:"/Users/zhenye/Desktop/Project_echo", since:"2026-07-14T05:58:03.000Z", timeout:60})`; then `get_atoms({atom_ids:[returned id], format:"minimal", prefer:"as_requested", view:"rich"})`.
+- **Returned:** Wait returned immediately with one Git atom, `next_since=2026-07-14T05:59:58Z`, no warnings. Body fetch returned commit `a30c115` moving 134 to `pending_review` with `BLOCKED` escalation; content truncated but preserved the exact founder question and no-drift assertion. Zero atoms dropped.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo`; no 133 source atom yet.
+- **Verdict:** right - confirmed 134's durable handoff; 133 remains the sole unclosed lane with no captured Claude turn.
+- **Note:** Chain from `05:59:58Z`; a quiet wait is expected and is not a blocker.
+
+### 2026-07-13 23:04 PDT - quiet 60-second brain-builder watch
+
+- **Trigger:** Continue lossless live monitoring of the sole unclosed 133 lane.
+- **Query inputs:** `wait_for_new_turns({sources:[exact 133 fs source,"git"], repo_path:"/Users/zhenye/Desktop/Project_echo", since:"2026-07-14T05:59:58.000Z", timeout:60})`.
+- **Returned:** Timed out after 60 seconds with zero turn IDs; `next_since` correctly echoed `2026-07-14T05:59:58Z`; no warnings.
+- **Sources:** Exact 133 Claude subagent source plus repo-scoped Git union.
+- **Verdict:** right - no new captured 133/Git event in the interval; this is a quiet interval, not evidence of failure.
+- **Note:** Preserve the watermark and continue waiting; filesystem activity can proceed between emitted Claude turns.
+
+### 2026-07-13 23:05 PDT - second quiet brain-builder watch
+
+- **Trigger:** Continue monitoring 133 after the first quiet interval.
+- **Query inputs:** Same lossless `wait_for_new_turns` union on exact 133 source + repo-scoped Git, `since:"2026-07-14T05:59:58.000Z"`, timeout 60.
+- **Returned:** Timed out with zero turn IDs; watermark unchanged; no warnings.
+- **Sources:** Exact 133 Claude subagent source and Project_echo Git.
+- **Verdict:** right - still no emitted/captured turn or handoff.
+- **Note:** Two quiet intervals warrant a non-content liveness check (source-file mtime/process state) while preserving ECHO as the event monitor; do not classify the builder as stalled from silence alone.
+
+### 2026-07-13 23:07 PDT - third quiet wait while brain target is actively materializing
+
+- **Trigger:** Continue the exact-source/Git watch after local non-content evidence showed 133's JSONL growing and the target tree present.
+- **Query inputs:** `wait_for_new_turns` on exact 133 source + repo-scoped Git, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, no warnings, unchanged watermark.
+- **Sources:** 133 Claude source and Project_echo Git.
+- **Verdict:** right - no turn boundary or Git handoff yet; independent liveness evidence showed active in-turn work.
+- **Note:** ECHO indexes completed/emitted turns, so a long tool-heavy builder turn can remain quiet while its JSONL and target filesystem change.
+
+### 2026-07-13 23:09 PDT - fourth quiet wait with fresh brain-builder heartbeat
+
+- **Trigger:** Continue the sole open builder lane until ECHO observes a Claude turn boundary or durable Git handoff.
+- **Query inputs:** `wait_for_new_turns` on the exact 133 Claude subagent source plus repo-scoped Git, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** Exact `agent-abuilder-133-brain-12706f356d4275f6` source and Project_echo Git.
+- **Verdict:** right - ECHO saw no emitted turn or Git event, while the source JSONL independently grew to 1,028,011 bytes with an mtime of 23:09:51 PDT, three seconds before inspection.
+- **Note:** Builder 133 is demonstrably live inside a long turn; `/Users/zhenye/Desktop/echo-brain` has the expected project tree materialized but still has no first commit. Preserve the event watermark and keep waiting.
+
+### 2026-07-13 23:11 PDT - fifth quiet brain-builder wait
+
+- **Trigger:** Continue the active 133 watch after a fresh source-file heartbeat.
+- **Query inputs:** Same exact-source plus repo-scoped Git `wait_for_new_turns`, `since:"2026-07-14T05:59:58.000Z"`, timeout 60.
+- **Returned:** Timed out with zero turn IDs; `next_since` remained `2026-07-14T05:59:58Z`; no warnings.
+- **Sources:** Builder 133 Claude subagent source and Project_echo Git.
+- **Verdict:** right - no completed Claude turn or durable Git event arrived in this interval.
+- **Note:** The immediately preceding 23:09:51 PDT source heartbeat keeps this classified as an active long turn, not a stalled builder.
+
+### 2026-07-13 23:12 PDT - sixth quiet source wait; brain target reaches first commit
+
+- **Trigger:** Continue waiting for builder 133's emitted turn or Project_echo handoff.
+- **Query inputs:** Same exact 133 source + Project_echo Git `wait_for_new_turns`, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** Builder 133 Claude subagent source and Project_echo Git.
+- **Verdict:** partial - the configured ECHO union remained quiet, but a non-content liveness check immediately afterward found target-repository commit `2de1c1961cc2909df88b415b8f0c13adfc0c84d1` at 23:12:28 PDT.
+- **Note:** The watch omitted `git:/Users/zhenye/Desktop/echo-brain`, so the new durable target checkpoint was outside its Git scope. Add the target Git source while retaining the Claude and Project_echo handoff lanes.
+
+### 2026-07-13 23:13 PDT - verify brain target commit through ECHO
+
+- **Trigger:** A local read-only check found brain target commit `2de1c196`; verify that ECHO has captured the corresponding target-repository Git atom before relying on it for live monitoring.
+- **Query inputs:** `search_memories({query:"2de1c196", source_prefix:"git:/Users/zhenye/Desktop/echo-brain", since:"2026-07-13T23:10:00-07:00", limit:10})`.
+- **Returned:** Zero matches, no pagination cursor, and no warnings.
+- **Sources:** Requested exact target Git prefix for `/Users/zhenye/Desktop/echo-brain`; no source returned.
+- **Verdict:** partial - the commit exists locally, but ECHO had not ingested or normalized its Git event at query time.
+- **Note:** Treat this as expected capture lag for a repository created during the builder turn. Subscribe to the literal target Git source alongside the Claude source and Project_echo Git; do not discard the locally verified checkpoint.
+
+### 2026-07-13 23:14 PDT - expanded brain watch after target commit
+
+- **Trigger:** Monitor builder 133 across its Claude source, the orchestration repo, and the newly committed target repo.
+- **Query inputs:** `wait_for_new_turns({sources:[exact 133 fs source,"git:/Users/zhenye/Desktop/Project_echo","git:/Users/zhenye/Desktop/echo-brain"], since:"2026-07-14T05:59:58.000Z", timeout:60})` with no repo filter so both Git roots remain eligible.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** Exact Claude and two literal Git sources; none emitted an indexed atom during the interval.
+- **Verdict:** partial - ECHO still lags the target commit and has not seen a turn boundary, while the exact Claude JSONL grew again through 23:14:19 PDT.
+- **Note:** Builder 133 remains live after its clean first commit, likely in verification/handoff. Continue the expanded watch.
+
+### 2026-07-13 23:16 PDT - quiet expanded wait during brain verification
+
+- **Trigger:** Keep the three-source 133 watch open through post-commit verification.
+- **Query inputs:** Same exact Claude + Project_echo Git + echo-brain Git `wait_for_new_turns`, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** Exact 133 Claude source and both Git roots.
+- **Verdict:** right for emitted-event monitoring - no terminal turn or new commit was captured.
+- **Note:** Non-content liveness showed the source growing through 23:15:56 PDT and a new untracked `node_modules/` directory, consistent with the builder actively installing/running verification after commit `2de1c196`.
+
+### 2026-07-13 23:17 PDT - quiet ECHO wait while brain builder fixes verification
+
+- **Trigger:** Continue watching for builder 133's post-verification terminal event.
+- **Query inputs:** Same three-source `wait_for_new_turns`, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** Exact 133 Claude source, Project_echo Git, and echo-brain Git.
+- **Verdict:** right for turn-boundary monitoring - ECHO remains quiet while the builder is still inside its active turn.
+- **Note:** The source grew through 23:17:15 PDT; `tests/migration/source-independence.test.ts` and `tools/verify-artifact.mjs` are now modified after the first commit, consistent with an evidence-driven verification fix rather than a handoff yet.
+
+### 2026-07-13 23:18 PDT - quiet ECHO wait; brain fixes folded into target commit
+
+- **Trigger:** Continue monitoring through the verification-fix cycle.
+- **Query inputs:** Same three-source `wait_for_new_turns`, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** Exact 133 Claude source plus both literal Git roots.
+- **Verdict:** partial - ECHO still has no indexed boundary event, while local durable state advanced.
+- **Note:** The source grew through 23:18:38 PDT and target HEAD became `54259ef67eb90b5a1412bf15bac716180e822c72`; the earlier verification-file modifications are committed, leaving only untracked `node_modules/`. Builder 133 remains active and nearing handoff.
+
+### 2026-07-13 23:19 PDT - second ECHO verification of brain target Git
+
+- **Trigger:** Target HEAD changed after verification fixes; test whether ECHO has begun capturing the newly created echo-brain repository.
+- **Query inputs:** `search_memories({query:"54259ef", source_prefix:"git:/Users/zhenye/Desktop/echo-brain", since:"2026-07-13T23:15:00-07:00", limit:10})`.
+- **Returned:** Zero matches, no cursor, no warnings.
+- **Sources:** Requested echo-brain Git prefix; none returned.
+- **Verdict:** wrong for target-repository observability - ECHO has not captured either of the locally verified target commits.
+- **Note:** Keep ECHO on the exact Claude and Project_echo handoff lanes; use read-only target Git only as corroborating durable evidence. This is a concrete new-repository capture gap worth preserving in the journal.
+
+### 2026-07-13 23:20 PDT - post-commit wait for brain orchestration handoff
+
+- **Trigger:** Builder 133 has a clean target commit; wait for its terminal Claude result or required Project_echo backlog/run-log handoff.
+- **Query inputs:** Three-source `wait_for_new_turns` on exact 133 Claude, Project_echo Git, and echo-brain Git, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** All three 133 monitoring lanes.
+- **Verdict:** right - no terminal boundary was captured in the interval.
+- **Note:** Read-only orchestration inspection still shows item 133's latest event as its claim `4d85b6c`; no pending-review move/run-log handoff yet. The Claude source last changed at 23:19:48 PDT, so allow for ongoing verification before classifying the lane.
+
+### 2026-07-13 23:21 PDT - brain remains live before orchestration handoff
+
+- **Trigger:** Distinguish an active post-commit verification turn from a missing handoff.
+- **Query inputs:** Same three-source `wait_for_new_turns`, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** Exact 133 Claude source, Project_echo Git, and echo-brain Git.
+- **Verdict:** right - no boundary event yet; the builder is not stopped.
+- **Note:** Source mtime advanced to 23:21:43 PDT, five seconds before inspection. Target HEAD remains `54259ef`; Project_echo still has no 133 handoff commit. Continue monitoring.
+
+### 2026-07-13 23:23 PDT - active brain turn continues after clean target commit
+
+- **Trigger:** Continue watching for item 133's terminal acceptance/escalation and orchestration handoff.
+- **Query inputs:** Same exact Claude + two-Git-source `wait_for_new_turns`, chained from `2026-07-14T05:59:58Z`, timeout 60.
+- **Returned:** Timed out with zero turn IDs, unchanged watermark, and no warnings.
+- **Sources:** The three established builder-133 lanes.
+- **Verdict:** right for emitted-event status - still no boundary event.
+- **Note:** Source mtime advanced to 23:23:09 PDT, two seconds before inspection; target HEAD remains clean at `54259ef`, and Project_echo still lacks the handoff. The builder is actively working, not stalled.
+
+### 2026-07-13 23:23 PDT - brain builder durable handoff captured
+
+- **Trigger:** Continue the live watch until builder 133 reaches a terminal Project_echo handoff.
+- **Query inputs:** `wait_for_new_turns` on exact 133 Claude source plus literal Project_echo and echo-brain Git, chained from `2026-07-14T05:59:58Z`, timeout 60; then `get_atoms` for returned ID `b4023222-81e1-416e-8387-18bccf159f66` with minimal/rich projection.
+- **Returned:** Wait returned immediately with one ID, `next_since=2026-07-14T06:23:24Z`, no warnings. Body fetch returned Project_echo commit `eda224b4234beb45aaccdf78798b34238c19f86c`, which moves item 133 from `claimed/` to `pending_review/`, records feature head `0caef8237c2aefba0d65c5f70000220654ee8f2e`, updates builder state/BACKLOG, and writes the agent-run log. Zero atoms dropped; commit content was truncated by 13,807 bytes.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo`; no Claude terminal atom yet.
+- **Verdict:** right - builder 133 has reached the required durable review handoff, so no builder lanes remain active.
+- **Note:** Preserved tail flags one genuine AC3↔AC5 schema-path tension for independent review: source/package expect `schemas/product/runtime-config.v1.schema.json`, while AC5 names `schemas/runtime-config.v1.schema.json`; builder staged the latter into the former tarball path. Read the committed handoff files for full test evidence rather than using `get_atom` unless verbatim recovery becomes necessary.
+
+### 2026-07-13 23:24 PDT - final Claude tail after all builder lanes closed
+
+- **Trigger:** After the durable 133 pending-review handoff, allow a short final interval for its Claude terminal message to land before ending the monitor.
+- **Query inputs:** `wait_for_new_turns({sources:[exact 133 Claude source,"git:/Users/zhenye/Desktop/Project_echo"], since:"2026-07-14T06:23:24.000Z", timeout:30})`.
+- **Returned:** Timed out with zero turn IDs; watermark unchanged; no warnings.
+- **Sources:** Exact 133 Claude source and Project_echo Git.
+- **Verdict:** partial - no separate Claude terminal atom was captured, but the authoritative Git handoff `eda224b` already closed the lane with full committed evidence.
+- **Note:** End monitoring. ECHO captured the stage transition but still never indexed the 133 Claude subagent turn or the newly created echo-brain Git repo; those are concrete observability gaps, not ambiguity in builder status.
+
+### 2026-07-14 11:25 PDT - resolve the current Project_echo Claude session
+
+- **Trigger:** User asked to connect to the other Claude session and recover the project's current state.
+- **Query inputs:** `echo_resolve_mru({sources:["claude_code"], repo_path:"/Users/zhenye/Desktop/Project_echo"})`.
+- **Returned:** Resolved the most-recent Project_echo Claude source to orchestrator session `f96bfcee-3199-472c-adf2-9b7367d03b4d.jsonl` with the repo filter; no warnings.
+- **Sources:** Exact Claude Code session JSONL under `~/.claude/projects/-Users-zhenye-Desktop-Project-echo/`.
+- **Verdict:** right - ECHO identified the live/recent cross-tool session rather than a builder child source.
+- **Note:** Tail this exact source next, then reconcile its claims against Git and backlog state. ECHO visibility is read-only and does not permit sending messages into Claude's conversation.
+
+### 2026-07-14 11:26 PDT - tail the other Claude orchestrator session
+
+- **Trigger:** Recover the latest status reported by the active/recent Claude session.
+- **Query inputs:** Source-exact `search_memories` on session `f96bfcee-3199-472c-adf2-9b7367d03b4d.jsonl`, scoped to Project_echo, since midnight PDT, limit 10.
+- **Returned:** Ten newest turns plus a pagination cursor, no warnings. Latest turn at 10:56:57 PDT says independent judgments ACCEPTED both active extraction lanes: 133 target `4a6dcb33`, review branch tip `f92af1db`; 135 target `c84b3edb`, with both items still in `pending_review/` and awaiting founder-authorized merge/cleanup. Earlier turns show 133 judgment #4 and 135 judgment #3 followed clean executor reruns. The newest body was content-truncated by 221 bytes; the client envelope was also large/truncated, but the status, SHAs, maturity boundary, and next action were preserved.
+- **Sources:** Claude Code orchestrator session, turns 70-79, with teammate messages from 133/135 builders and R1 executors.
+- **Verdict:** right for the session's own claimed state, pending independent Git/backlog reconciliation.
+- **Note:** Claude explicitly says both standalone repos remain local `DEV`, `authority:false`, no remotes, while Project_echo remains live authority. Item 134 is absent from this latest scoreboard and must be checked separately rather than inferred complete.
+
+### 2026-07-14 11:26 PDT - cross-source freshness check after Claude's ACCEPT report
+
+- **Trigger:** Determine whether any newer captured repo event superseded the other Claude session's 10:56 PDT wrap-up.
+- **Query inputs:** `find_clusters({repo_path:"/Users/zhenye/Desktop/Project_echo", since:"2026-07-14T10:45:00-07:00", view:"rich", format:"skeleton"})`.
+- **Returned:** One untruncated 11-atom cluster spanning 10:45:37-10:56:57 PDT, with source breakdown `{codex:7, claude_code:4}` and no Git atoms; no warnings. The only open-loop hint was marked resolved.
+- **Sources:** Project_echo-scoped Codex reviewer/judgment activity and the Claude orchestrator; no newer captured source after Claude's final turn.
+- **Verdict:** right - ECHO has no evidence of a post-wrap-up merge or newer project transition in the requested window.
+- **Note:** Absence of Git in the cluster is not proof that local/remote refs are unchanged; reconcile via read-only Git/backlog inspection before reporting current state.
+
+### 2026-07-14 11:27 PDT - short live tail on the other Claude session
+
+- **Trigger:** Check whether the resolved Claude session is still emitting work after its ACCEPT/merge-ready wrap-up.
+- **Query inputs:** `wait_for_new_turns` on the exact orchestrator source, Project_echo repo filter, `since:"2026-07-14T17:56:57.998Z"`, timeout 15.
+- **Returned:** Timed out with zero turn IDs; watermark unchanged; no warnings.
+- **Sources:** Exact Claude orchestrator session only.
+- **Verdict:** right - no newer captured Claude turn arrived during the live interval.
+- **Note:** The session is quiet after handing control back to the founder; quiet is not failure. Current state should therefore be grounded in its last turn plus Git/backlog truth.
+
+### 2026-07-14 14:13 PDT - confirm Claude-side item 134 review state before merge cleanup
+
+- **Trigger:** User asked for a full pre-merge cleanup while explicitly holding all merges until Claude approves item 134.
+- **Query inputs:** `search_memories({query:"2026-07-13-134-local-echo-loop-source-extraction", source_app:"claude_code", repo_path:"/Users/zhenye/Desktop/Project_echo", since:"2026-07-14T00:00:00-07:00", limit:10})`.
+- **Returned:** Two Claude subagent matches, no cursor and no warnings. The newest (13:39 PDT) is successor builder 134b's terminal handoff: target `171fdfc…`, 121 green tests, feature head `b8e4fe23…`, item moved to `pending_review/`, main handoff `5fd7e099`. The older match is the prior neutral reviewer-side executor and is superseded by the successor build. Both bodies/metadata were clipped (`11,303` and `10,311` content bytes elided), but the bindings and handoff state survived.
+- **Sources:** Claude Code builder-successor and prior reviewer-executor subagent JSONL sources under the Project_echo orchestrator session.
+- **Verdict:** partial but useful — ECHO confirms the new 134 builder handoff, but returns no fresh independent Claude verdict for `b8e4fe23…`.
+- **Note:** Treat 134 as review-pending. Ground cleanup in Git/backlog truth and preserve its feature/target worktrees until a new verdict is committed.
