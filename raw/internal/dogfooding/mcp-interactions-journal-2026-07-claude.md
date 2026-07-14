@@ -617,3 +617,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** codex rollout JSONLs; claude_code; git ground truth origin/main @ 56180804.
 - **Verdict:** ✅ right — confirmed no r18 dispatch, no r17 combined.md, items still in proposed/; loop is cleanly parked at "r17 responses in, undispositioned."
 - **Note:** Trailing reviewer ticks after a pause burn sessions but publish nothing when no eligible request exists — harmless but visible in ECHO.
+
+## 2026-07-13 22:35 PDT — r18 fenced-verification dispatch (founder-approved Option A)
+
+- **Trigger:** Founder approved the r17 disposition (commit 19fe3ae2) and chose Option A: one fenced r18, no r19. Strategist committed disposition + r18 requests (cad8fec0, SHA fixup 6afad8ce) and dispatched.
+- **Query inputs:** `coord_invoke` ×6 — roles codex + codex-ops for each of the three r18 requests (133: d06403f5…, 134: 49243b93…, 135: 8948e786…); repo-relative request_path per the pin rule.
+- **Returned:** all six ok — reviewer_invoked ids issued, wrappers run-codex-reviewer.sh / run-codex-ops-reviewer.sh spawned fire-and-forget.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
+- **Verdict:** ✅ right — active-trigger accepted all six; pre-spawn deadlines opened.
+- **Note:** Caught pre-dispatch: my generated r18 request bodies carried r17's spec SHA verbatim while frontmatter pinned 19fe3ae2 — reviewers bind to frontmatter but the contradictory body text would have confused content-only children; fixed in 6afad8ce before invoking. Founder's earlier loop-pause did not block coord_invoke spawning.
