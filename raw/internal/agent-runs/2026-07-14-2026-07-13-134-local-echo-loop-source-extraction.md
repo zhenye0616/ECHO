@@ -569,3 +569,176 @@ corrected fixed point, envelope-invariant dual-route hash, `authority:false`,
 None. Three authorized operations only (pinned read-only Project_echo source
 reads; local no-remote target; feature-branch push). No sibling / wiki /
 holdout-131 touching. No `mcp__echo__*` calls this run.
+
+---
+
+## Run 9 (fourth-review remediation — successor builder)
+
+### Trigger and prior state
+
+The immutable fourth `codex-ops` judgment child
+`fe26a78f89d130364af5b2207e7b07b41eecb78b` reproduced the Run 8 evidence and
+REJECTed four same-class residuals: D1 (schema false-green), D2 (executable-edge
+extraction/context omissions), C1 (takeover evidence crash window), and C2
+(stale-owner APPLYING mutation). Founder authorized only those four repairs and
+the normal builder handoff.
+
+Kept: the clean feature-branch judgment child, the clean no-remote target at
+rejected HEAD `d69c003ae4146140d3d0ee3fe945778781ae5a43`, and all previously
+accepted A/B/E and broader C/D work. Discarded: no committed or uncommitted
+state. The successor consists of five linear target commits after `d69c003`:
+`27290be` (schema/scanner/watcher fix), `cf2e936` (repo-vs-fixture roots),
+`02e0107` (validated closure regeneration), `7d349fe` (remove closure
+self-reference), and `38989db` (final stable closure).
+
+### Outcome
+
+**D1, D2, C1, and C2 are CLOSED on disposable fixtures.** This is a normal
+builder handoff to `pending_review`; fresh independent review is required and
+the builder makes no acceptance claim. The target remains UNACCEPTED, has no
+remote, is not installed, and remains a local `DEV` candidate with
+`authority:false` and `installed:false`.
+
+### Implemented remediation
+
+- **D1 — CLOSED.** Added the complete Draft-07 schema for all emitted root and
+  row fields, including `policy_sha256`, source/manifest blobs, `from_blob`, the
+  closed edge enum, and class/resolution-kind relationships. Generation and
+  `--check` validate generated and exact committed values against the exact
+  committed schema before comparison/write. Rejecting and structurally invalid
+  schema fixtures fail closed.
+- **D2 — CLOSED.** Replaced global regex/literal inference with a lexical,
+  string/comment-aware JS scanner. It scans executable calls in test bodies but
+  ignores fixture strings; recognizes member/computed expressions such as
+  `process.env.SCRIPT`; classifies absolute repo-root paths; tracks lexical
+  shadowing and reassignment; and binds a source-specific tsconfig chain.
+  Equal-depth competing tsconfigs reject as `ambiguous_tsconfig_context`. Exact
+  adversarial fixtures cover all six fourth-review cases.
+- **C1 — CLOSED.** Takeover now accepts the exact prior owner token, prior PGID,
+  prior PGID file, and validated termination evidence as CAS inputs. The same
+  guarded SQL update installs the successor and durably records prior identity
+  plus proof. A crash-immediately-after-CAS fixture reopens the database and
+  observes both successor ownership and evidence already committed.
+- **C2 — CLOSED.** Every APPLYING mutation is guarded by
+  `state='APPLYING' AND owner_token=?`, including escalation, retry/failure
+  accounting, PGID/evidence writes, recovery, and APPLIED. Non-applying
+  escalation is limited to PREPARED/APPROVED. A stale-owner fixture proves the
+  prior owner cannot escalate, increment attempts, overwrite evidence, or mark
+  the successor applied after takeover.
+
+### Files modified
+
+The target delta `d69c003..38989db` is 15 files, 1,383 insertions and 305
+deletions:
+
+- `provenance/edge-record.v1.json`
+- `provenance/edge-record.v1.schema.json`
+- `src/watcher/apply.ts`
+- `src/watcher/reaper.ts`
+- `src/watcher/state.ts`
+- `tests/migration/source-plan.test.ts`
+- `tests/migration/verification-result.test.ts`
+- `tests/watcher/containment.test.ts`
+- `tests/watcher/recovery.test.ts`
+- `tests/watcher/state.test.ts`
+- `tools/build-source-plan.mjs`
+- `tools/lib/draft7-schema.mjs`
+- `tools/lib/source-plan.mjs`
+- `tools/run-verification.mjs`
+- `tools/verify-offline-install.mjs`
+
+Project_echo feature commit `ed41a6685848a0dc6f04d558e00e3c426a9b3166`
+changes only
+`raw/internal/migrations/2026-07-13-134-echo-loop.md`; its sole parent is the
+rejected judgment child `fe26a78f89d130364af5b2207e7b07b41eecb78b`.
+The migration-record blob is `275d500416f15c6d01385923e990c254bcdea4b9`
+(12,761 bytes; SHA-256
+`ade1111973a9d6734444729be59305377bb39957cdb0f420227499e1a4265cae`).
+
+### Exact target and closure evidence
+
+- Target HEAD `38989db78e221a7e15b2adbe859fa76244bf16e4`; tree
+  `76a7bc47a9aaf0196d2a43497d01460b0df86847`; branch
+  `migration/2026-07-13-134`; 34 linear commits; one root and one branch.
+- Edge schema blob `9ed57b7a338f12a6258a4ea4fdddab7f1da78813`, SHA-256
+  `70af1779c9a864073e3690b8eb93662292d4b5d5e4c4d47480fcd9210d775c09`.
+  Edge record blob `02b50876b9f07c5fa4a004b68fe6816622c97fa4`, SHA-256
+  `2dbb5f13edabdac076ba4b961281f36aef3bae93d251c53fa001c439197b87c0`.
+- Exact HEAD closure: 604 rows / 9 classes, 104 source blobs, 3 manifest
+  blobs; fixed point
+  `b1745bfd39cd51d89b52d0e669b073643103ec597ee9c5f731d1bcb599b9cb5a`.
+- Direct and npm routes each passed the exact 14-row workload. Their inner
+  projection is byte-identical and envelope-invariant, SHA-256
+  `e21c1d0fb2f4afcbe88b27d4fd7988cb7f180c9b72a18936ca4ea98c7d81d0ef`.
+  Route SHA-256 values are direct
+  `e545fadfde78db82fe846fe2e4ed1ec1efc9396187740a27f85c5ac5171bc32e`
+  and npm
+  `c0095e584c4a845b23c7b59ed26f3156d2e091816553c5915e623a4da9689e52`.
+- Target filesystem is clean, including ignored/untracked state: 173 tracked
+  files exactly equal 173 non-`.git` filesystem files. The tracked
+  `.verify-smoke*` directories exactly match HEAD; generated `.DS_Store`,
+  `.verify-*`, `dist/`, and `node_modules/` residue was removed.
+- All 400 objects are reachable: 34 commits / 147 trees / 219 blobs. Strict
+  fsck/unreachable checks are clean. There is no target remote, alternate,
+  promisor, replace, shallow state, tag, symlink, or gitlink.
+
+### Tests and checks — verbatim result summaries
+
+Full suite:
+
+```text
+Test Files  22 passed (22)
+Tests       153 passed (153)
+Duration    225.37s
+```
+
+Focused source-plan suite:
+
+```text
+Test Files  1 passed (1)
+Tests       46 passed (46)
+Duration    5.81s
+```
+
+Focused watcher suite:
+
+```text
+Test Files  4 passed (4)
+Tests       28 passed (28)
+Duration    42.67s
+```
+
+Additional zero-exit checks: TypeScript `--noEmit`; lint (`43 source files, no
+stray debug`); provenance (`76 byte-identical ports / 148 inventory rows`);
+dependencies (`5 declared / 132 locked, no root drift`); skills (`13 ported,
+byte-identical`); repeated source-plan `--check`; private-clone source
+independence; strict fsck; and both direct/npm route verifiers. The focused
+tests explicitly include exact-schema validation, six extraction/context
+adversaries, atomic-CAS crash persistence, and stale-owner exclusion.
+
+### Acceptance-criteria status and decisions
+
+- AC1–AC7 remain green at the exact successor target and hashes above.
+- AC8 feature publication is complete: literal remote readback of
+  `refs/heads/agent/134-echo-loop` equals
+  `ed41a6685848a0dc6f04d558e00e3c426a9b3166`. The first strict config-free push
+  attempt lacked credentials and failed without mutation; a one-shot explicit
+  credential helper retried the same `--force-with-lease` expected-old
+  `fe26a78f89d130364af5b2207e7b07b41eecb78b` and succeeded.
+- The exact target repository remains the acceptance object. No result was
+  generalized into a release, install, remote creation, maturity advancement,
+  or authority transfer.
+- Fresh independent review at feature head `ed41a668...` is the only next
+  lifecycle step; do not inherit the builder's conclusion.
+
+### Open questions
+
+None for the builder. Independent review may accept or reject the immutable
+feature head; this handoff does not pre-decide that verdict.
+
+### Drift and ECHO MCP
+
+No drift. Only pinned read-only source access, the existing local no-remote
+target, and the authorized Project_echo feature-branch publication were in
+scope. No sibling, wiki, holdout-131, install, release, or target-remote action
+occurred. No ECHO MCP call was made, so no dogfooding-journal entry was added.

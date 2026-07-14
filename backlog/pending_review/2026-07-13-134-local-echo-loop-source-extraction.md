@@ -35,51 +35,41 @@ claimed_by: "fable-builder-134b"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "375bdf694d8bd71bf383b6ae7416d69990ab3092"
+head_sha: "ed41a6685848a0dc6f04d558e00e3c426a9b3166"
 pr_url: ""
 agent_notes: |
-  A-E ROUND-2 RESIDUALS CLOSED — normal builder handoff to pending_review for
-  re-review (builder fable-builder-134b). The third codex-ops review (child
-  770b101f) confirmed A+B repaired and all 18 hashes reproduced, and raised
-  same-class residuals in C, D, E. This round closes all three on disposable
-  fixtures only. New builder head stacks on the review child 770b101f.
-  Green at target HEAD d69c003ae4146140d3d0ee3fe945778781ae5a43 (tree
-  ca77fbda46887a4b7e6170029cd5615e2feefad8, 29 commits, no remote, fsck exit 0,
-  tree clean): full `vitest run` = 22 files / 143 tests pass; `tsc --noEmit`
-  clean; lint/check:provenance/check:dependencies/check:skills exit 0;
-  `build-source-plan.mjs --check` exit 0 (committed edge record == HEAD closure,
-  584 rows / 9 classes, fixed_point 203f53420fb50ce82d0064ef238b568371a7095d8f7d2fff52256f7875a8dac8).
-  - Finding D residual (CLOSED): resolver is policy-driven (void policy removed;
-    policy object drives edge_classes + fail-closed reject flags; policy_sha256
-    bound into fixed point). Rows are (from, from_blob, specifier, edge_class,
-    resolution, context_hash); source_blobs binds all 103 executable code file
-    blobs (incl. the verifier itself) + manifest_blobs → tamper-evident fixed
-    point (verified: 1-byte change to build-source-plan.mjs AND policy-sha change
-    each MOVE the fixed point). context_hash hashes canonical manifest/context
-    BYTES (verified: same target, different lock row → different context_hash).
-    Fail-closed EdgeReject on unresolved repository-capable file/schema/worker/
-    script/exec + computed (no silent null-skip); extractor precision fixed
-    (script-ext boundary guard + heredoc skipping) → real tree = 0 rejects.
-    Workspace exports/pkg exports/tsconfig extends/baseUrl/references resolve
-    (workspace-only @acme/foo fixture passes). Full fixture roster added.
-  - Finding C residual (CLOSED): transport children write their pgid to a durable
-    pgid_file BEFORE contacting the remote (sh shim), closing the crash window
-    where owner_pgid was persisted only after the synchronous child returned;
-    takeover reaps the ACTUAL prior group (owner_pgid or pgid_file) with
-    termination evidence BEFORE attemptPush; owner-token-predicated setOwnerPgid +
-    takeover CAS; state adds pgid_file + termination_evidence (+ forward-migrate).
-    Fixtures couple a LIVE prior-owner group (orphaned to init) to an expired
-    lease + a crash-window recovery-via-pgid_file fixture.
-  - Finding E residual (CLOSED): migration record binds the literal publication
-    endpoint https://github.com/zhenye0616/ECHO.git + full ref
-    refs/heads/agent/134-echo-loop, and states concrete route argv (no <dir>/
-    <npm-cli> placeholders). Dual-route inner hash
-    b47d8c8d2bc0c99fbdd1550b4930a7199468360cb04f0f03c9332373840e3f9d (byte-
-    identical direct+npm; envelope-invariant under a distinct scratch HOME/TMPDIR).
-  A + B remain repaired (re-verified on disk). Target /Users/zhenye/Desktop/
-  echo-loop UNACCEPTED, no remote, not installed, DEV; authority:false. head_sha
-  above is the immutable builder head 375bdf69... on agent/134-echo-loop, sole
-  parent the review child 770b101f. Campaign detail in run log Run 8.
+  FOURTH-REVIEW REMEDIATION COMPLETE — normal builder handoff for a fresh,
+  independent AC8 review. The immutable fourth codex-ops judgment child
+  `fe26a78f89d130364af5b2207e7b07b41eecb78b` rejected D1, D2, C1, and C2;
+  all four residuals are closed on disposable fixtures only.
+  - D1 CLOSED: the full Draft-07 schema constrains every generated field and
+    generated + committed records are validated against the exact committed
+    schema before fixed-point/byte comparison or write.
+  - D2 CLOSED: the lexical JS scanner distinguishes executable test bodies from
+    fixture strings and covers member/computed env expressions, absolute repo
+    paths, scope shadowing, reassignment, and competing tsconfig contexts.
+  - C1 CLOSED: takeover's owner-token CAS atomically binds the prior PGID and
+    termination evidence with the successor owner; crash-after-CAS recovery is
+    proven from durable state.
+  - C2 CLOSED: every APPLYING mutation, including escalation/failure/recovery/
+    APPLIED, is owner-token-predicated; a stale owner cannot mutate a takeover.
+  Target `/Users/zhenye/Desktop/echo-loop` is clean at HEAD
+  `38989db78e221a7e15b2adbe859fa76244bf16e4`, tree
+  `76a7bc47a9aaf0196d2a43497d01460b0df86847`: 34 linear commits; 22 files /
+  153 tests pass; focused source-plan 46/46 and watcher 28/28 pass; typecheck,
+  lint, provenance, dependencies, skills, closure check, source independence,
+  strict fsck, and the 14-row direct+npm workload pass. The closure is 604 rows
+  / 9 classes, 104 source blobs, 3 manifest blobs, fixed point
+  `b1745bfd39cd51d89b52d0e669b073643103ec597ee9c5f731d1bcb599b9cb5a`.
+  Direct+npm inner SHA-256 is
+  `e21c1d0fb2f4afcbe88b27d4fd7988cb7f180c9b72a18936ca4ea98c7d81d0ef`;
+  all 400 objects are reachable and 173 tracked files exactly equal the 173
+  non-`.git` filesystem files, with no remote or hidden repository state.
+  Feature head `ed41a6685848a0dc6f04d558e00e3c426a9b3166` is a migration-record-only
+  child of the rejected judgment and is published at
+  `refs/heads/agent/134-echo-loop`. Fresh independent review is required; this
+  builder makes no acceptance claim. Target remains UNACCEPTED, no remote, not
+  installed, local `DEV`; `authority:false`; `installed:false`.
 review_notes: ""
 ---
 
