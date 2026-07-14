@@ -31,10 +31,10 @@ spec_refs:
   - tools/review-queue/reviewer-bindings.json                 # current bindings
   - tools/review-queue/reviewers.json                         # current roster
   - raw/internal/migrations/2026-07-13-134-echo-loop-source-policy.v1.json # SEALED read-only: blob dd9d78abbbecf01d5de6ab7edbc8bace07e4f50a, sha256 44bef194b379b83185aab3f7055ce547c7a51a7b6df18764022a6f565cbde52a
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "fable-builder-134"
+claimed_at: "2026-07-14T05:49:30Z"
+branch: "agent/134-echo-loop"
+worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
