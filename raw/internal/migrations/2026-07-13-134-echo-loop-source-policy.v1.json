@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "policy_id": "2026-07-13-134-echo-loop-source-policy",
+  "source_commit": "2971310441b69735cbe759293abd8c4d044bf347",
+  "seed_files": [
+    "package.json",
+    "package-lock.json",
+    "tsconfig.json",
+    "tsconfig.cli.json",
+    "backlog/README.md",
+    "docs/AGENT_INSTRUCTIONS.md",
+    "tools/backlog_index.py",
+    "tools/blocked.py",
+    "tools/coord-status.sh",
+    "tools/install-echo-codex-skills.sh",
+    "tools/sync-skills.sh"
+  ],
+  "directory_rules": [
+    {"root": "skills", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "src/coord", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tools/backlog", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tools/review-queue", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tools/task-state", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tests/backlog", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tests/coord", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tests/review-queue", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tests/skills", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tests/sync-skills", "selection": "recursive_regular_files_at_source_commit"},
+    {"root": "tests/task-state", "selection": "recursive_regular_files_at_source_commit"}
+  ],
+  "directory_expansion": {
+    "command": "git ls-tree -rz --full-tree <source-commit> -- <literal-root>",
+    "accepted_modes": ["100644", "100755"],
+    "path_order": "raw_utf8_byte_ascending",
+    "reject": ["invalid_utf8", "duplicate_path", "symlink", "submodule", "non_blob"]
+  },
+  "manifest_context": {
+    "exact_names": ["package.json", "package-lock.json", "npm-shrinkwrap.json", "tsconfig.json", "tsconfig.cli.json"],
+    "name_patterns": ["tsconfig.*.json"],
+    "fields": ["workspaces", "exports", "imports", "bin", "scripts", "extends", "compilerOptions.baseUrl", "compilerOptions.paths", "references"]
+  },
+  "edge_classes": [
+    "repository_static_import",
+    "repository_dynamic_literal_import",
+    "repository_commonjs_literal_require",
+    "repository_literal_file_read",
+    "repository_schema_or_template",
+    "node_builtin",
+    "npm_package",
+    "npm_javascript_cli",
+    "shell_literal_command",
+    "shell_literal_script",
+    "python_literal_module",
+    "python_literal_script",
+    "worker_literal_entry",
+    "system_toolchain_helper"
+  ],
+  "resolution_precedence": [
+    "node_builtin",
+    "repository_exact_relative_or_absolute_within_target",
+    "repository_package_imports_and_workspace_exports",
+    "npm_package_or_javascript_cli",
+    "shell_or_python_literal_repository_script",
+    "system_toolchain_helper"
+  ],
+  "computed_repository_capable_edges": "reject",
+  "unknown_edges": "reject",
+  "excluded_capabilities": ["echo_brain_product", "echo_context_capture_storage_retrieval", "project_echo_history"]
+}

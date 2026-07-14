@@ -10,17 +10,18 @@ Materialize the item-132 product closure as a source-independent local `echo-bra
 - No `.echo-migration-evidence`, publisher, capsule, process watcher, seal, custom credential transport, or custom handoff protocol is built.
 - Normal Project_echo builder workflow owns run log, migration record, commit, feature-branch push, and review response.
 - Source reads use a fully scrubbed, NUL-safe raw-object launcher; hostile config/object redirection and filtered bytes fail.
-- Source closure starts from the item-132 boundary, package/shrinkwrap/schema/README, and eight product tests; rewrite/exclusion allowlists are empty and the target-only set is literal/review-SHA bound.
+- Source closure starts from the item-132 boundary, package/shrinkwrap/schema, and eight product tests; source-boundary is byte-copied, README is target-only, rewrite/exclusion allowlists are empty, and all 21 target-only paths are literal/review-SHA bound.
 - A named target audit command independently recomputes source closure and target partition from explicit git-dir/SHA/target/policy arguments.
 - Every target HEAD edge partitions into local blob, exact npm lock row, or pinned system tool; source/sibling/path/Git/workspace edges fail.
 - Boundary excludes context/MCP/loop/history and the target owns package, config, state, build, artifact, tests, and provenance.
-- Builder artifact, two clean rebuilds, reviewer rebuild, and records share one exact artifact/member/HEAD/tree/lock tuple under a pinned environment.
-- Builder is sole writer; a same-host independent reviewer is read-only, reruns shared-target/audit/clean-clone checks, and writes a named review record.
+- Named B0/B1/B2/R1 runs and records share one exact artifact/member/HEAD/tree/lock tuple under pinned offline network-denied lifecycle rules.
+- Accepted object database equals sole-branch reachable closure; every Git operation is config/template/hook scrubbed.
+- Builder is sole target writer; a same-host independent reviewer reruns shared-target/audit/clean-clone checks and adds only a named review-record child commit to the feature branch.
 - Project_echo remains authority; target remains local, no remote, `maturity:DEV`.
 
 ## open_questions
 
-- R16 by `codex` and `codex-ops` must confirm the literal reviewed policy, hermetic Git reads, named audit, exact build matrix, and same-host review handoff.
+- R17 by `codex` and `codex-ops` must confirm the literal 21-path policy, hermetic Git/object closure, offline lifecycle, B0/B1/B2/R1 matrix, and review-record child commit.
 - Later authority-transfer work decides target remote, branch protection, cutover, and old-path freeze.
 
 ## dont_touch
