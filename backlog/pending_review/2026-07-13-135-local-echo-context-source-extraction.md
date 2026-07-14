@@ -34,9 +34,30 @@ claimed_by: "fable-builder-135"
 claimed_at: "2026-07-14T05:47:41Z"
 branch: "agent/135-echo-context"
 worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
-head_sha: ""
+head_sha: "8d5ae35e502fb6105f17ae9088b51f750f721cc2"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED (incomplete attended build — target unaccepted).
+  Blocker: full acceptance requires a multi-day, byte-exact, cross-validated build
+  (standalone TS package with ~107 green tests, native better-sqlite3 install proof
+  under sandbox-exec network denial, six audit tools, 14 provenance JSON + 9 schemas
+  reproduced identically from an independent reviewer's clone, context-tool + service
+  parity, migration record, and the codex-ops reviewer feature-branch child-push
+  handoff) that exceeds a single attended session; pushing an unverified partial as
+  "complete" would fail the reviewer's from-clone reproduction and misreport status.
+  Tried/done + verified: toolchain matches spec pins (git 2.37.3, node 22.22.1);
+  AC6 inventory binding reproduced byte-for-byte (217 paths=110 src+107 test, SHA-256
+  8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37) via an authored
+  tools/emit-source-inventory.mjs; AC1 isolated repo created (unborn migration/2026-07-13-135,
+  config-free envelope, no remote/reflogs); full exclude/rewrite disposition map produced.
+  Best guess if forced: the continuation is well-specified and low-ambiguity; next
+  step is the import-graph closure over the 217 paths, then materialize ported/rewritten
+  source + author source-evidence/parity-matrix/source-extraction/target-only-policy (confidence high).
+  Why escalated: governing decision 2026-07-13-one-shot-local-extraction-lifecycle.md
+  provisions exactly this — an incomplete attended build is unaccepted and founder-archived
+  before a continued/fresh run; no agent auto-adopts/resumes. head_sha is the claim commit
+  (this item's code lives in the standalone target repo, not the worktree branch). Full
+  detail + per-AC remaining map in the run log.
 review_notes: ""
 ---
 
