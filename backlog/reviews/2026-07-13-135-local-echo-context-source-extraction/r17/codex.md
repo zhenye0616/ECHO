@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 17
+reviewer: "codex"
+artifact_sha: "e1115daee4ad389bca1bed9b10a43e76df534c19"
+completed_at: '2026-07-14T04:40:46Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC2 runtime-inventory grammar / AC6 canonical source-inventory command"
+    finding: "Computed process launches must fail, but emit-source-inventory.mjs must spawn the executable supplied through --git. Require that argument to equal and resolve to literal /usr/local/bin/git before spawning the pinned helper, or define a closed validated-helper edge class with wrong-path and escape fixtures."
+  - severity: "high"
+    where: "AC6 parity-matrix rewrite policy"
+    finding: "A rewritten row can currently bless an arbitrary authored target blob because no transformation representation or rejection rule distinguishes a permitted rewrite from the whole-blob rewrite that must fail. Define one-to-one source-to-target mapping, an embedded deterministic patch format and exact replay command, and closed rejection rules for authored replacement and extra output."
+  - severity: "medium"
+    where: "AC3 source context-tool parity setup"
+    finding: "The source half of the parity proof lacks an exact reproducible install and launch contract: the npm CLI, flags, script/native policy, launcher argv/environment, and fixed clock/random/ID injection mechanism are unspecified. Pin those inputs, bind the harness bytes and hashes in provenance, and add wrong-toolchain and missing-injection fixtures."
+  - severity: "high"
+    where: "AC3 stdio runner / AC8 service runner"
+    finding: "Wall-clock deadlines do not bound output: stderr has no numeric cap, while MCP stdout and frames, service stdout/stderr, HTTP bodies, and readiness FD3 have none. Add literal per-frame, per-stream, and aggregate limits with incremental fail-closed overflow handling, process-group termination, and flood/oversized-record fixtures."
+  - severity: "high"
+    where: "AC7 cache-fill and native lifecycle execution"
+    finding: "Cache fill, network probes, npm ci, and the native rebuild have no phase or overall deadlines, output caps, process-group ownership, or survivor cleanup. Specify bounded execution and signal/reap order for every phase, and add hang, fork, and flood fixtures."
+  - severity: "medium"
+    where: "AC1 and AC7 config-free Git envelope"
+    finding: "The listed settings do not neutralize inherited Git state such as GIT_OBJECT_DIRECTORY, GIT_ALTERNATE_OBJECT_DIRECTORIES, GIT_COMMON_DIR, GIT_NAMESPACE, GIT_CONFIG_COUNT, GIT_CONFIG_PARAMETERS, and GIT_EXEC_PATH, or repository-local include directives. Define a literal env -i allowlist, pin helper/upload-pack resolution, reject local includes before use, and add injected-environment fixtures."
+  - severity: "high"
+    where: "AC8 independent-review ownership and handoff"
+    finding: "The handoff state machine is not closed: claims are unrestricted although the text assumes a Claude builder, rerunning AC1 conflicts with its exclusive EEXIST-failing creation, rerunning AC8 is recursive, and the reviewer child changes the branch after pending-review handoff without an explicit final-head metadata owner. Define enforceable builder/reviewer eligibility, a finite verification-only command list, the publisher/approval owner, and an atomic final handoff bound to the reviewer head and expected-old lease."
+---
