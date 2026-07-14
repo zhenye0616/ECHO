@@ -9,6 +9,7 @@ blocked_by:
   - 2026-07-13-132-product-graduation-foundation
 task_state_ref: 2026-07-13-135-local-echo-context-source-extraction
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: aa9fa9d89c30b2ba2823d6b3eecdc32e389120bb9f3bc46538b9335a301c8392
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/**                      # NEW standalone context repository; local only
   - raw/internal/migrations/2026-07-13-135-echo-context.md     # NEW Project_echo provenance/parity record
