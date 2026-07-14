@@ -1,44 +1,30 @@
 ## current_thesis
 
-Materialize capture, normalization, storage, retrieval, and context APIs as a source-independent local `echo-context` repository while leaving live daemon/MCP/state untouched. Judge the final repo and synthetic parity, not migration machinery.
+Materialize capture, storage, retrieval, and context APIs as a source-independent local `echo-context` repo while leaving live daemon/MCP/state untouched. Judge raw-source parity and synthetic behavior from fresh clones.
 
 ## locked_decisions
 
-- `echo-context` owns generic capture, normalization/identity, append-only storage, clustering/retrieval, permissions/health, and context APIs.
-- Source is pinned to `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; dirty checkout bytes are excluded.
-- After orchestrator preflight, one builder atomically `mkdir`s absent target `/Users/zhenye/Desktop/echo-context`; siblings never touch it and the builder refuses EEXIST.
-- The builder creates local branch `migration/2026-07-13-135` under scrubbed Git/object/index/config environment with no remote or external object state.
-- Project_echo gains no extraction CLI, lifecycle state, lock/takeover, publication/recovery helper, committed sandbox profile, or migration-framework tests.
-- An interrupted target is incomplete/unaccepted and manually archived before a fresh assigned run; no automatic adoption/resume/delete.
-- Source projector selects eight unique context tools from the mixed source roster; target has exactly those eight, with canonical descriptors/behavior matching.
-- Source MCP and target use exact request/seed bytes from sidecar-hashed per-tool fixtures, fresh processes/state, fixed volatile inputs, and equal per-case/aggregate hashes.
-- State uses distinct ECHO_CONTEXT_HOME; live `~/.echo`, credentials, daemon, and MCP config are never read/mutated.
-- Raw Granola capture may be copied generically; product decision/card/brief/approval logic stays out.
-- Candidate inventory is exactly 211 paths (109 source, 102 test/fixture), pinned aggregate SHA-256 `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
-- Every source row has provenance and ported/rewritten/excluded disposition; standalone parity needs no source access.
-- A host-aware Node fetch runner validates lock URLs/TLS/redirects, quarantines and integrity-admits tarballs; npm is offline-only and separate sealed seeds feed installs.
-- Installs use direct offline npm-cli with `--ignore-scripts`; lifecycle commands run only from the plan after hostile `.npmrc`/postinstall denial tests.
-- Native rebuilds use a closed static executable/SDK/header manifest enforced by default-deny sandbox-exec plus readiness/denial probes; no unsupported unprivileged tracing claim remains.
-- Shared target stays read-only; verifier records exact HEAD/tree, clones that commit privately, detaches, removes origin, checks object independence, and rechecks shared HEAD/tree.
-- Stdio, service-server, and service-client profiles are distinct: server only binds/accepts loopback and reports readiness by FD; client connects only after readiness to that exact endpoint.
-- Retained one-shot operator runner owns named hostile fetch/native/capsule/signal/budget/handoff suites; it is non-shipping evidence, not migration product machinery.
-- After O_CLOEXEC failures-dir bootstrap, every spawn has an FD allowlist; the exact schema/publisher/FD3 contract uses deterministic candidates, `RENAME_EXCL`, bounded capsule, and descriptor-inheritance tests.
-- Every command/probe owns a process group and descendant ledger; timeout/signal/exit-0 paths all require bounded TERM/KILL/wait and no detached/listener/writer survivor.
-- Handoff alone receives network/auth. It binds the frozen Project_echo parent/HEAD/tree/claim ref and literal HTTPS endpoint, pushes that exact commit once with expected-absent lease, and never publishes echo-context.
-- The outcome table treats every post-attempt zero-row/transport ambiguity as unknown; bounded create-new receipt fields cover all terminal cases and never retry.
-- Synthetic loopback service tests prove capture/retrieval behavior; no live state migration or service cutover.
-- The migration record pins only pre-commit-stable target/evidence fields; external handoff receipt owns commit OID and probe/push status.
+- `echo-context` owns generic capture, normalization, append-only storage, clustering/retrieval, permissions/health, and context APIs.
+- Source is raw Git objects at `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; dirty/replacement/filter/external-object inputs fail.
+- One builder creates absent `/Users/zhenye/Desktop/echo-context`, local branch `migration/2026-07-13-135`, fixed identity, and no remote; EEXIST aborts.
+- No evidence tree, capsule, process watcher, credential transport, endpoint protocol, or custom handoff is built; normal Project_echo workflow owns handoff.
+- Source projector selects eight unique context tools from mixed source; target exposes exactly those eight with equal canonical descriptors/cases.
+- State uses distinct `ECHO_CONTEXT_HOME`; live `~/.echo`, credentials, daemon, and MCP config are never read or mutated.
+- Raw Granola capture may remain generic; decision/card/brief/approval product logic stays out.
+- Raw source inventory is exactly 211 paths (109 source, 102 tests), aggregate `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
+- Exact disposition/target-only allowlists and full target partition prevent omission, authored replacement, or whole-blob rewrite evasion.
+- Final-HEAD edges partition local/npm/toolchain; pinned dependency lifecycle (including better-sqlite3) is recorded and independently repeated without claiming hostile supply-chain containment.
+- Builder and reviewer use private clones and synthetic state for tool, storage, retrieval, stdio, and loopback service parity.
+- Project_echo daemon/MCP/live state remains authoritative; target is local, no remote, not installed.
 
 ## open_questions
 
-- R14 by independent `codex` and `codex-ops` must confirm no-script installs, exec prevention, FD containment, exact capsule oracle, all-command reap, exact Project_echo handoff invocation/HTTPS auth isolation, clean staged diff, outcome table, and bounded receipt.
-- Later cutover decides remote, install, live-state migration/rollback, and echo-brain's versioned read-only contract.
+- R15 by `codex` and `codex-ops` must confirm the simplified final-repo proof, raw source envelope, dependency lifecycle record, exact tool roster, and synthetic service parity.
+- Later cutover decides remote, installation, live-state migration/rollback, and echo-brain's versioned context contract.
 
 ## dont_touch
 
-- Do not alter live daemon/MCP/state/credentials/launchd/user config.
-- Do not add features or include product/loop code.
-- Do not touch siblings, wiki, or holdout-131.
+- Do not alter live daemon/MCP/state/credentials/launchd, add features, include product/loop code, or touch siblings/wiki/holdout-131.
 
 ## canonical_anchors
 

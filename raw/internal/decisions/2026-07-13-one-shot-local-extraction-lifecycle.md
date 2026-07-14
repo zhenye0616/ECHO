@@ -1,18 +1,20 @@
 # Local extraction is an attended build, not a product
 
 Date: 2026-07-13
-Status: locked for proposal R14
+Status: locked for proposal R15
 Applies to: items 133 (`echo-brain`), 134 (`echo-loop`), and 135 (`echo-context`)
 
 ## Decision
 
 The three local source splits are one-time, operator-attended repository builds. They will not ship or leave behind a generic extraction CLI, lifecycle state machine, lock/takeover protocol, publication transaction, recovery daemon, committed sandbox profile, or migration-framework tests in Project_echo.
 
+They also do not create a dedicated `.echo-migration-evidence` tree, native evidence publisher, failure capsule, custom descendant supervisor, credential transport, or second Git handoff protocol. Those mechanisms made the proposal harder to implement and review without improving the standalone repositories. Normal Project_echo builder workflow owns claim, run log, commit, feature-branch push, and review publication.
+
 Each assigned builder owns one absent, disjoint target path and materializes it directly from pinned Project_echo commit objects. The durable outputs are only:
 
 - the standalone local Git repository;
-- its target-local provenance, boundary, dependency, parity, and test evidence; and
-- one Project_echo migration record committed with the builder handoff.
+- its target-local provenance, boundary, dependency, parity, and tests; and
+- one Project_echo migration record committed through the normal builder handoff.
 
 If a builder is interrupted, the visible target is incomplete and unaccepted. The orchestrator inspects and manually archives it before a fresh assigned run. No agent automatically adopts, deletes, resumes, reconciles, or repairs it.
 
@@ -34,4 +36,4 @@ That machinery did not improve the actual product boundaries or parity proof. Re
 
 ## Operational consequence
 
-Builders implement repository contents, not migration infrastructure. Reviewers judge the final repository and reproducible evidence. A failed run costs another attended build; it does not justify adding automatic recovery code.
+Builders implement repository contents, not migration infrastructure. Reviewers judge the exact target HEAD/tree and rerun its target-local checks from their own fresh clones. Ordinary command output is summarized in the run and migration records; it is not promoted into a crash-atomic evidence protocol. A failed run costs another attended build and manual archive; it does not justify adding automatic recovery code.

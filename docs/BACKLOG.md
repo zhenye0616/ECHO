@@ -8,8 +8,8 @@ Do not edit by hand.
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
 | PROPOSED | HIGH | 2026-07-13 | [2026-07-13-133-local-echo-brain-source-extraction](../backlog/proposed/2026-07-13-133-local-echo-brain-source-extraction.md) | Local standalone echo-brain source extraction and parity proof | 4d | 2026-07-13-132-product-graduation-foundation |
-| PROPOSED | HIGH | 2026-07-13 | [2026-07-13-134-local-echo-loop-source-extraction](../backlog/proposed/2026-07-13-134-local-echo-loop-source-extraction.md) | Local standalone echo-loop orchestration source extraction and parity proof | 5d | - |
-| PROPOSED | HIGH | 2026-07-13 | [2026-07-13-135-local-echo-context-source-extraction](../backlog/proposed/2026-07-13-135-local-echo-context-source-extraction.md) | Local standalone echo-context capture and retrieval source extraction and parity proof | 5d | - |
+| PROPOSED | HIGH | 2026-07-13 | [2026-07-13-134-local-echo-loop-source-extraction](../backlog/proposed/2026-07-13-134-local-echo-loop-source-extraction.md) | Local standalone echo-loop source extraction and fixture proof | 5d | 2026-07-13-132-product-graduation-foundation |
+| PROPOSED | HIGH | 2026-07-13 | [2026-07-13-135-local-echo-context-source-extraction](../backlog/proposed/2026-07-13-135-local-echo-context-source-extraction.md) | Local standalone echo-context source extraction and synthetic parity proof | 5d | 2026-07-13-132-product-graduation-foundation |
 
 ## Ready
 
