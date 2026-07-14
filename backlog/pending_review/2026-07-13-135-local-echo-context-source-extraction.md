@@ -37,29 +37,29 @@ worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
 head_sha: "8d5ae35e502fb6105f17ae9088b51f750f721cc2"
 pr_url: ""
 agent_notes: |
-  ESCALATION at capacity (Run 2, founder-endorsed in-place continuation) — INCOMPLETE/UNACCEPTED target committed.
-  Target: /Users/zhenye/Desktop/echo-context @ HEAD e49f87da18c12db90700938666ea4bff1b6e7e53
-  (tree 0918788b8d7c3d3d4497904c1885b7e81106b25a), branch migration/2026-07-13-135, no remote,
-  181 tracked files, git fsck --full clean, no unreachable objects. NOT accepted.
-  Done + verified this run: import-graph closure over the 217 paths → final disposition
-  partition 172 ported (byte-exact) / 3 rewritten / 42 excluded, with 0 unresolved local imports.
-  Rewrites: src/mcp/server.ts (deletion-only → EXACTLY the 8 context tools), src/enrich/granola-signals.ts
-  (AC5 minimal generic duplicate — full product module NOT copied, recorded duplication not silent
-  double-claim), tests/mcp/tools/search-memories.test.ts (excised product decision-store import + item-112
-  cases; generic + item-115 coverage kept). Committed provenance/source-evidence.v1.json (217 rows),
-  provenance/parity-matrix.v1.json (dispositions + rewrite hashes/replay), context-tools.v1.json (8 roster),
-  package.json (Node 22.22.1/npm 10.9.4 pins), tools/emit-source-inventory.mjs (reproduces SHA
-  8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37). AC1 + AC6-core landed.
-  Two spec-partition questions surfaced (do not guess): (Q1) tsconfig.json is not in the AC6 38-path
-  target-only policy yet AC7 needs typecheck/lint — provisional tsconfig kept in scratch, not committed;
-  (Q2) AC4 src/state/paths.ts is neither in the 38-path policy nor source-extracted (src/state not a root;
-  closure ships src/echo-home/state-paths.ts) — clarify rewrite/rename vs added path vs reuse.
-  Remaining (multi-hour): AC7 clean-install proof (better-sqlite3 rebuild under sandbox-exec deny-network) +
-  package-lock; standalone typecheck/lint/~107 tests green; target-only-policy/source-extraction + 9 schemas +
-  exact HEAD equality; runtime-inventory + check-runtime-inventory (AC2); context-tool + service parity
-  harnesses (AC3/AC8); the 6 migration tests; migration record; codex-ops reviewer child-push handoff.
-  Why escalated: at-capacity per founder instruction; the target is a founder-endorsed incomplete milestone
-  for continuation, not an accepted target. Full detail + updated per-AC map in the Run 2 run log.
+  ESCALATION at capacity (Run 3, Q1/Q2 adjudicated) — INCOMPLETE/UNACCEPTED target, but now a GREEN standalone build.
+  Target: /Users/zhenye/Desktop/echo-context @ HEAD d0b67033175b1c936e153c984a6e1e33a5efa89c
+  (tree 0c4218ff24255cdcc30b1deb626cfa39a7a3ca78), branch migration/2026-07-13-135, no remote,
+  159 tracked files, git fsck --full clean, no unreachable. node_modules + scratch tsconfig NOT tracked. NOT accepted.
+  HEADLINE: standalone `tsc --noEmit` = 0 errors; `vitest run` = 64 files / 939 tests pass, 17 skipped, 0 fail
+  (dev npm install built better-sqlite3 natively). Core buildability risk retired.
+  Partition finalized (import-closed): 144 ported / 8 rewritten / 65 excluded, 0 unresolved.
+  8 rewrites (parity-matrix rows w/ target hashes + replay): server.ts (8-tool roster), granola-signals.ts
+  (AC5 generic duplicate), state-paths.ts (AC4: ECHO_HOME→ECHO_CONTEXT_HOME, ~/.echo→~/.echo-context per
+  Founder adjudication #2), + 5 test rewrites (roster 15→8, enable_deadlines drop, coord_emit→search_memories
+  isError case, product-case excision, AC4 defaults). 65 excluded now also includes the echo-home
+  onboarding/config-sync layer (not context substrate per AC2; reaches assets/ outside roots).
+  AC1 done. AC4 done (per Q2). AC5 done. AC6 extraction + source-evidence/parity-matrix done.
+  Q1 record for migration record: scratch tsconfig SHA-256 7164ed9356aa3bd1d9108283eee164053bc6f251418d0aa1dc4d4b02726bf78f
+  (invoke typecheck/lint via --project <scratch>; not committed).
+  Remaining (each a bounded authored subsystem): AC2 runtime-inventory + check-runtime-inventory.mjs;
+  AC3 context-tool-parity fixture + verify-context-tools.mjs + stdio runner + provenance;
+  AC6 target-only-policy (38) + source-extraction + 9 schemas + check-parity/audit-pinned-extraction + 5 migration tests + exact-HEAD;
+  AC7 install proof under sandbox-exec deny-network (lifecycle-expected/observed, native-toolchain, probes) + pinned lock;
+  AC8 service-api schema + verify-service-parity + context-service test + migration record (NOT the codex-ops reviewer leg); lint.
+  head_sha is the Project_echo feature-branch head (unchanged — the code lives in the standalone target repo; the
+  builder migration record that would advance the branch is in the AC8 remaining set). Target HEAD above is the real deliverable pointer.
+  Why escalated: at-capacity per founder instruction; founder-endorsed incomplete milestone for continuation. Full map in the Run 3 run log.
   head_sha is the Project_echo feature-branch head (no code by design — code lives in the standalone target).
 review_notes: ""
 ---

@@ -253,3 +253,88 @@ forbidden-capability seeds with edge-cuts at rewrite/duplicate nodes.
 ### Journal
 - Zero `mcp__echo__*` calls this run (all filesystem/git/node analysis). Per the
   CLAUDE.md skip-rule, no dogfooding-journal entry is owed.
+
+---
+
+## Run 3 (2026-07-14 — founder-endorsed continuation; Q1/Q2 adjudicated)
+
+Founder adjudicated Q1 (scratch tsconfig, never committed; record its bytes in the
+migration record; invoke via `--project <scratch>`) and Q2 (implement AC4 as a
+recorded REWRITE of `src/echo-home/state-paths.ts`, not a new `src/state/paths.ts`).
+Both applied. This run got the standalone package to a GREEN build.
+
+### Headline: standalone typecheck clean + 939 tests green
+
+- Dev `npm install` in the target succeeded (native better-sqlite3 built, exit 0).
+- `tsc --noEmit` via the scratch tsconfig: **0 errors**.
+- `vitest run`: **64 test files pass, 939 tests pass, 17 skipped, 0 fail.**
+- Target committed (INCOMPLETE/UNACCEPTED) at HEAD
+  `d0b67033175b1c936e153c984a6e1e33a5efa89c`, tree
+  `0c4218ff24255cdcc30b1deb626cfa39a7a3ca78`, 159 tracked files (152 source + 7
+  policy/provenance), fsck clean, no unreachable, no remote. node_modules and the
+  scratch tsconfig are NOT tracked.
+
+### Partition finalized (import-closed, build-verified)
+
+Re-analysis with the echo-home onboarding layer excluded gives the final
+partition **144 ported / 8 rewritten / 65 excluded** (0 unresolved local imports):
+- **8 rewritten** (each a parity-matrix `rewritten` row with source OID +
+  target_content_sha256 + rewrite kind + replay): `src/mcp/server.ts` (8-tool
+  roster), `src/enrich/granola-signals.ts` (AC5 generic duplicate),
+  `src/echo-home/state-paths.ts` (AC4: `ECHO_HOME`→`ECHO_CONTEXT_HOME`, `~/.echo`→
+  `~/.echo-context` — Founder adjudication #2), and five test rewrites
+  (`recent-work-context.test.ts` roster 15→8; `server.test.ts` +
+  `recent-calls-endpoint.test.ts` drop `enable_deadlines`, latter also swaps the
+  removed-`coord_emit` error case for a documented `search_memories` isError path;
+  `search-memories.test.ts` product-case excision; `paths.test.ts` AC4 defaults).
+- **65 excluded**: coord/product/loop MCP tools, product enrich workers, the
+  onboarding wizard subtree, AND the echo-home onboarding/config-sync layer
+  (adapter-sync, index, roles, scaffold, adapters/{claude-code-mcp,codex-config,
+  cursor-config,markers,role-sync,skill-sync,workflow-sync}) which is not imported
+  by the context core, reaches `assets/` outside the 20 roots, and is not context
+  substrate per AC2 — plus their tests. Kept echo-home = `paths.ts`,
+  `state-paths.ts`, `adapters/atomic-write.ts` (the generic bits capture/storage need).
+
+### AC4 (done, per Q2) + AC5 (done)
+
+- `state-paths.ts` rewritten for `ECHO_CONTEXT_HOME` (default `~/.echo-context`,
+  distinct from echo-brain/echo-loop/`~/.echo`). `paths.ts` inherits the context
+  home via its state-paths dependency, so capture-source config lands under the
+  context home. Deviation from AC4's literal `src/state/paths.ts` recorded here for
+  the migration record.
+- AC5 granola dedup: `granola-signals.ts` minimal generic duplicate ships;
+  `post-meeting-brief.ts` excluded (item-133 product). Recorded, no double-claim.
+
+### Provenance updated
+
+- `source-evidence.v1.json` (217 rows) and `parity-matrix.v1.json` (144/8/65 with
+  rewrite hashes + replay) regenerated from a single idempotent extract script.
+- `package.json` + committed `package-lock.json` (dev-generated; AC7 will re-derive
+  under the pinned offline lock). `context-tools.v1.json` (8 roster).
+
+### Q1 record (for the migration record)
+- Scratch tsconfig SHA-256: `7164ed9356aa3bd1d9108283eee164053bc6f251418d0aa1dc4d4b02726bf78f`
+  (NodeNext/ES2022 strict, mirrors source). Typecheck/lint invoke via
+  `--project <scratch-tsconfig>`; not committed to the target.
+
+### Remaining before acceptance (capacity boundary)
+- AC2: `provenance/runtime-inventory.v1.json` + `tools/check-runtime-inventory.mjs`
+  (closed edge grammar); `tests/migration/dependency-set.test.ts`.
+- AC3: `tests/fixtures/context-tool-parity.v1.json` (10 ordered cases) +
+  `tools/verify-context-tools.mjs` + `provenance/context-tool-parity.v1.json` +
+  schema; the stdio parity runner; `tests/api/context-only-roster.test.ts`.
+- AC6: `provenance/target-only-policy.v1.json` (exact 38) + `source-extraction.v1.json`
+  + the 9 provenance schemas + `tools/check-parity.mjs` + `audit-pinned-extraction.mjs`;
+  the migration tests (parity-matrix, context-tool-evidence, committed-source-only,
+  source-independence, object-closure). Exact-HEAD equality once all 38 exist.
+- AC7: `lifecycle-expected/observed.v1.json`, `native-toolchain.v1.json`; private
+  clone; `sandbox-exec` deny-network `npm ci --offline --ignore-scripts` +
+  `npm rebuild better-sqlite3` (only that rebuild executes); DNS/TCP + loopback probes.
+- AC8: `schemas/service-api.v1.json`, `tools/verify-service-parity.mjs`,
+  `tests/integration/context-service.test.ts`; migration record. (NOT the codex-ops
+  reviewer leg — that's the independent reviewer's.)
+- lint (via scratch eslint config, same Q1 pattern).
+
+### Journal
+- 2× `search_memories` this run (both 0-match — siblings' artifacts not in the live
+  db); journaled in-the-moment to the 2026-07 claude shard.
