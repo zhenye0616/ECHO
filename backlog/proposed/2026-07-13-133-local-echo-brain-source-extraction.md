@@ -11,6 +11,7 @@ task_state_ref: 2026-07-13-133-local-echo-brain-source-extraction
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - /Users/zhenye/Desktop/echo-brain/**                         # NEW standalone client-product source repository; local only
+  - /Users/zhenye/Desktop/.echo-migration-evidence/133/**      # NEW retained artifact/command evidence through review disposition
   - raw/internal/migrations/2026-07-13-133-echo-brain.md       # NEW Project_echo handoff/provenance/parity record
 spec_refs:
   - raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md # one-time attended build; no migration controller
@@ -42,7 +43,9 @@ The founder has named the complete client-facing Team decision product `echo-bra
 
 ### AC1 — Materialize one local Git repository without shipping migration machinery
 
-One assigned builder lane owns `/Users/zhenye/Desktop/echo-brain`; sibling lanes never touch it. The target must be absent when the attended run begins. The builder creates the repository directly, initializes branch `migration/2026-07-13-133`, sets local identity `ECHO Migration Agent <migration@echo.local>`, disables signing/hooks/templates/global and system Git config, and configures no remote. Source bytes come only from Project_echo commit objects at the pinned SHA via `git show`/`git archive`, never from dirty working-tree files.
+One assigned builder lane owns `/Users/zhenye/Desktop/echo-brain`; sibling lanes never touch it. After the orchestrator confirms every target path component is a real non-symlink directory and the final path is absent, the builder's first mutation is plain non-recursive `mkdir /Users/zhenye/Desktop/echo-brain`, which must fail on `EEXIST`; only that invocation may write inside. The builder initializes branch `migration/2026-07-13-133`, sets local identity `ECHO Migration Agent <migration@echo.local>`, disables signing/hooks/templates/global and system Git config, and configures no remote.
+
+Every source and target Git command runs from an explicit minimal environment that clears `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_CONFIG_COUNT/KEY/VALUE`, replace/graft/ceiling variables, askpass/SSH/proxy settings, and sets `GIT_NO_REPLACE_OBJECTS=1`. Final checks prove git-dir/worktree/index/object storage are target-local, `git fsck --full` passes, and no alternates, replace/graft refs, promisor objects, or external object stores exist. Source bytes come only from Project_echo commit objects at the pinned SHA via explicit-repository `git show`/`git archive`, never dirty working-tree files.
 
 This is a one-time operator build, not a reusable extraction product. Do not add a Project_echo extraction CLI, daemon, lifecycle database, lock/takeover protocol, sandbox profile, publication helper, or recovery code. If interrupted, the target is visibly incomplete and unaccepted; the orchestrator inspects and archives it before assigning a fresh run. No second agent automatically adopts, deletes, resumes, or repairs it.
 
@@ -56,7 +59,7 @@ Direct dependencies derive from final bare imports plus the fixed build/test too
 
 ### AC3 — Preserve file-level provenance
 
-`/Users/zhenye/Desktop/echo-brain/provenance/source-extraction.v1.json:1` records source repository identity, pinned SHA, item 132, boundary version, and a sorted row for every copied source file: source path/blob/content SHA-256, destination path/hash, disposition (`copied`, `relocated`, `rewritten`, `excluded`), and reason. Rewrites have an explicit literal/path substitution list. Small shared utilities may be copied with no synchronization promise. Symlinks, submodules, generated mirrors, workspaces, `file:`/Git/path dependencies, and imports into Project_echo or siblings are forbidden.
+`/Users/zhenye/Desktop/echo-brain/provenance/source-extraction.v1.json:1` covers the independently derived item-132 transitive source/test/build closure plus every newly created target file, excluding only the manifest itself and generated install/build outputs. Paths are NFC UTF-8 repository-relative POSIX paths, unique and byte-sorted; hashes are SHA-256. Source-backed rows require source path/blob/content hash and disposition `copied`, `relocated`, `rewritten`, or `excluded`; materialized rows require destination path/hash, while excluded rows forbid destination fields and require rationale. New rows use `authored` or `generated`, require destination fields/origin rationale, and have no source identity. Rewrites include an exact substitution list. Small shared utilities may be copied with no synchronization promise. Symlinks, submodules, generated mirrors, workspaces, `file:`/Git/path dependencies, and imports into Project_echo or siblings are forbidden.
 
 ### AC4 — Enforce the product boundary natively
 
@@ -64,7 +67,7 @@ Direct dependencies derive from final bare imports plus the fixed build/test too
 
 ### AC5 — Own configuration, state, build, and artifact identity
 
-`schemas/runtime-config.v1.schema.json:1` preserves the client-local config contract using secret references only; `src/runtime/paths.ts:1` owns install-local state distinct from Project_echo and siblings. `npm run build:artifact -- --expected-head <target-head> --run-output <empty-temp-dir>` exports the clean committed HEAD, emits version/HEAD/tree/artifact SHA-256, and never changes repository HEAD. The resulting artifact installs into a fresh temp prefix and runs `smoke`, `validate-config`, and `selftest` with maturity still DEV.
+`schemas/runtime-config.v1.schema.json:1` preserves the client-local config contract using secret references only; `src/runtime/paths.ts:1` owns install-local state distinct from Project_echo and siblings. Before target creation, the orchestrator creates owner-only `/Users/zhenye/Desktop/.echo-migration-evidence/133/<builder-id>` and an in-progress receipt. `npm run build:artifact -- --expected-head <target-head> --run-output <that-root>/artifact` refuses pre-existing output, exports the clean committed HEAD, emits version/HEAD/tree/artifact SHA-256, and never changes repository HEAD. After checks, artifact/manifest/receipt are finalized under that stable root, retained unchanged through review, and cleaned only after recorded disposition. The artifact installs into a fresh temp prefix and runs `smoke`, `validate-config`, and `selftest` with maturity still DEV.
 
 ### AC6 — Preserve product behavior at the pinned boundary
 
@@ -74,15 +77,15 @@ No behavior redesign is allowed. `selftest` remains honest about the production 
 
 ### AC7 — Prove clean-install and source independence
 
-After the target HEAD is committed, verification exports that HEAD to a fresh temporary directory. Dependency installation runs under a scratch HOME/XDG/npm config with auth/proxy variables removed and the target lockfile as authority. Tests then run with network disabled and a temporary macOS sandbox rule denying Project_echo, sibling targets, live `~/.echo`, credentials, and writes outside the verification root. The profile is ephemeral evidence, not committed migration machinery.
+After the target HEAD is committed, each verification actor treats the shared target as read-only and creates a unique private `git clone --no-local --no-hardlinks` of the recorded HEAD under the scrubbed Git environment. It proves the clone has no alternates/external objects. Dependency installation runs under a scratch HOME/XDG/npm config with auth/proxy variables removed, target lockfile authority, and the filesystem-denial sandbox already active; registry network is allowed only for package fetch, `file:`/link/workspace/Git/path resolutions are rejected, and lifecycle scripts are disabled unless individually enumerated and run later inside the same sandbox. Tests run with network disabled and deny Project_echo, siblings, live `~/.echo`, credentials, and writes outside the private root. The profile is ephemeral evidence, not committed migration machinery.
 
-Verification runs exact dependency, boundary, provenance, test-parity, typecheck, lint, product tests, synthetic end-to-end, artifact build/install, smoke/config/selftest, source-independence, and `git diff --check` commands. A hostile source-worktree edit, HOME npm config, Git config/template/hook, PATH, or sibling sentinel must not enter output. Final scans reject absolute source paths, symlinks, submodules, and escaping imports/process reads.
+Verification runs exact dependency, boundary, provenance, test-parity, typecheck, lint, product tests, synthetic end-to-end, artifact build/install, smoke/config/selftest, source-independence, `git fsck --full`, and `git diff --check` commands. A separate read-only operator audit derives the manifest universe from the item-132 boundary and pinned Git tree, recomputes every source blob/content hash at `2971310441b69735cbe759293abd8c4d044bf347`, validates substitutions against committed target HEAD, and records its exact rerunnable commands/exits. A hostile source-worktree edit, HOME npm config, Git config/template/hook, Git injection variable, PATH, or sibling sentinel must not enter output.
 
 ### AC8 — Record the local handoff and stop before authority transfer
 
-Only after all checks pass, the builder writes `raw/internal/migrations/2026-07-13-133-echo-brain.md` in its isolated Project_echo feature worktree. It records the pinned source SHA, exact commands/exits, target path/branch/HEAD/tree, package/lock/provenance/parity hashes, artifact path/manifest/SHA-256, verified no-remotes/clean status, differences, and `authority:false`, `maturity:DEV`. The builder commits that record with the backlog handoff; it does not mutate target history afterward.
+Every failed stop first appends phase/command/exit, target HEAD/tree when available, and retained evidence/scratch paths to the Project_echo agent-run log/agent notes; it preserves the no-adopt/no-delete target rule and cleans only run-owned scratch. Only after all checks pass, the builder writes `raw/internal/migrations/2026-07-13-133-echo-brain.md` in its isolated Project_echo feature worktree. It records the pinned source SHA, exact commands/exits including operator source audit, target path/branch/HEAD/tree, package/lock/provenance/parity hashes, stable evidence root and artifact manifest/SHA-256, verified no-remotes/clean status, differences, and `authority:false`, `maturity:DEV`. The builder commits that record with the backlog handoff; it does not mutate target history afterward.
 
-Independent review reruns target-local checks and compares record hashes to the actual target and artifact. Passing this item proves only a local DEV source split. It does not create a remote, release, install on a client, switch authority, or advance graduation.
+Independent review inspects the shared target read-only, uses a unique private clone/output root for every install/test/artifact rebuild, recomputes the operator source audit, and compares the record to the actual target and retained artifact. Passing proves only a local DEV source split.
 
 ## Out of Scope (Don't Drift)
 

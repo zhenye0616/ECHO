@@ -6,21 +6,21 @@ Materialize the reviewed item-132 product closure as a source-independent local 
 
 - `echo-brain` is the complete client-facing Team decision product.
 - Source is pinned to `Project_echo@2971310441b69735cbe759293abd8c4d044bf347`; dirty checkout bytes are excluded.
-- One attended builder owns absent target `/Users/zhenye/Desktop/echo-brain`; sibling lanes never touch it.
-- The builder creates a direct local Git history on `migration/2026-07-13-133`, with sanitized local Git config and no remote.
+- After orchestrator preflight, one builder atomically `mkdir`s absent target `/Users/zhenye/Desktop/echo-brain`; sibling lanes never touch it and the builder refuses EEXIST.
+- The builder creates local branch `migration/2026-07-13-133` with fully scrubbed Git environment/storage, fixed identity, no alternates/replace/promisor state, and no remote.
 - Project_echo gains no extraction CLI, lifecycle state, lock/takeover, publication helper, recovery daemon, committed sandbox profile, or migration-framework tests.
 - An interrupted target is incomplete/unaccepted and must be manually inspected/archived before a fresh assigned run; no automatic adoption/resume/delete.
 - Copy only the item-132 product closure plus source/test/build necessities; hash every copy/relocation/rewrite/exclusion.
 - No symlink, submodule, workspace, path/Git dependency, import, or runtime read may reach Project_echo or siblings.
 - The target owns package/lock, config, state paths, build, artifact, boundary, tests, and provenance.
 - Exact eight-file product test parity plus a new synthetic meeting-to-manual-gate-to-brief test prove behavior.
-- Verification exports committed target HEAD, uses sanitized dependency config, then denies source/sibling/live-state/network access for target checks.
-- The Project_echo migration record is written only after target checks pass and pins target HEAD/tree, artifact, hashes, commands, no-remotes, clean state, false authority, and DEV.
+- Verification uses read-only target inspection plus unique private clones, sanitized/sandboxed install, and a read-only operator audit recomputing every pinned source blob/rewrite.
+- Stable owner-only evidence under `.echo-migration-evidence/133` retains receipt/artifact/manifest through review; the migration record pins those hashes with target HEAD/tree and false authority/DEV.
 - Project_echo remains backup/authority; no remote, release, real data, or maturity advance.
 
 ## open_questions
 
-- R8 by independent `codex` and `codex-ops` must confirm the controller-free contract is complete and buildable.
+- R9 by independent `codex` and `codex-ops` must confirm the closed provenance/source audit, atomic path claim, Git isolation, retained artifact evidence, and read-only review contract.
 - A later authority-transfer item decides remote creation, branch protection, and old-path freeze.
 
 ## dont_touch

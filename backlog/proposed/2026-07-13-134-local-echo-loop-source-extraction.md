@@ -41,7 +41,9 @@ The founder has named the internal agent-orchestration system `echo-loop`: the v
 
 ### AC1 — Materialize one local Git repository without shipping migration machinery
 
-One assigned builder lane owns `/Users/zhenye/Desktop/echo-loop`; sibling lanes never touch it. The absent target is created directly and initialized on branch `migration/2026-07-13-134` with local identity `ECHO Migration Agent <migration@echo.local>`, signing/hooks/templates/global and system Git config disabled, and no remote. All source bytes come from pinned commit objects via `git show`/`git archive`, not the dirty source checkout.
+One assigned builder lane owns `/Users/zhenye/Desktop/echo-loop`; sibling lanes never touch it. The orchestrator (not the builder) first verifies all parent components are real non-symlink directories and archives any incomplete prior target. The builder's first mutation is plain non-recursive `mkdir /Users/zhenye/Desktop/echo-loop`, aborting on `EEXIST`; only that invocation may write inside. It initializes branch `migration/2026-07-13-134` with local identity `ECHO Migration Agent <migration@echo.local>`, signing/hooks/templates/global and system Git config disabled, and no remote.
+
+Every source/target Git command uses an explicit minimal environment clearing `GIT_DIR`, `GIT_WORK_TREE`, index/object/common-dir/alternates, config-count/key/value, replace/graft/ceiling, askpass/SSH/proxy variables; sets `GIT_NO_REPLACE_OBJECTS=1`; and invokes declared-version Git/Node/npm via controlled resolution. Final checks prove target-local Git dirs/index/objects, no alternates/replace/graft/promisor state, and `git fsck --full`. Source bytes come from the pinned explicit repository and full SHA only.
 
 This is an attended one-time build. Do not add a Project_echo extraction CLI, daemon, lifecycle state, locks/takeover, publication helpers, or recovery framework. An interrupted target is incomplete and unaccepted; the orchestrator inspects and archives it before a fresh assigned run. No other agent automatically adopts, deletes, resumes, or repairs it.
 
@@ -49,15 +51,15 @@ The accepted target ends clean with a committed local history, exactly the migra
 
 ### AC2 — Give echo-loop accurate orchestration ownership
 
-`/Users/zhenye/Desktop/echo-loop/package.json:1` pins Node/npm and owns a committed lockfile. `/Users/zhenye/Desktop/echo-loop/src/:1`, `skills/:1`, and `tools/:1` contain only agent-loop capabilities: skills and derived adapters, backlog/task-state/review protocols, coordination/deadlines, builder/reviewer/merge workflows, fixture-safe operator commands, and package initialization.
+`/Users/zhenye/Desktop/echo-loop/package.json:1` pins Node/npm, owns a committed lockfile, and defines `check:provenance`, `check:dependencies`, `check:skills`, `test:task-state`, `test:review-queue`, `test:coord`, `test:workflows`, and fail-closed aggregate `verify:extraction`; the aggregate runs every named command plus typecheck/lint/full test/source-independence and propagates any nonzero exit. `/Users/zhenye/Desktop/echo-loop/src/:1`, `skills/:1`, and `tools/:1` contain only agent-loop capabilities.
 
-`provenance/source-plan.v1.json:1` records every copied/relocated/rewritten/excluded source row and classifies static/dynamic imports, runtime reads, shell/shebang edges, package scripts, PATH lookups, and child executables. Product meeting logic, capture/normalization/storage/retrieval, context MCP tools, Project_echo history, and source/sibling dependencies are forbidden. Direct dependencies derive from final imports and scripts at exact versions.
+The independently derived source universe starts at pinned roots `skills/`, `tools/review-queue/`, `tools/task-state/`, `tools/backlog/`, `tools/blocked.py`, `tools/backlog_index.py`, `tools/coord-status.sh`, `src/coord/`, `tests/review-queue/`, `tests/task-state/`, `tests/coord/`, `backlog/README.md`, and `docs/AGENT_INSTRUCTIONS.md`, then closes over imports/scripts/schema/template references. `provenance/source-plan.v1.json:1` contains each source-universe path exactly once plus every authored/generated target path, excluding only self-referential manifests and build/install output. Paths are normalized unique byte-sorted POSIX paths and hashes are SHA-256. Source-backed dispositions are `copied`, `relocated`, `rewritten`, or `excluded`; materialized rows require destination/hash, excluded rows forbid them and require rationale; `authored`/`generated` rows require destination/hash/origin and no source fields. Product/context/history paths are forbidden. Direct dependencies derive from final imports/scripts at exact versions.
 
 ### AC3 — Preserve loop-owned coordination semantics without claiming external exactly-once action
 
-`/Users/zhenye/Desktop/echo-loop/src/api/:1` exposes only loop-owned coordination emission/invocation, role-state reads, skill/protocol reads, and queue status. It does not register memory search, clusters, atoms, capture controls, Granola retrieval, or client-product actions. Loop state uses validated `ECHO_LOOP_HOME` and a private SQLite store, never echo-context or live Project_echo state.
+`/Users/zhenye/Desktop/echo-loop/src/api/:1` exports `emitCoordEvent`, `invokeRole`, `readTaskState`, `readSkill`, and `getQueueStatus`; target CLI exposes `echo-loop init`, `validate`, `status`, and fixture-only `run-once`. Allowed child executables are enumerated in the source plan and default-deny tests. It does not register memory search, clusters, atoms, capture controls, Granola retrieval, or client-product actions. `ECHO_LOOP_HOME` must be an absolute no-symlink directory; private state is `state/coord.sqlite` with migrations/schema behavior pinned by source golden vectors, never echo-context or live Project_echo state.
 
-Target tests preserve current transaction, ordering, role/deadline projection, busy/failure diagnostics, and idempotent retry behavior for effects committed in the same loop store. No acceptance criterion promises exactly-once external effects; external actions remain forbidden. Initialization/concurrency tests pin the observed source behavior rather than adding a new migration lifecycle.
+`provenance/parity-vectors.v1.json:1` names pinned source tests/golden inputs and canonical expected results for transaction ordering, retry/idempotency, role/deadline projection, busy/failure diagnostics, review publication, and workflow outcomes. Target tests consume those independent vectors; mutating a target result without updating the pinned source oracle must fail. No criterion promises exactly-once external effects; external actions remain forbidden.
 
 ### AC4 — Ship reusable protocol templates, not Project_echo history
 
@@ -65,7 +67,7 @@ Target tests preserve current transaction, ordering, role/deadline projection, b
 
 ### AC5 — Preserve cross-vendor and fresh-eyes invariants
 
-`/Users/zhenye/Desktop/echo-loop/tests/review-queue/:1` proves request SHA pinning, requested-reviewer enforcement, content-only reviewer bindings, wrapper-owned publication, response validation, combination, convergence, and founder checkpoints. `/Users/zhenye/Desktop/echo-loop/tests/task-state/:1` proves pointer schema, line caps, anchors, ref pinning, and that reviewer ticks never read task state. Vendor adapters remain derived from canonical skills and drift checks fail.
+`/Users/zhenye/Desktop/echo-loop/tests/review-queue/:1` proves request SHA pinning, requested-reviewer enforcement, content-only reviewer bindings, wrapper-owned publication, response validation, combination, convergence, and founder checkpoints. It also covers duplicate same-reviewer ticks, watcher reads during publication, one atomic response/no partial combine, concurrent upstream push preservation, dirty-tree refusal without autostash loss, cleanup failure, and durable operator error before ephemeral cleanup. `/Users/zhenye/Desktop/echo-loop/tests/task-state/:1` proves pointer schema, line caps, anchors, ref pinning, and that reviewer ticks never read task state. Vendor adapters remain derived from canonical skills and drift checks fail.
 
 ### AC6 — Prove claim/build/review/merge safety on disposable repositories
 
@@ -77,13 +79,15 @@ Every fixture child receives an explicit allowlisted environment: scratch HOME/X
 
 `/Users/zhenye/Desktop/echo-loop/provenance/source-extraction.v1.json:1` maps every source blob/hash to destination hash/disposition/reason. A deliberate dirty source-worktree mutation cannot enter the target. Final scans/tests reject symlinks, submodules, absolute source paths outside provenance, escaping imports/process reads, and dependencies on echo-brain, echo-context, or Project_echo.
 
-After target HEAD is committed, verification exports it to a fresh temp directory, installs from its lock under scratch HOME/npm config with auth/proxy variables removed, then runs with network disabled and a temporary macOS sandbox denial for Project_echo, siblings, live state, credentials, and external writes. Exact source-plan, dependency, skills/adapters, backlog, task-state, review, coord, workflow, package, test, source-independence, and `git diff --check` commands must pass from exported HEAD.
+After target HEAD is committed, every verifier treats the shared target read-only and creates a unique private `git clone --no-local --no-hardlinks` of the recorded HEAD under the scrubbed Git environment. `npm ci --ignore-scripts` runs inside the filesystem-denial sandbox with scratch HOME/cache/temp/config, external writes denied, and registry network allowed only for lock-authorized package fetch; `file:`, link, workspace, Git, and escaping path resolutions are rejected. Any required lifecycle/rebuild command is explicitly inventoried and later runs in the same sandbox with network denied. Hostile source/sibling/credential/Git/PATH sentinels cover install and checks. Aggregate `npm run verify:extraction` must pass in the private clone.
+
+A separate read-only operator audit derives the source universe from the pinned tree/roots, recomputes every blob/content hash, validates rewrites and target parity vectors against committed target HEAD, and records exact commands/exits. The builder records any failed phase/command/exit and retained target/scratch paths in the Project_echo agent-run log/agent notes before returning; only run-owned scratch is cleaned.
 
 ### AC8 — Record the local handoff and stop before installation
 
 After all checks pass, the builder writes `raw/internal/migrations/2026-07-13-134-echo-loop.md` in its isolated Project_echo feature worktree. The record contains source SHA, commands/exits, target path/branch/HEAD/tree, package/lock/source-plan/dependency/skill hashes, test summaries, no-remotes/clean status, exclusions/differences, and `authority:false`, `installed:false`. The builder commits that record with the backlog handoff and does not mutate target history afterward.
 
-Independent review reruns target-local checks and fixture workflows and compares record hashes. Passing proves only a local source split; the active Project_echo loop, launchd jobs, user-level skill adapters, and repository authority remain unchanged.
+Independent review inspects the target read-only, runs the operator audit and `verify:extraction` from unique private clone/output roots, and compares record hashes. Passing proves only a local source split; the active Project_echo loop, launchd jobs, user-level skill adapters, and repository authority remain unchanged.
 
 ## Out of Scope (Don't Drift)
 
