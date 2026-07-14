@@ -15,12 +15,12 @@ Materialize the reviewed item-132 product closure as a source-independent local 
 - The target owns package/lock, config, state paths, build, artifact, boundary, tests, and provenance.
 - Exact eight-file product test parity plus a new synthetic meeting-to-manual-gate-to-brief test prove behavior.
 - Verification uses read-only target inspection plus unique private clones, sanitized/sandboxed install, and a read-only operator audit recomputing every pinned source blob/rewrite.
-- Stable owner-only evidence under `.echo-migration-evidence/133` retains receipt/artifact/manifest through review; the migration record pins those hashes with target HEAD/tree and false authority/DEV.
+- Unique atomic 0700 attempt evidence retains phase profiles/probes/artifact and NOT_ACCEPTED→handoff states; final state follows pushed handoff and migration record pins all hashes.
 - Project_echo remains backup/authority; no remote, release, real data, or maturity advance.
 
 ## open_questions
 
-- R9 by independent `codex` and `codex-ops` must confirm the closed provenance/source audit, atomic path claim, Git isolation, retained artifact evidence, and read-only review contract.
+- R10 by independent `codex` and `codex-ops` must confirm env-i phase profiles/offline install, attempt receipt lifecycle, source-only substitution audit, Git isolation, and workflow paths.
 - A later authority-transfer item decides remote creation, branch protection, and old-path freeze.
 
 ## dont_touch

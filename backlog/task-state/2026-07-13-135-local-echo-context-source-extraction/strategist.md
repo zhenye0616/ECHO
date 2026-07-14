@@ -16,13 +16,16 @@ Materialize capture, normalization, storage, retrieval, and context APIs as a so
 - Raw Granola capture may be copied generically; product decision/card/brief/approval logic stays out.
 - Candidate inventory is exactly 211 paths (109 source, 102 test/fixture), pinned aggregate SHA-256 `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
 - Every source row has provenance and ported/rewritten/excluded disposition; standalone parity needs no source access.
-- Separate source/target installs use sandboxed `--ignore-scripts` roots/caches; private-clone stdio/service profiles fail closed and operator audit recomputes pinned source evidence.
+- Separate source/target fetch phases integrity-verify lock-authorized packages, seal distinct caches, and accepted installs/builds run `npm ci --offline --ignore-scripts --no-audit --no-fund` under network denial.
+- Shared target stays read-only; verifier records exact HEAD/tree, clones that commit privately, detaches, removes origin, checks object independence, and rechecks shared HEAD/tree.
+- Stdio, service-server, and service-client profiles are distinct: server only binds/accepts loopback and reports readiness by FD; client connects only after readiness to that exact endpoint.
+- Failed runs retain a bounded evidence capsule and publish a Project_echo summary; scratch deletion is containment-checked and target cleanup remains founder-owned.
 - Synthetic loopback service tests prove capture/retrieval behavior; no live state migration or service cutover.
 - The migration record pins target HEAD/tree, hashes, commands, tests, no-remotes, clean state, false authority, and no-live-state.
 
 ## open_questions
 
-- R9 by independent `codex` and `codex-ops` must confirm fixture framing/cases, runtime inventory, sandboxed installs/profiles, source audit, atomic path claim, and failure logging.
+- R10 by independent `codex` and `codex-ops` must confirm the R9 fixture, offline-install, split service-sandbox, exact-clone, process-cleanup, and durable-failure-handoff patches.
 - Later cutover decides remote, install, live-state migration/rollback, and echo-brain's versioned read-only contract.
 
 ## dont_touch

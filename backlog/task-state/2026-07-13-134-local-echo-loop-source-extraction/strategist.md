@@ -21,7 +21,7 @@ Materialize the internal orchestration protocol as a source-independent local `e
 
 ## open_questions
 
-- R9 by independent `codex` and `codex-ops` must confirm source/API closure, parity vectors, sandboxed install, scrubbed Git, concurrency fixtures, and operator audit.
+- R10 by independent `codex` and `codex-ops` must confirm normative API/CLI, deterministic resolver/manifest reconciliation, regenerated source oracle, prefetch/offline profiles, toolchain/private clone, and narrowed threat model.
 - Later cutover decides installation, per-repository queue state, and authority transfer.
 
 ## dont_touch
