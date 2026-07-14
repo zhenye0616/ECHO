@@ -34,7 +34,7 @@ claimed_by: "fable-builder-133"
 claimed_at: "2026-07-14T05:46:05Z"  # reclaimed 2026-07-14 for founder-directed AC5/AC7 four-clone matrix (B0/B1/B2) continuation
 branch: "agent/133-echo-brain"
 worktree: "/Users/zhenye/Desktop/Project_echo--133-echo-brain"
-head_sha: "3a693a7369c46a15f07f5704dec033b1a7230af5"
+head_sha: "20c8135a37e123f1735dd07023ccc0bfc184b624"
 pr_url: ""
 agent_notes: |
   Builder fable-builder-133 (Claude Code). Attended one-time extraction; no migration
@@ -105,7 +105,19 @@ agent_notes: |
   Re-ran full B0/B1/B2 matrix + lint leg under env -i; all three share ONE tuple: tarball b7708d8f195662a9180347ea0a52e6440af3b572fa2a6248c61e146d65f26e8b,
   27 members, canonical manifest digest f868ad68125b2d0943f98793419784ba7399357eaf3ecd13f770a55d8f25cc24, tree 27250ad0, lock 9ffc39fa.
   Accepted target UNCHANGED by matrix. New builder head 3a693a7369c46a15f07f5704dec033b1a7230af5.
-  REMAINING: R1 rerun + codex-ops re-judgment (reviewer side). Standing rule: a 3rd rejection on any NEW finding class halts to founder.
+  MICRO-CYCLE (2026-07-14, post 3rd codex-ops REJECT — founder-authorized surgical fix for ONE residual): third judgment
+  confirmed F1/F3-F7 + N1/N3-N6 all FIXED and the four-clone tuple matched; sole residual was the N2 DESTRUCTURE_RE defect
+  (matched any [ident,] array literal, so `const unrelated=[c,...]` falsely proved c and let spawnSync(c) pass). FIX: regex
+  now /\b(?:const|let|var)\s+\[\s*(ident)\s*,/g — requires a binding keyword before the pattern, so value-position array
+  literals are NOT counted while genuine const/for-of destructuring still is. Added fixture-array-construction.mjs driving the
+  exact evasion (now fails closed). ONLY check-dependencies.mjs + dependency-set.test.ts changed (+ regenerated source-extraction);
+  nothing else touched. NEW accepted OID 4a6dcb33d2e73f718e36832941b4fa2bc34c7285 (tree e2466238d90691cc4488b9909ec31064a1b3df33),
+  single root, fsck clean, object-set==reachable (78). Re-verified: 3 checkers exit 0, operator audit PASS, vitest 22/22.
+  Re-ran full B0/B1/B2 matrix + lint under env -i: all three share ONE tuple — tarball b7708d8f195662a9180347ea0a52e6440af3b572fa2a6248c61e146d65f26e8b
+  (UNCHANGED, no tarball member changed), 27 members, canonical manifest digest f868ad68125b2d0943f98793419784ba7399357eaf3ecd13f770a55d8f25cc24
+  (unchanged), NEW tree e2466238, lock 9ffc39fa. Accepted target UNCHANGED by matrix. New builder head 20c8135a37e123f1735dd07023ccc0bfc184b624.
+  Recordable-only (NOT changed per scope): typescript-eslint@8.20.0 vs TS 5.9.2 peer-range needs --legacy-peer-deps; pre-lifecycle
+  sanitizer-regex abort (harness preflight, no lifecycle retried). REMAINING: R1 pass #4 + codex-ops judgment #4 (reviewer side).
 
   QUESTION FOR REVIEWER/FOUNDER — AC3<->AC5 schema path: byte-identical src/product/config.ts:55 + package.json
   files field reference schemas/product/runtime-config.v1.schema.json, but AC5 names schemas/runtime-config.v1.schema.json.
