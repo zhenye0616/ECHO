@@ -35,25 +35,29 @@ claimed_by: "fable-builder-134"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "4d4f1c9ef50233bd1444b95a81f8eab59ae50bf5"
+head_sha: "baa7b14112c7f203827b51917ead7a0f1d607d9d"
 pr_url: ""
 agent_notes: |
-  CHECKPOINT (multi-session build, founder chose continue-in-place; not yet a
-  completion). Session 2 progress on top of the kept Run 1 foundation.
-  DONE + verified: AC1 (repo); AC3 (./coord better-sqlite3 publication protocol
-  + atomic init, 28 tests green, builds to ./coord export); AC4 (templates +
-  empty queue); AC2 core + check:provenance green (sealed policy + 76 ports
-  byte-identical). tsc --noEmit clean.
-  NOT done: AC2 rest (edge-record schema + source-plan closed-edge fixed point,
-  dependency-set minimal derived lock, full verify:extraction, excluded-capability
-  edge disposition); AC3 refinement (native build via the exact named
-  `npm rebuild better-sqlite3 --offline --foreground-scripts` row); AC5 (watcher
-  force-with-lease CAS); AC6/AC7 (fixture loop + dual-route byte-identical
-  verifier + source-independence); AC8 (final binding + reviewer child-commit).
-  Target /Users/zhenye/Desktop/echo-loop remains INCOMPLETE/UNACCEPTED, no
-  remote, not installed; HEAD 2dcb0f9, tree 141925b0, fsck clean. head_sha above
-  is the current immutable builder feature head (agent/134-echo-loop) carrying
-  the refreshed migration record raw/internal/migrations/2026-07-13-134-echo-loop.md.
+  CHECKPOINT Run 3 (multi-session build, founder continue-in-place; not yet a
+  completion). Kept all prior work; built AC5 + AC6 + AC7-core this run.
+  DONE + verified (54 tests green: coord 28, watcher 21, workflows 4, migration 1;
+  tsc --noEmit clean; check:provenance green): AC1; AC3 core (./coord protocol +
+  atomic init); AC4 (templates); AC2 core + check:provenance; AC5 core (watcher
+  force-with-lease CAS: probe parser, substitution guard, SQLite CAS + takeover,
+  ephemeral candidate, apply proven on disposable remotes, founder worktree
+  untouched); AC6 (fixture loop: single-winner claim/seal-freshness/proposed-
+  unclaimable/worktree-isolation/explicit-merge); AC7 core (dual-route verifier,
+  byte-identical inner projection + differing route records, verdict pass).
+  NOT done: AC2 rest (edge-record schema + closed-edge fixed point, minimal
+  derived lock, full battery, excluded-capability edge disposition); AC3
+  refinement (native rebuild named row); AC5 refinements (own-pgid isolation,
+  crash/gc/both-orders/mismatched-digest fixtures); AC7 rest (offline install
+  matrix under sandbox-exec deny-network + loopback, private-clone
+  source-independence); AC8 reviewer child-commit ceremony (independent
+  reviewer's leg, not builder's — per lane 133).
+  Target /Users/zhenye/Desktop/echo-loop INCOMPLETE/UNACCEPTED, no remote, not
+  installed; HEAD 2f367da, tree cda5b122, fsck clean. head_sha above is the
+  current immutable builder feature head carrying the Run 3 migration record.
   Next session resumes from the run log's "Remaining map"; no spec ambiguity —
   only build volume. Not for merge; this is an iterate-again checkpoint.
 review_notes: ""

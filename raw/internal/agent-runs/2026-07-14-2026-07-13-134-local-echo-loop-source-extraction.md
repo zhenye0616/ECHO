@@ -160,3 +160,72 @@ commit 22a98d8 stood; this run built on top.
 ### Drift events
 
 None. Stayed within acceptance-criteria scope; three authorized operations only.
+
+---
+
+## Run 3 (resumed 2026-07-14 — founder-endorsed continuation)
+
+### Outcome
+
+**Checkpoint escalation (multi-session build), not completion.** Kept all prior
+banked work; built AC5 + AC6 + AC7-core on top. Target advanced 22a98d8 → 2f367da.
+
+### What was implemented this run (verified, tests green)
+
+- **AC5 — DONE (core), 21 tests.** `src/watcher/`:
+  - `probe.ts` strict `ls-remote` parser: ok/missing/duplicate/malformed/unreachable
+    distinct outcomes.
+  - `project.ts` endpoint normalization (scheme/host/.git/slash) + substitution
+    guard (transport allowlist + canonical-endpoint + repo-identity); sealed
+    `provenance/watcher-project.v1.json`.
+  - `state.ts` SQLite CAS state machine PREPARED→APPROVED→APPLYING→
+    APPLIED/APPROVED/ESCALATED; approval-token retention across recovery +
+    expired-lease takeover; conditional transitions serialize owners.
+  - `candidate.ts` ephemeral detached worktree + private index, parent =
+    probed expected-old, anchor ref `refs/echo-watcher/prepared/<id>`.
+  - `apply.ts` lease acquire → revalidate bindings/endpoint → strict re-probe →
+    direct-parent proof → `push --force-with-lease=<ref>:<expected-old>` →
+    outcome re-probe → APPLIED/APPROVED-retryable/ESCALATED; bounded backoff.
+  - Fixtures on disposable bare remotes: happy path (remote→candidate, founder
+    worktree untouched), concurrent-advance→ESCALATED (remote not clobbered),
+    endpoint-substitution→ESCALATED, idempotent already-present→APPLIED,
+    expired-lease takeover→APPLIED.
+- **AC6 — DONE, 4 tests.** `tests/workflows/local-fixture-loop.test.ts` on
+  disposable repos: single-winner claim race, ready-seal freshness,
+  proposed-unclaimable predicate, worktree isolation, explicit merge checkpoint
+  (feature push never advances main).
+- **AC7 — PARTIAL (equivalence core done), 1 test.** `tools/run-verification.mjs`
+  + `provenance/verification-workload.v1.json`: `direct` and `npm` routes yield a
+  BYTE-IDENTICAL inner projection (manifest hash, roster, workload env, per-row
+  argv/status/hash, HEAD/tree, verdict) with differing route records; verdict pass.
+
+Full `vitest run`: **54 tests green** (coord 28, watcher 21, workflows 4, migration 1).
+`tsc --noEmit` clean. `check:provenance` green.
+
+### Files modified
+
+- Target `/Users/zhenye/Desktop/echo-loop` (no remote): HEAD `2f367da…`,
+  tree `cda5b122…`; 10 commits; fsck clean.
+- `agent/134-echo-loop`: migration record refreshed (Run 3 binding). Feature head
+  `baa7b14112c7f203827b51917ead7a0f1d607d9d`.
+
+### Remaining map (next attended session)
+
+- **AC2 rest** — edge-record schema + source-plan closed-edge fixed point;
+  dependency-set minimal derived lock; full battery rows; excluded-capability
+  edge disposition.
+- **AC3 refinement** — native build via the exact named
+  `npm rebuild better-sqlite3 --offline --foreground-scripts` row.
+- **AC5 refinements** — own-pgid isolation + TERM/KILL escalation;
+  crash-before/after-push, gc-survival, both-orders, mismatched-digest fixtures.
+- **AC7 rest** — offline install matrix under `sandbox-exec` deny-network +
+  loopback control + probes; better-sqlite3 rebuild as sole named lifecycle row;
+  private-clone source-independence; full workload battery.
+- **AC8** — final migration record (maintained each checkpoint); reviewer
+  child-commit ceremony is the independent reviewer's leg, not the builder's.
+
+### Drift events
+
+None. Within acceptance-criteria scope; three authorized operations only
+(pinned read-only source reads, local no-remote target creation + build, feature
+-branch push). No sibling/wiki/holdout touching. No MCP calls this run.
