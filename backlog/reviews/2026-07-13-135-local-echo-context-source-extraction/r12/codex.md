@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 12
+reviewer: "codex"
+artifact_sha: "83ba8a0ec42306b58948b7a942a16521962a89ad"
+completed_at: '2026-07-14T02:01:49Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC8 — single-push command and competing-update fixtures"
+    finding: "The prescribed `<commit>:<ref>` push does not atomically preserve the successfully probed absent-ref precondition: a concurrent creator at an ancestor or the intended OID can be silently accepted, after which the equal-OID probe reports success. Use an explicit empty expected-value lease such as `--force-with-lease=<full-ref>:` on the sole push, narrow the no-force rule to permit only that lease, and test concurrent ancestor and same-OID creation."
+  - severity: "high"
+    where: "AC8 — pre-push and post-push OID reconciliation"
+    finding: "A nullable OID conflates ref absence with probe failure, and a successful post-push zero-match is unclassified. Require exit zero plus exactly zero well-formed exact-ref rows before pushing; timeout, nonzero exit, malformed output, or multiple rows must abort without a push. Define an exhaustive post-push table: intended OID is success, another OID is divergence, transport or parse failure is unknown, and zero-match after an ambiguous timeout, reset, or disconnect remains unknown unless the push result proves no update."
+  - severity: "high"
+    where: "AC7–AC8 and Tests — retained operator ownership"
+    finding: "The hostile fetch, native-exec, capsule, signal-reentry, byte-budget, and push-reconciliation fixtures are buried in acceptance criteria without exact harness paths or invocations; AC8 also requires a run-wide finalizer but names no owning runner. Specify retained one-shot runner and test paths under `<attempt-root>/operator`, their entrypoints, argv, cwd, environment, and assertions; list them in `## Tests` and explicitly classify them as non-shipping evidence permitted by the no-controller boundary."
+  - severity: "high"
+    where: "AC8 — migration record and handoff ordering"
+    finding: "The migration record is written and committed before the push but is required to contain the exact commit being pushed and post-probe handoff status. A commit cannot contain its own OID, and post-push results cannot enter that same commit. Restrict the committed record to pre-commit-stable fields and name a retained handoff receipt that records the resulting commit OID, raw probes, push result, and final status."
+  - severity: "medium"
+    where: "AC8 — descriptor-relative capsule publication"
+    finding: "The anchored no-replace algorithm is underspecified. Require single-component temp and final names, `openat` with `O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC` and mode 0600, complete write plus file fsync, `renameatx_np` with both directory arguments bound to the retained FD and `RENAME_EXCL`, descriptor-relative final inode/hash verification, and directory fsync. Define collision advancement for both temp and final collisions without unlinking existing entries."
+  - severity: "medium"
+    where: "AC8 — capsule schema and outer byte budget"
+    finding: "The spec says the cap always wins while over-cap tests verify an exact outer size, but it defines neither a capsule schema nor padding; base64 payloads change in four-byte quanta, so equality with 2,621,440 bytes is not generally attainable. Define bounded required fields and deterministic truncation metadata, then choose `serialized_size <= cap` or add a canonical padding field and specify exact equality."
+  - severity: "medium"
+    where: "AC3 — source and target tool-roster comparison"
+    finding: "The risk register says retrieval and loop tools share the current MCP, while AC3 says extra IDs fail for both source and target projections. Clarify whether the source is launched in a named context-only mode or whether its full roster may contain explicitly classified non-context IDs. In the latter case, reject extras only in the target while requiring unique, present, byte-identical projections for the eight selected source IDs."
+  - severity: "medium"
+    where: "AC7 — provenance/source-extraction.v1.json coverage"
+    finding: "The open-ended exclusion for `self-referential manifests` lets coverage vary and can hide omitted tracked files. Enumerate the exact excluded paths, ideally only the extraction manifest itself, define the tracked regular-file universe at target HEAD, and require the checker to reject every path absent from both the row set and that fixed exclusion set."
+---
