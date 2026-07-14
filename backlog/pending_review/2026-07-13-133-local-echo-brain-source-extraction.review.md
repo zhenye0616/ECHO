@@ -1,26 +1,25 @@
 ---
 item_id: 2026-07-13-133-local-echo-brain-source-extraction
 verdict: redo before merge
-reviewed_at: '2026-07-14T19:20:07Z'
+reviewed_at: '2026-07-14T22:01:16Z'
 test_counts:
-  passed: 2227
-  failed: 17
+  passed: 25
+  failed: 1
 producer: review-pending-orchestrator
 ---
 ## Verdict
-Redo before merge. The accepted echo-brain target has a reproducible HIGH fail-closed defect: `tools/check-dependencies.mjs` trusts any declaration-destructured command identifier without proving that its initializer is the enumerated literal command tuple. A disposable committed fixture sourcing `[command, args]` from `process.env.SNEAKY` passed with `ok:true`, so AC2/AC5/AC7 and the independent record's N2-closed claim do not hold. The Project_echo merge itself is mechanically conflict-free, but the target must receive a new accepted OID and fresh independent review first.
+Redo before merge. Fresh independent AC8 review of target 957ad4680f6c67d15fb3dfa0941b52c2ab9c3110 rejected the candidate: the file-global command-literal map in tools/check-dependencies.mjs lets an attacker-controlled inner command inherit authorization from an unrelated outer same-name literal binding. AC2, AC5, and AC7 remain unmet. The immutable rejection record is published as sole-parent review child 1caf83fc63c83f044a2f0d2608a85bcf4759bbcc.
 
 ## Pre-merge fixups
-- [ ] Replace syntactic destructuring trust in `/Users/zhenye/Desktop/echo-brain/tools/check-dependencies.mjs:158-183` with proven dataflow to an enumerated literal tuple, or reject computed commands outside explicit owners.
-- [ ] Add the exact arbitrary-RHS destructuring evasion as a committed fail-closed regression fixture.
-- [ ] Produce a new accepted target OID, regenerate extraction provenance and the Project_echo migration record, and rerun the complete B0/B1/B2/R1 matrix, operator audit, lint, and target suite.
-- [ ] Publish a fresh immutable builder head and independent reviewer child; the existing `f92af1db` ACCEPT record is superseded by this finding.
+- [ ] Replace the file-global command-name map in `tools/check-dependencies.mjs:152-176` with scope- and mutation-correct analysis, or reject every nonliteral executable token outside the explicit computed-command owners.
+- [ ] Commit the exact same-name shadowing fixture from the fresh review as a fail-closed regression alongside the direct arbitrary-RHS fixture.
+- [ ] Produce a new accepted echo-brain target OID/tree, regenerate extraction provenance and the Project_echo migration record, and rerun B0/B1/B2 plus fresh independent R1.
+- [ ] Publish a new immutable builder head and independent sole-parent review child without advancing authority or maturity.
 
 ## Expected merge conflicts
-- No textual conflicts are predicted against current `main`; merge-tree was clean and the candidate contributes only the item-133 migration and review records.
-- If the item is later re-reviewed, preserve current-main backlog, task-state, `docs/BACKLOG.md`, run-log, and journal versions rather than accepting misleading two-dot branch reversions.
+- No textual conflicts are predicted against current `main`; the fresh merge-tree preview was clean.
+- On re-review, preserve current-main backlog, task-state, generated-index, run-log, journal, and sidecar state; do not treat two-dot branch reversions as merge inputs.
 
 ## Follow-up items (defer, do not block merge)
 - Reconcile the TypeScript/typescript-eslint peer-range mismatch before qualification.
-- Consolidate superseded identity sections in a future migration-record cleanup.
-- Re-run the broader Project_echo suite under normal machine load; this review observed 2,205 passed and 17 failed there, while the target's 22-test suite and built-in checks were green.
+- Consolidate superseded identity sections in a later migration-record cleanup.
