@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-133-local-echo-brain-source-extraction"
+round: 13
+reviewer: "codex"
+artifact_sha: "69a11b2c6780b759f15ef2944aeb31d0e048793d"
+completed_at: '2026-07-14T02:13:38Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC7 — verification-plan schema and runner bootstrap"
+    finding: "The committed plan requires literal argv, sorted environment values, and profile hashes, but those values depend on the runtime attempt root, private clone, and namespace; only cwd is described as tokenized, and the runner has no substitution contract. Define the complete token vocabulary and single-pass expansion rules for argv, cwd, env, profiles, streams, and outputs; distinguish template hashes from rendered-profile hashes; reject unknown tokens and paths escaping their namespace; and add malformed-token and cross-root fixtures."
+  - severity: "high"
+    where: "AC5/AC7 — baseline, hostile, and rebuild execution"
+    finding: "The spec creates three namespaces but does not assign each stable plan row to a namespace or define what makes hostile execution hostile. Add an exact row-to-namespace roster, repetition rules, hostile canaries and perturbations, canonical baseline selection, and rebuild inputs/outputs. Require distinct retained install and cache manifests for fetch, baseline, hostile, and rebuild, and fail on missing, duplicate, or cross-namespace outputs."
+  - severity: "high"
+    where: "AC5 — command process lifecycle"
+    finding: "Quiescence cleanup is explicitly triggered only by timeout or signal, so a command that exits successfully after forking a child, listener, or open writer can be accepted. Require quiescence after every command outcome, define the exact macOS process-group/session and descendant/listener/open-writer inspection primitives with pinned tool paths, record their raw evidence in each result, and add fixtures for a successful parent that leaves each kind of descendant behind."
+  - severity: "medium"
+    where: "AC1/AC3/AC7 — pinned-source extraction and operator audit"
+    finding: "The operator audit has no explicit source-repository or boundary argument/profile even though it must read Project_echo, while other profiles deny source reads. Also, allowing git archive permits export-ignore/export-subst transformations before provenance checking. Specify the source-repository and boundary tokens, a read-only source-audit profile, and exact no-replace Git commands using canonical git ls-tree modes plus raw blob reads; alternatively require every archive entry to be checked against its raw blob before any write. Record checks for replace refs, grafts, alternates, and promisor configuration for both source and target."
+  - severity: "medium"
+    where: "AC7 — semantic-normalizer.v1.json"
+    finding: "The allowlist-only normalizer is not itself constrained by an enumerated set of permissible pointers and replacement tokens, so an implementation could normalize meaningful status, hash, path-containment, or artifact differences. Pin the allowed variance fields and tokens, prohibit normalization of exit state, raw hashes, artifact/member manifests, Git identities, and probe verdicts, and add tests showing undeclared or security-relevant variance fails."
+  - severity: "medium"
+    where: "AC5/AC7 — toolchain and filesystem mode contract"
+    finding: "The publisher is compiled with a pinned clang, but clang is absent from toolchain.v1.json and its path, version, hash, flags, environment, and output mode are unspecified; Git likewise has a version but no exact path. Pin both executables and the compiler invocation. Define and verify exact modes for publisher source/binary, recursively frozen cache-seed entries, and the post-handoff attempt tree; setting only the cache-seed root to 0500 does not make writable descendants immutable."
+  - severity: "medium"
+    where: "AC8 — independent reviewer evidence"
+    finding: "Reviewer isolation names a builder-attempt hash without defining the hashed object or canonical serialization, and it does not state how a reviewer obtains and binds the runner, profiles, cache inputs, and source-audit implementation while writing only its own root. Define that digest, its coverage/exclusions, where it is recorded, and the reviewer bootstrap and namespace layout. Require descriptor-relative create-new publication under the prevalidated parent and tests proving the reviewer cannot write the builder root."
+---
