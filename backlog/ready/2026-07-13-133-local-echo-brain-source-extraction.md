@@ -9,6 +9,7 @@ blocked_by:
   - 2026-07-13-132-product-graduation-foundation
 task_state_ref: 2026-07-13-133-local-echo-brain-source-extraction
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 832be81341f2c523fd42918206774ec8a51f54de653a323ad56d612e0ea47748
 files_to_modify:
   - /Users/zhenye/Desktop/echo-brain/**                         # NEW standalone client-product source repository; local only
   - raw/internal/migrations/2026-07-13-133-echo-brain.md       # NEW Project_echo provenance/parity record
