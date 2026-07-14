@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-133-local-echo-brain-source-extraction"
+round: 12
+reviewer: "codex"
+artifact_sha: "83ba8a0ec42306b58948b7a942a16521962a89ad"
+completed_at: '2026-07-14T01:49:05Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC3 — provenance checks / AC7 — source-independent private-clone verification"
+    finding: "The target-local `check:provenance` must validate the pinned-source universe and replay rewritten rows from source bytes, but AC7 denies source-repository reads and defines no retained source-byte witness; hashes and rewrite literals cannot reconstruct arbitrary original files. Define a content-addressed witness with exact path, schema, hash, and sandbox allowance, or limit the local checker to target-internal and cross-manifest invariants while making the read-only operator audit solely responsible for source-universe and forward-replay proof."
+  - severity: "high"
+    where: "AC5 — immutable intent/result publication"
+    finding: "`O_EXCL` protects only the temporary file; plain POSIX `rename` may replace an existing final intent or result, violating create-new immutability, and post-rename hash verification cannot undo that overwrite. Require an atomic no-replace primitive such as `renamex_np(..., RENAME_EXCL)` or same-directory hard-link publication, and add a test proving a pre-existing destination remains byte-identical and publication fails."
+  - severity: "high"
+    where: "AC5 — retained attempt evidence / AC7 — Phase 1 cleanup"
+    finding: "AC5 says the item deletes nothing beneath `<attempt-root>`, while AC7 explicitly deletes Phase 1 `node_modules` from a retained private clone. Preserve the Phase 1 clone and its installation, then perform Phase 2 in a separately allocated private clone so both phases and all evidence remain intact."
+  - severity: "high"
+    where: "AC7 — committed verification plan and sealed retained runner"
+    finding: "The exact verifier is under-specified: no runner or operator-audit path, plan-row schema, literal script/argv/profile/timeout/output mapping, bootstrap invocation, sealing procedure, or bounded semantic-normalization algorithm is defined, and ownership of the operator audit and second rebuild relative to the roster is unclear. Name the retained runner and audit artifacts, define every ordered plan field and one bootstrap command, publish and hash-seal the runner before use, bind its hash into every ledger intent, version an allowlist-only normalizer with raw hashes retained, and state how the audit and second rebuild are ledgered."
+  - severity: "medium"
+    where: "AC7 — final Git verification roster"
+    finding: "`git diff-tree --check --root HEAD` is not recursive, so whitespace errors or conflict markers in nested files can escape the required check. Add `-r` to the pinned invocation and test it with a failing nested-file fixture."
+  - severity: "medium"
+    where: "AC5 — single-writer attempt root / AC8 — independent review"
+    finding: "AC8 requires an independent reviewer to install, audit, and rebuild using paths beneath the builder's retained attempt root, but AC5 assigns that evidence to one builder and provides no reviewer namespace, create-only allocation, or separate ledger. Keep the builder attempt read-only after handoff and allocate an O_EXCL reviewer-owned evidence root or precisely defined subroot with its own immutable ledger bound to the accepted target HEAD and tree."
+  - severity: "medium"
+    where: "AC3 — source-extraction and rewrite provenance schemas"
+    finding: "The provenance rows bind paths and blob/content hashes but not Git tree modes, so a behavior-significant `100755` to `100644` change can pass copied, relocated, and byte-parity checks. Record source and destination Git modes, require equality for copied and relocated rows including the eight pinned tests, require destination modes for target-only rows, and permit any mode change only through an explicit reviewed disposition validated by both checkers."
+---
