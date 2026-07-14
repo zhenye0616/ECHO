@@ -1,54 +1,51 @@
 ---
 task_id: 2026-07-13-135-local-echo-context-source-extraction
 role: builder
-writer: fable-builder-135
-last_updated: 2026-07-14T17:36:13Z
+writer: codex-builder-135
+last_updated: 2026-07-14T20:59:16Z
 handoff_branch: agent/135-echo-context
-handoff_head_sha: e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c
+handoff_head_sha: caf4bdde2dc852357410264f00d5ccef20708a11
 handoff_run_log: raw/internal/agent-runs/2026-07-14-2026-07-13-135-local-echo-context-source-extraction.md
 ---
 
 ## current_thesis
 
-Claim of 2026-07-13-135-local-echo-context-source-extraction. Materialize the
-echo-context source closure from pinned Project_echo commit 2971310441… into the
-standalone local repo /Users/zhenye/Desktop/echo-context and prove it on
-synthetic state only. This run completed the verified foundation and escalated:
-full acceptance (eight ACs; byte-exact provenance cross-validated from an
-independent reviewer's clone; native better-sqlite3 install under sandbox-exec
-network denial; standalone build with ~107 green tests; context-tool + service
-parity; migration record; codex-ops reviewer child-push handoff) exceeds a single
-attended session. Per raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md,
-an incomplete attended build is unaccepted and founder-archived before retry —
-no auto-resume. See the run log for the verified foundation and per-AC map.
-
-<!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c.
-<!-- builder-state-handoff:end -->
+The independent AC2/AC3/AC6/AC8 rejection is remediated at target
+`c3882ec057d1f19dd729977730a87ac6e76e5714` (tree
+`14ccf48df9155462efbbf798662cce7fd0f68b53`). Exact-target and private-clone
+proofs are green, the target is clean and local-only, and feature handoff
+`caf4bdde2dc852357410264f00d5ccef20708a11` is pushed. Fresh independent review
+is the next action; no acceptance, authority transfer, installation, or product
+graduation is claimed.
 
 ## locked_decisions
 
-- AC list locked at claim (8 ACs, all merge-blocking).
-- Source pin 2971310441b69735cbe759293abd8c4d044bf347; toolchain /usr/local/bin/git 2.37.3 + /usr/local/bin/node v22.22.1 verified to match spec.
-- AC6 inventory binding verified: the 20 sealed roots produce exactly 217 paths (110 source, 107 test/fixture), SHA-256 8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37. tools/emit-source-inventory.mjs reproduces it byte-for-byte.
-- AC1 structural init done: isolated repo on unborn migration/2026-07-13-135, config-free envelope, no remote, no reflogs. NOT accepted (zero commits) — acceptance requires the extracted contents committed + git fsck clean.
-- Disposition set (verified against pinned source): exclude/rewrite server.ts (rewrite to 8-tool roster) and exclude coord-*, get-role-state, list-task-states, pending-decisions, tools/internal/decision-*, enrich decision-drift/granola-intake*/post-meeting-brief/granola-signals, echo-home/wizard/detect-agents, plus their tests. granola-signals.ts + post-meeting-brief.ts are item-133 product-owned (AC5): exclude or recorded-duplication, never silent double-claim.
+- AC3 proves the pinned HTTP-only source through one hash-bound scratch stdio registrar used identically on source and target.
+- The wait case sends source-valid `timeout:1`, preserves the literal 10ms request budget, and observes exactly one 1000ms timer plus a 1000ms virtual-clock advance.
+- AC3 binds complete JSON-RPC envelopes, IDs, roster projection, ignored descriptors, all ten case hashes, lifecycle evidence, and aggregate `6569b047…`.
+- AC2 inventory is recursive and fail-closed across entrypoints, repository edges, literal assets, process launches, JavaScript CLIs, native helpers, and the transitive platform-matching npm closure.
+- AC6 binds ready/disposition/inventory evidence plus source and target paths, Git blob OIDs, content hashes, partition counts, and replay semantics; ambiguity or omitted evidence fails closed.
+- AC8 uses strict request/response schemas, bounded bodies/results/IDs/deadlines, 127.0.0.1 only, sanitized environment, exact atom projection, and verified graceful/forced process-group cleanup.
+- Target remains one clean local branch with no remote, `authority:false`, `installed:false`, and DEV maturity.
+- Builder evidence cannot substitute for reviewer independence; the historical ACCEPT remains bound to superseded target `c84b3edb…`.
 
 ## open_questions
 
-- None spec-ambiguity; escalation is scope/single-session, not a contradiction. Continuation is well-specified.
-
-<!-- builder-state-handoff-open-questions:start -->
-- See agent_notes and run log for the escalation question.
-<!-- builder-state-handoff-open-questions:end -->
+- Fresh codex-ops review must bind the exact target OID/tree and feature head, then independently rerun the required checks.
+- General MCP loopback/auth hardening and residual task-state/product semantics remain deferred and must be resolved before qualification if they enter the release boundary.
 
 ## dont_touch
 
-- No target remote, publish/install, daemon/MCP/launchd change.
-- No migration/evidence/recovery/process-containment/credential infrastructure.
-- No read/copy/migrate/mutate of live databases, checkpoints, credentials, Keychain, user config — synthetic only.
-- No echo-brain product semantics, echo-loop protocols, added features, or touching siblings/wiki/holdout-131.
+- Do not rewrite the existing independent review record or review sidecar.
+- Do not create a target remote, install or activate the target, transfer authority, advance maturity, or claim release.
+- Do not touch items 133/134, wiki, holdout-131, live databases, credentials, or sibling repositories.
 
 ## canonical_anchors
 
+- decision: raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md
 - spec: backlog/pending_review/2026-07-13-135-local-echo-context-source-extraction.md
+- migration_record: raw/internal/migrations/2026-07-13-135-echo-context.md
+- handoff_head_sha: caf4bdde2dc852357410264f00d5ccef20708a11
+- target_head: c3882ec057d1f19dd729977730a87ac6e76e5714
+- target_tree: 14ccf48df9155462efbbf798662cce7fd0f68b53
+- reviews: backlog/reviews/2026-07-13-135-local-echo-context-source-extraction/

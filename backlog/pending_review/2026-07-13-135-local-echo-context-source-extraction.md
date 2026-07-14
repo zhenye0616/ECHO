@@ -34,14 +34,20 @@ claimed_by: "codex-builder-135"
 claimed_at: "2026-07-14T19:24:50Z"  # founder-directed Codex takeover after independent review rejected the prior acceptance proof
 branch: "agent/135-echo-context"
 worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
-head_sha: "7b58ebf04068b13e24b1c0187eaacb3bce4b6226"
+head_sha: "caf4bdde2dc852357410264f00d5ccef20708a11"
 pr_url: ""
 agent_notes: |
-  REMEDIATION IN PROGRESS — Codex builder takeover. The independent review at
-  7b58ebf0 rejects the prior AC2/AC3/AC6/AC8 proof and clean-target claim. The
-  next handoff must close the pinned-source stdio, transitive inventory,
-  evidence-binding, service fail-closed, clean-target, and README gaps, then
-  mint a new target OID and regenerate all OID-bound evidence.
+  READY FOR FRESH INDEPENDENT REVIEW — codex-builder-135 remediated the AC2,
+  AC3, AC6, AC8, clean-target, and README gaps rejected by the prior review.
+  Current target is c3882ec057d1f19dd729977730a87ac6e76e5714 / tree
+  14ccf48df9155462efbbf798662cce7fd0f68b53: clean, one branch, no remote,
+  authority:false, installed:false, maturity:DEV. Focused remediation is 36/36;
+  exact-target and config-free private-clone suites are each 72/72 files, 987
+  passed, 17 intentionally skipped, 0 failed. Feature handoff
+  caf4bdde2dc852357410264f00d5ccef20708a11 is pushed; its sole delta from the
+  prior review child is the refreshed migration record. The historical ACCEPT
+  remains bound to the superseded target; a new independent reviewer must bind
+  this exact OID/tree and feature head.
 
   COMPLETE — R3 F6 fix cycle resolves the codex-ops re-review's sole finding (F6) + RR-F1. All 8 ACs pass. Ready for codex-ops re-review.
   Accepted target: /Users/zhenye/Desktop/echo-context @ HEAD c84b3edba7d96d327bbef4a4268da7bda71a05fd

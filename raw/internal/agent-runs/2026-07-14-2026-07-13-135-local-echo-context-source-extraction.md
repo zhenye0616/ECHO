@@ -735,3 +735,77 @@ the item and builder.md. The codex-ops re-review of e8bd2440 is the next step.
 
 ### Journal
 - Zero `mcp__echo__*` calls this run. No journal entry owed.
+
+---
+
+## Run 11 (2026-07-14 — codex-builder-135 independent-review remediation)
+
+- **Trigger:** the independent sidecar rejected the prior acceptance proof for
+  fail-open gaps in AC2 recursive inventory, AC3 pinned-source stdio parity,
+  AC6 evidence binding, AC8 service containment, and the clean-target claim.
+- **Resolution:** hardened all four proof surfaces, corrected README claims,
+  removed target residue, minted a new target OID, and regenerated the bound
+  migration evidence. The historical independent review remains byte-identical
+  and approves only the superseded target.
+- **Target:** `c3882ec057d1f19dd729977730a87ac6e76e5714` (tree
+  `14ccf48df9155462efbbf798662cce7fd0f68b53`), sole branch
+  `migration/2026-07-13-135`, no tags/remotes/reflogs, clean, 190 tracked files,
+  no symlinks/gitlinks, and 507/507 reachable Git objects. The sorted object-set
+  digest is `6c9bf63de3f88386a392d5b30f2935133837bdf61db8c85e430f823d36c4a165`.
+- **Feature handoff:** `caf4bdde2dc852357410264f00d5ccef20708a11`
+  (tree `9f587f620788d6a52241d8aa54ad2de604f1af47`), pushed to
+  `origin/agent/135-echo-context`. Its parent is the prior review child
+  `7b58ebf04068b13e24b1c0187eaacb3bce4b6226`; the sole delta is the refreshed
+  migration record, blob `2ebdb48977df70b25c0ceb09adb0bf74d2f85e0a`,
+  SHA-256 `81f8ad89ba42f04d03ba517a31046cddee23b4874505a2944692d24719bb9359`.
+
+### Remediated proof surfaces
+
+- **AC2:** recursive committed-object inventory now follows all entrypoints,
+  aliases/reassignments, literal assets, tsx scripts, repository launches,
+  JavaScript CLIs, native helpers, and the transitive platform npm closure;
+  comment/text spoofing and computed roots or launches fail closed.
+- **AC3:** the HTTP-only pinned source and target run through the same hash-bound
+  scratch stdio registrar. Full JSON-RPC envelopes and IDs are bound. The wait
+  case observes one 1000ms poll and one +1000ms virtual-clock advance under the
+  literal 10ms request deadline; immediate/no-advance controls reject. Aggregate:
+  `6569b0472372ad666404aa22bcf5b1e0e0c716b573dec35c4b9212864420bba2`.
+- **AC6:** source/target paths, blob OIDs, content hashes, ready/disposition
+  bindings, counts, target-only policy, replay patches, and anti-whole-blob
+  semantics are enforced together; missing, ambiguous, or swapped evidence
+  fails closed.
+- **AC8:** strict request and response schemas, atom bounds/projection, bounded
+  bodies/results/deadlines, sanitized environment, loopback-only binding,
+  cancellation, readiness failure cleanup, and graceful/forced process-group
+  teardown are enforced.
+
+### Verification
+
+- Focused remediation battery: 4 files / 36 tests passed (AC2 6, AC3 7,
+  AC6 14, AC8 9).
+- Exact target: 72/72 files, 987 passed, 17 intentionally skipped, 0 failed.
+- Corrected config-free private clone: the same 72/72, 987 passed, 17 skipped,
+  0 failed. TypeScript, ESLint, all tool syntax checks, and `git diff --check`
+  passed.
+- Private lifecycle: loopback accepted outside and failed EPERM inside the
+  deny-network profile; DNS/direct-IP/HTTPS probes failed before install, after
+  install, and after rebuild; offline script-disabled install, isolated
+  better-sqlite3 rebuild, and native smoke passed. Native artifact SHA-256
+  `289ac2671fc501b275af7ce170ea2ef84e07be7e2a4a403aaa055cef02018557`
+  matches committed evidence.
+- The first target full run hit Vitest's five-second harness timeout while the
+  recursive inventory completed in 6.4s; the committed test now has an explicit
+  30-second bound and the exact candidate passed. The first private run placed
+  TMPDIR under Git ancestry and omitted the pinned-source lock from its scratch
+  cache; correcting only the proof harness produced the green private result.
+  Neither transient changed target bytes.
+
+### Handoff boundary
+
+The target remains local-only with `authority:false`, `installed:false`, and DEV
+maturity. This is builder evidence, not acceptance. A fresh independent reviewer
+must bind the exact target OID/tree and feature head before any merge decision.
+
+### Journal
+
+- Zero `mcp__echo__*` calls this run. No journal entry owed.
