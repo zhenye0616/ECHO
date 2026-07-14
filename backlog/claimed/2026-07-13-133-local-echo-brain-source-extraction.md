@@ -30,13 +30,19 @@ spec_refs:
   - product/package.template.json                             # runtime identity and dependencies
   - product/npm-shrinkwrap.json                               # pinned runtime tree
   - product/README.md                                         # DEV commands and inherited debt
-claimed_by: "fable-builder-133"
-claimed_at: "2026-07-14T05:46:05Z"  # reclaimed 2026-07-14 for founder-directed AC5/AC7 four-clone matrix (B0/B1/B2) continuation
+claimed_by: "codex-builder-133"
+claimed_at: "2026-07-14T19:24:50Z"  # founder-directed Codex takeover after independent review rejected the prior acceptance proof
 branch: "agent/133-echo-brain"
 worktree: "/Users/zhenye/Desktop/Project_echo--133-echo-brain"
-head_sha: "20c8135a37e123f1735dd07023ccc0bfc184b624"
+head_sha: "f92af1db90fd6fb911243deb408a1ed760c3b249"
 pr_url: ""
 agent_notes: |
+  REMEDIATION IN PROGRESS — Codex builder takeover. The independent review at
+  f92af1db rejects the prior AC7 dependency proof because check-dependencies.mjs
+  accepts destructured command/args from an arbitrary RHS. The next handoff must
+  bind accepted dataflow to enumerated literal tuples, add the exact regression,
+  mint a new target OID, and regenerate all OID-bound evidence.
+
   Builder fable-builder-133 (Claude Code). Attended one-time extraction; no migration
   controller/evidence-publisher built (per one-shot-lifecycle decision).
 

@@ -30,13 +30,19 @@ spec_refs:
   - src/storage/interface.ts                                 # storage contract
   - tests/mcp/                                               # retrieval/API behavior
   - tests/storage/                                           # storage behavior
-claimed_by: "fable-builder-135"
-claimed_at: "2026-07-14T05:47:41Z"
+claimed_by: "codex-builder-135"
+claimed_at: "2026-07-14T19:24:50Z"  # founder-directed Codex takeover after independent review rejected the prior acceptance proof
 branch: "agent/135-echo-context"
 worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
-head_sha: "e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c"
+head_sha: "7b58ebf04068b13e24b1c0187eaacb3bce4b6226"
 pr_url: ""
 agent_notes: |
+  REMEDIATION IN PROGRESS — Codex builder takeover. The independent review at
+  7b58ebf0 rejects the prior AC2/AC3/AC6/AC8 proof and clean-target claim. The
+  next handoff must close the pinned-source stdio, transitive inventory,
+  evidence-binding, service fail-closed, clean-target, and README gaps, then
+  mint a new target OID and regenerate all OID-bound evidence.
+
   COMPLETE — R3 F6 fix cycle resolves the codex-ops re-review's sole finding (F6) + RR-F1. All 8 ACs pass. Ready for codex-ops re-review.
   Accepted target: /Users/zhenye/Desktop/echo-context @ HEAD c84b3edba7d96d327bbef4a4268da7bda71a05fd
   (tree 7846166e674440007ae40867533bbaadbc1ab1a5), sole branch migration/2026-07-13-135, no remote,
