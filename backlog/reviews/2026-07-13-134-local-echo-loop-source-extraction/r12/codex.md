@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-134-local-echo-loop-source-extraction"
+round: 12
+reviewer: "codex"
+artifact_sha: "83ba8a0ec42306b58948b7a942a16521962a89ad"
+completed_at: '2026-07-14T01:53:31Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "medium"
+    where: "AC2 — source universe and resolution-rules paragraphs"
+    finding: "The initial ls-tree inventories only the listed roots, while the resolver may discover repository dependencies outside those roots; no fixed-point expansion mechanism says how newly reached blobs acquire pinned mode/OID/path records. Define deterministic traversal order, cycle/dedup handling, pinned-tree lookup commands, unresolved-edge failures, and make that completed closure the source universe reconciled by both manifests. Add a fixture whose transitive helper is outside the initial roots."
+  - severity: "medium"
+    where: "AC2 — dependency-plan and build-lock paragraph"
+    finding: "The dependency plan conflates npm dependencies with external interpreters/helpers, although tools such as Git and /bin/sh cannot map to package.json and package-lock.json. It also does not define lock selection for transitive, peer, optional, platform-specific, or bundled dependencies. Split npm-managed and toolchain-managed dependency classes, define the exact retained/pruned lock-node closure and conflict behavior, and test that the derived lock installs offline without undeclared or extraneous packages."
+  - severity: "medium"
+    where: "AC3 — package exports and idempotency paragraph"
+    finding: "invokeRole returns status duplicate, but only emitCoordEvent has an idempotency key. Specify invokeRole's exact key, which fields constitute payload mismatch (including deadline changes), whether duplicates return the original invocationId, and the transaction behavior for concurrent identical and conflicting calls. Add corresponding concurrency-table cases."
+  - severity: "medium"
+    where: "AC3 — CLI init atomicity paragraph"
+    finding: "Atomic temp/fsync/rename does not itself prevent concurrent init from replacing an existing destination, and the losing call's result is undefined. Name the state paths, create-new/no-replace primitive, file-and-parent fsync order, stale-temp cleanup ownership, and collision error code; add two-contender and crash-before-publication tests proving no initialized state is overwritten."
+  - severity: "medium"
+    where: "AC1 toolchain contract and AC7 private-clone verification"
+    finding: "Pinning only /usr/local/bin/git does not close executable provenance for clone --no-local and related operations, which dispatch Git helpers through the Git exec path. This conflicts with the requirement to fail when another executable is used. Pin and sanitize GIT_EXEC_PATH, inventory/hash every required helper, include those helpers in the sandbox allowlist, and add a hostile exec-path/PATH fixture that proves an unpinned helper cannot run."
+  - severity: "medium"
+    where: "AC2 aggregate verification and AC7 audit invocation"
+    finding: "The package contract calls verify:extraction an aggregate, while AC7 says the package script is exactly a command containing the runtime placeholder <create-new-target-result>. A static package script cannot encode each audit's unique output path, leaving its callable contract ambiguous. Specify the literal script value, the exact direct and npm invocations, required --out behavior and create-new semantics, and prove both routes execute the same aggregate checks."
+  - severity: "medium"
+    where: "AC7 operator audit and AC8 independent review"
+    finding: "The executable audit is retained outside committed target history, but independent review is told to run it and only then compare record hashes. Require verification of the audit, runner, comparator, vectors, profiles, and inventory hashes against the committed migration record before any retained-evidence code executes, then recheck immutable inputs after execution."
+---
