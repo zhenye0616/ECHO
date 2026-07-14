@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-13-134-local-echo-loop-source-extraction"
+round: 13
+reviewer: "codex-ops"
+artifact_sha: "69a11b2c6780b759f15ef2944aeb31d0e048793d"
+completed_at: '2026-07-14T02:27:57Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC3 — invokeRole PENDING outbox"
+    finding: "No runtime owner or trigger is specified for reconciling PENDING rows while daemons and schedulers are out of scope. A crash after reservation can leave an invocation unpublished while its retry returns duplicate. Define bounded reconciliation on a named startup or call path, concurrent-reconciler semantics, publication-failure return behavior, durable attempt/error evidence, and crash/retry fixtures that require no unrelated later call."
+  - severity: "high"
+    where: "AC3 — create-new state/coord.sqlite initialization"
+    finding: "Publishing only the temporary SQLite main file with linkat can omit committed state held in WAL, SHM, or rollback-journal sidecars. Require checkpointing into a single-file journal mode, closing all handles, asserting sidecar absence, fsyncing and reopening the temporary database for integrity/schema validation before linkat, and tests for WAL-backed initialization plus crashes after link and before/after directory fsync and temp unlink."
+  - severity: "high"
+    where: "AC5 — overlapping watcher ticks"
+    finding: "The race matrix covers duplicate reviewers and watcher reads during publication but not two watchers dispositioning the same completed round. Require an item/round/spec-SHA-scoped atomic claim or compare-and-swap, a durable duplicate or BUSY result for losers, and a two-watcher fixture proving exactly one promotion, next-round creation, or escalation."
+  - severity: "medium"
+    where: "AC3 — invocation-event identity"
+    finding: "Generic event uniqueness is defined as actor, kind, and correlationId, while invocation uniqueness includes role and taskId and publication is described as keyed by invocationId. Distinct tasks sharing a correlation can therefore collide unless a separate invocation-event key is normative. Define the exact actor, kind, eventId, and uniqueness projection and test concurrent same-correlation invocations for different roles and tasks."
+  - severity: "medium"
+    where: "AC2 — fixed-point source resolution"
+    finding: "The byte-sorted queue marks path-and-OID pairs visited before workspace manifests, import maps, or extended tsconfigs may establish the binding context needed to resolve those files. Require a resolver-configuration bootstrap closure before source traversal, or include binding-context state in reprocessing, and test aliases and workspace packages outside initial roots under multiple queue orders."
+  - severity: "medium"
+    where: "AC2 and AC7 — npm installation inputs"
+    finding: "The offline-install contract does not explicitly disable lifecycle scripts or allowlist and contain required ones, and empty user/global configs do not by themselves suppress a project .npmrc. Pin absence or validated contents of every project config, strip npm_config environment inputs, define the lifecycle-script policy and sandboxed outputs, and add hostile .npmrc and postinstall fixtures."
+  - severity: "medium"
+    where: "AC7 and AC8 — verifier --out contract"
+    finding: "The verifier output lacks a versioned schema, canonical serialization, failure-publication behavior, and exact comparison rules; same-contract-output is also ambiguous under create-new EEXIST semantics. Require distinct absent outputs for direct and npm routes, atomic no-replace publication of success and failure results, a schema covering roster entries, argv, exit/signal/timeout state and hashes, and an explicit normalization/equality rule."
+  - severity: "medium"
+    where: "AC7 — child-process containment and diagnostics"
+    finding: "A 900-second deadline does not bound framed stdout, stderr, or log growth, so a faulty child can exhaust memory or evidence storage before timeout. Define incremental frame and aggregate byte limits, terminate the registered process group on overflow, prohibit launches after the shutdown latch trips, and retain a create-new fsynced diagnostic with phase, argv, timing, pid/pgid, signals, wait status, and survivor state."
+---
