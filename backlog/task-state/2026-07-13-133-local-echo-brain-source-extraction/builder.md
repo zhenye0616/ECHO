@@ -1,6 +1,6 @@
 ## current_thesis
 
-Fix cycle after codex-ops REJECT complete (F1-F7, founder adjudication #3); re-handed to pending_review. NEW accepted target `/Users/zhenye/Desktop/echo-brain` @ HEAD `493b558f30d0e7b24dd2ebef883c10285f835f48` (tree `98d8549b55cdfd4f10d9452c840c006fa2c7a693`), branch `migration/2026-07-13-133`, single root, no remote, clean, UNCHANGED by the re-run matrix. Feature-branch handoff head (binds the fix-cycle migration record) is now `e64bfb8071097af9156e79e7a6ffc7d437a7be60` (supersedes d3f71b16). New artifact tuple: tarball `72a32d2d…`, canonical manifest digest `1f9dbd66…`, tree `98d8549b`, lock `9ffc39fa`.
+Fix cycle 2 (post 2nd codex-ops REJECT; N2-N6) complete; re-handed to pending_review. NEW accepted target `/Users/zhenye/Desktop/echo-brain` @ HEAD `ffc11b45ca42fba19e25582f00e92dbaa63c9a3c` (tree `27250ad06e90d6ed4534dc6e50f880874818e659`), branch `migration/2026-07-13-133`, single root, no remote, clean, UNCHANGED by the re-run matrix. Feature-branch handoff head (binds the fix-cycle-2 migration record, built on review child 4e43c996) is now `3a693a7369c46a15f07f5704dec033b1a7230af5`. New artifact tuple: tarball `b7708d8f…`, canonical manifest digest `f868ad68…`, tree `27250ad0`, lock `9ffc39fa`.
 
 ## locked_decisions
 
@@ -12,9 +12,11 @@ Fix cycle after codex-ops REJECT complete (F1-F7, founder adjudication #3); re-h
 
 ## open_questions
 
-- Fix cycle F1-F7 (post codex-ops REJECT, founder adj #3) COMPLETE: F4 .DS_Store removed; F3 package.json npm-pin transform (sole transform_allowlist entry, operator-audit-verified); F2 check-dependencies enforces helper/CLI partition + omission/evasion fixtures + completed dependency-toolchain (clang++/xcode-select/xcrun, @types build_inputs, real digests); F1 scratch-config eslint lint gate (out-of-band, bytes+digest recorded, not committed). Re-verified: 3 checkers exit 0, transform-aware operator audit PASS, vitest 18/18, fsck clean, object-set==reachable-set.
-- Re-ran full B0/B1/B2 matrix WITH lint leg under sandbox-exec deny-network; all three share one tuple (tarball 72a32d2d…, canonical manifest digest 1f9dbd66…, tree 98d8549b…, lock 9ffc39fa…). F6 argv/env echoes + F7 canonical serialization recorded in migration record. Accepted target 493b558f UNCHANGED by matrix.
-- REMAINING: R1 rerun + AC8 codex-ops re-judgment — reviewer's responsibility, explicitly not run by builder.
+- Fix cycle 2 (post 2nd codex-ops REJECT; N2-N6) COMPLETE. N1 = executor lint-binding (reviewer side); F3/F4/F5 confirmed fixed.
+  - N2 (real code): check-dependencies recognizes spawnSanitizedChild (/sbin/mount edge in config.ts:165 now enforced; used_commands includes /sbin/mount) and is FAIL-CLOSED per variable (computed spawn allowed only for a declared computed_command_owner or a directly tuple-destructured var; file-level hasTuple whitelist removed). toolchain-preflight.mjs is a documented owner (wrapper+which()-indirected; command set is the independently-classified tuple). 3 new fixtures. vitest 21/21.
+  - N3: strict env -i on every sandboxed lifecycle invocation + sanitized runner (durable runner-env.txt, 0 dangerous vars) + argv-echo all 6 commands incl smokes. N4: complete fresh hash table at ffc11b45. N5: README npm-pin exception. N6: comparator named String.localeCompare (no tuple churn).
+- Re-verified: 3 checkers exit 0, transform-aware operator audit PASS, vitest 21/21, fsck clean, object-set==reachable-set (78). Re-ran full B0/B1/B2 matrix + lint leg under env -i; all three share ONE tuple (tarball b7708d8f…, canonical manifest digest f868ad68…, tree 27250ad0…, lock 9ffc39fa…). Accepted target ffc11b45 UNCHANGED by matrix.
+- REMAINING: R1 rerun + codex-ops re-judgment — reviewer side. Standing rule: a 3rd rejection on any NEW finding class halts to founder.
 
 ## dont_touch
 
@@ -25,5 +27,5 @@ Fix cycle after codex-ops REJECT complete (F1-F7, founder adjudication #3); re-h
 - decision: raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md
 - spec: backlog/pending_review/2026-07-13-133-local-echo-brain-source-extraction.md
 - migration_record: raw/internal/migrations/2026-07-13-133-echo-brain.md
-- handoff_head_sha: e64bfb8071097af9156e79e7a6ffc7d437a7be60
+- handoff_head_sha: 3a693a7369c46a15f07f5704dec033b1a7230af5
 - reviews: backlog/reviews/2026-07-13-133-local-echo-brain-source-extraction/

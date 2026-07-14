@@ -34,7 +34,7 @@ claimed_by: "fable-builder-133"
 claimed_at: "2026-07-14T05:46:05Z"  # reclaimed 2026-07-14 for founder-directed AC5/AC7 four-clone matrix (B0/B1/B2) continuation
 branch: "agent/133-echo-brain"
 worktree: "/Users/zhenye/Desktop/Project_echo--133-echo-brain"
-head_sha: "e64bfb8071097af9156e79e7a6ffc7d437a7be60"
+head_sha: "3a693a7369c46a15f07f5704dec033b1a7230af5"
 pr_url: ""
 agent_notes: |
   Builder fable-builder-133 (Claude Code). Attended one-time extraction; no migration
@@ -85,7 +85,27 @@ agent_notes: |
   canonical manifest digest 1f9dbd66932a6120e9cfad90b1c820faf5052ca9cb8e481772744289460467ae (serialization spelled out in
   migration record F7), tree 98d8549b, lock 9ffc39fa. F6 argv/env echoes recorded per leg; proxy wording aligned (poisoned
   proxy present, not absent). Accepted target UNCHANGED by matrix. New builder head e64bfb8071097af9156e79e7a6ffc7d437a7be60.
-  REMAINING: R1 rerun + AC8 codex-ops re-judgment (reviewer's responsibility; explicitly not run per founder).
+  REMAINING (cycle 1): superseded by fix cycle 2 below.
+
+  FIX CYCLE 2 (2026-07-14, post 2nd codex-ops REJECT): confirmed F3/F4/F5 fixed; N1 = executor lint-binding (reviewer side).
+  NEW accepted OID ffc11b45ca42fba19e25582f00e92dbaa63c9a3c (tree 27250ad06e90d6ed4534dc6e50f880874818e659), single root, fsck clean,
+  object-set==reachable (78). Fixes:
+  - N2 (real code): check-dependencies now recognizes spawnSanitizedChild (the /sbin/mount edge in config.ts:165 is enforced;
+    used_commands includes /sbin/mount) and is FAIL-CLOSED per variable (computed spawn allowed only for a declared
+    computed_command_owner or a directly tuple-destructured var; removed the file-level hasTuple whitelist). toolchain-preflight.mjs
+    is a documented computed_command_owner (wrapper+which()-indirected; its command SET is the independently-classified tuple).
+    3 new fixtures (spawnSanitizedChild undeclared edge; computed-spawn-without-proven-tuple in a file with an unrelated tuple;
+    plus /sbin/mount enforcement assertion). vitest 21/21.
+  - N3: strict env -i on EVERY sandboxed lifecycle invocation (inherited NODE_OPTIONS/NODE_PATH/DYLD/npm/Git absent by
+    construction); runner itself launched under env -i with a durable runner-env.txt outer transcript (0 dangerous vars);
+    argv-echo now covers all 6 commands incl validate-config + selftest smokes.
+  - N4: complete fresh content-hash table at ffc11b45 in the migration record (the 3 stale hashes replaced).
+  - N5: README states the package.json npm-pin transform exception (not "without content change").
+  - N6: migration record names the actual comparator String.localeCompare (verify-artifact unchanged; no tuple churn).
+  Re-ran full B0/B1/B2 matrix + lint leg under env -i; all three share ONE tuple: tarball b7708d8f195662a9180347ea0a52e6440af3b572fa2a6248c61e146d65f26e8b,
+  27 members, canonical manifest digest f868ad68125b2d0943f98793419784ba7399357eaf3ecd13f770a55d8f25cc24, tree 27250ad0, lock 9ffc39fa.
+  Accepted target UNCHANGED by matrix. New builder head 3a693a7369c46a15f07f5704dec033b1a7230af5.
+  REMAINING: R1 rerun + codex-ops re-judgment (reviewer side). Standing rule: a 3rd rejection on any NEW finding class halts to founder.
 
   QUESTION FOR REVIEWER/FOUNDER — AC3<->AC5 schema path: byte-identical src/product/config.ts:55 + package.json
   files field reference schemas/product/runtime-config.v1.schema.json, but AC5 names schemas/runtime-config.v1.schema.json.
