@@ -34,22 +34,23 @@ claimed_by: "fable-builder-135"
 claimed_at: "2026-07-14T05:47:41Z"
 branch: "agent/135-echo-context"
 worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
-head_sha: "ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf"
+head_sha: "e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c"
 pr_url: ""
 agent_notes: |
-  COMPLETE — R2 fix cycle resolves the codex-ops REJECT (F2/F3/F4/F5). All 8 ACs pass. Ready for codex-ops re-review.
-  Accepted target: /Users/zhenye/Desktop/echo-context @ HEAD 86a5c40386250a3c87313f39f65273be914b3b93
-  (tree a933781cf669ae6cbdf0c3f240ade248bf90afed), sole branch migration/2026-07-13-135, no remote,
+  COMPLETE — R3 F6 fix cycle resolves the codex-ops re-review's sole finding (F6) + RR-F1. All 8 ACs pass. Ready for codex-ops re-review.
+  Accepted target: /Users/zhenye/Desktop/echo-context @ HEAD c84b3edba7d96d327bbef4a4268da7bda71a05fd
+  (tree 7846166e674440007ae40867533bbaadbc1ab1a5), sole branch migration/2026-07-13-135, no remote,
   190 tracked files (38 target-only + 152 source-derived, exact-HEAD), fsck clean. authority:false, installed:false.
-  Full suite 72 files / 966 tests pass, tsc clean, lint clean.
-  R2 fixes: F5 — check-parity now EXECUTES each rewritten replay_patch (unified diff → reproduces target hash) + REJECTS whole-blob (≥30% source-line retention); mutation fixtures (whole-blob/incomplete/omitted/byte-copy all FAIL). F2 — recent-calls replay row regenerated from real diff (includes coord_emit→search_memories). AC5 — granola-signals reclassified rewritten→duplicated (partition 144/7/1/65). F3 — migration record now embeds exact scratch tsconfig + eslint bytes verbatim. F4 — 72 test files (not 66).
+  Full suite 72 files / 973 tests pass, tsc clean, lint clean. AC7 spot re-verified against c84b3edb.
+  R3 fix (F6): added full 40-hex target_blob_oid to the parity-matrix + source-extraction schemas and all 7 rewritten + 1 duplicated rows (the 7 match the reviewer's F6 table); check-parity gained gitBlobOid() and now recomputes+verifies each row's target_blob_oid (rejects missing/non-40hex/mismatch) alongside the R2 replay execution + anti-whole-blob guard; 2 new mutation fixtures (missing/wrong OID FAIL). RR-F1: count corrected to exact 973 (971 + 2 F6 fixtures). No other churn — re-review confirmed everything else (config bytes, 7/7 replays, install, service, 19 hashes).
+  Prior R2 fixes stand (F5 executable replay + anti-whole-blob; F2 replay row; AC5 granola duplicated; F3 config bytes embedded; F4 72 files).
   AC8 (adjudication #3): tsx pinned devDep; tools/verify-service-parity.mjs launched `node --import tsx …` — real child-process/FD3/
   process-group/loopback ceremony; service-api.v1.json; context-service.test.ts 7/7. AC7 re-verified with tsx (291 pkgs, only better-sqlite3
   rebuilds, artifact 289ac267 unchanged, network denial + loopback both halves). check-runtime-inventory now classifies literal dynamic imports.
-  MIGRATION RECORD (R2): raw/internal/migrations/2026-07-13-135-echo-context.md updated on the feature branch on top of the review child f5596ab3; binds source SHA,
+  MIGRATION RECORD (R2): raw/internal/migrations/2026-07-13-135-echo-context.md updated on the feature branch on top of the re-review child 45a24e3a; binds source SHA,
   new target HEAD/tree, all 19 refreshed provenance/tool hashes, AC3 aggregate 632a7b2f, AC7 re-verify, AC8 service results, object-closure, authority/installed,
   the exact scratch tsconfig + eslint BYTES verbatim (F3) + their SHAs, and adjudication-#2/#3 + AC5-duplication deviations.
-  head_sha = the FRESH R2 builder head ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf (parent = review child f5596ab3; delta = exactly the updated migration record; pushed to origin).
+  head_sha = the FRESH R2 builder head e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c (parent = re-review child 45a24e3a; delta = exactly the updated migration record; pushed to origin).
   This IS the immutable builder head the codex-ops reviewer RE-reviews (adds an updated 2026-07-13-135-echo-context-review.md child) — that reviewer leg is NOT my scope (same Option B ceremony as 133/134).
   Prior structural questions Q1/Q2/Q3 all founder-adjudicated (item adjudication sections #2, #3 + Q1 record now byte-complete in the migration record). Full 9-run per-AC map in the run log.
   NEW STRUCTURAL QUESTION Q3 (do not guess — shapes AC8/AC2/AC3-stdio): AC8's verify-service-parity.mjs + AC3's literal stdio

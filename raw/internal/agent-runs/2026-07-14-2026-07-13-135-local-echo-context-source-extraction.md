@@ -702,3 +702,36 @@ and builder.md. The codex-ops re-review of ca70b7f2 is the next step (reviewer's
 
 ### Journal
 - Zero `mcp__echo__*` calls this run. No journal entry owed.
+
+---
+
+## Run 10 (2026-07-14 — R3 F6 fix cycle: target Git blob OID binding)
+
+The codex-ops re-review (R2 head ca70b7f2, re-review child 45a24e3a) verified every
+prior finding + all proofs and REJECTED solely on new-class **F6**: AC6 requires
+each rewritten row to bind the TARGET Git blob OID, which the schema, the 7 rewritten
+rows, and check-parity omitted. Founder authorized one mechanical cycle. Resolved.
+New accepted target HEAD **c84b3edba7d96d327bbef4a4268da7bda71a05fd** (tree
+7846166e674440007ae40867533bbaadbc1ab1a5), 190 tracked, fsck clean. Full suite
+72 files / **973 tests** pass, tsc clean, lint clean, AC7 spot re-verified.
+
+- **F6 (MEDIUM, blocking) → FIXED.** Added `target_blob_oid` (full 40-hex git blob
+  object id) to the parity-matrix + source-extraction schemas and populated it on all
+  7 rewritten + 1 duplicated rows (the 7 match the reviewer's F6 table exactly).
+  `tools/check-parity.mjs` gained a `gitBlobOid(bytes)` helper (`sha1("blob <len>\0"
+  + bytes)`) and now recomputes + verifies each row's `target_blob_oid` against the
+  target file bytes (rejects missing / non-40-hex / mismatched), alongside the R2
+  replay execution + anti-whole-blob guard. Two new mutation fixtures in
+  parity-matrix.test.ts: a MISSING target_blob_oid FAILS, a WRONG one FAILS.
+- **RR-F1 (LOW) → FIXED.** Aggregate test count corrected to the exact 973
+  (971 at R2 + the 2 new F6 fixtures); the R2 "966" is superseded.
+- No other churn: the re-review confirmed everything else (config bytes reproduced,
+  7/7 replay patches, install, service, all 19 hashes). No new finding class arose.
+
+Migration record R3 committed on the feature branch on top of the re-review child
+45a24e3a → new builder head **e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c** (parent
+45a24e3a; delta = the updated builder migration record). head_sha refreshed in BOTH
+the item and builder.md. The codex-ops re-review of e8bd2440 is the next step.
+
+### Journal
+- Zero `mcp__echo__*` calls this run. No journal entry owed.

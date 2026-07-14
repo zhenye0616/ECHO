@@ -2,9 +2,9 @@
 task_id: 2026-07-13-135-local-echo-context-source-extraction
 role: builder
 writer: fable-builder-135
-last_updated: 2026-07-14T09:39:12Z
+last_updated: 2026-07-14T17:36:13Z
 handoff_branch: agent/135-echo-context
-handoff_head_sha: ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf
+handoff_head_sha: e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c
 handoff_run_log: raw/internal/agent-runs/2026-07-14-2026-07-13-135-local-echo-context-source-extraction.md
 ---
 
@@ -23,7 +23,7 @@ an incomplete attended build is unaccepted and founder-archived before retry —
 no auto-resume. See the run log for the verified foundation and per-AC map.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf.
+- Lifecycle: COMPLETE — ready for review at e8bd2440eb7bd9b1ed66d827205aa8afa6395d4c.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
