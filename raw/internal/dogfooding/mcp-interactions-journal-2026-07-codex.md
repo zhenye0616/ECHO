@@ -1670,3 +1670,21 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** Claude Code capture lane scoped to `/Users/zhenye/Desktop/Project_echo`; no matching source atoms.
 - **Verdict:** partial — ECHO has no captured Claude judgment bound to either current remediation head; local Git/review artifacts remain the authority for the gate.
 - **Note:** Do not inherit the older ACCEPT records. Fresh independent review children and updated sidecars are still required for 133 and 135.
+
+### 2026-07-14 15:06 PDT - resolve the live Claude 134 builder lane
+
+- **Trigger:** Founder asked Codex to wait for Claude builder 134 to land before driving items 133, 134, and 135 to mergeable state.
+- **Query inputs:** `echo_resolve_mru({sources:["claude_code"], repo_path:"/Users/zhenye/Desktop/Project_echo"})`.
+- **Returned:** Resolved the most-recent Project_echo Claude source to exact subagent session `agent-abuilder-134b-loop-a6664f024d7ac3f3.jsonl`, with the repo filter and no warnings.
+- **Sources:** Claude Code successor builder 134b under orchestrator session `f96bfcee-3199-472c-adf2-9b7367d03b4d`.
+- **Verdict:** right - ECHO selected the active 134 builder lane rather than the older orchestrator or reviewer sessions.
+- **Note:** Tail this exact source and reconcile it against the durable Git/backlog handoff before beginning any 133/134/135 remediation.
+
+### 2026-07-14 15:07 PDT - Claude 134 builder handoff has landed
+
+- **Trigger:** Determine whether the founder's wait condition has cleared and capture 134's exact immutable handoff bindings.
+- **Query inputs:** Source-exact `search_memories` on `agent-abuilder-134b-loop-a6664f024d7ac3f3.jsonl`, scoped to Project_echo since 14:00 PDT, limit 10.
+- **Returned:** One newest turn at 15:05:43 PDT, no cursor or warnings. Builder reports target `d69c003a...`, 22 files / 143 tests green, feature head `375bdf694d8bd71bf383b6ae7416d69990ab3092` as a sole-parent child of review record `770b101f`, item moved to `pending_review/`, and clean main handoff `0496acf5`. Content was truncated by 15,734 bytes and tool-call metadata projected, but all durable bindings and terminal status survived.
+- **Sources:** Exact Claude Code successor-builder 134b source, with captured Git state clean at main `0496acf5`.
+- **Verdict:** right - the wait condition is cleared; 134 has landed durably and can enter fresh independent review alongside 133 and 135 remediation.
+- **Note:** Reconcile the reported SHAs, branch endpoint, target tree, item frontmatter, and main state directly from Git before taking over the three-item path.
