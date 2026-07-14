@@ -30,10 +30,10 @@ spec_refs:
   - src/storage/interface.ts                                 # storage contract
   - tests/mcp/                                               # retrieval/API behavior
   - tests/storage/                                           # storage behavior
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "fable-builder-135"
+claimed_at: "2026-07-14T05:47:41Z"
+branch: "agent/135-echo-context"
+worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
