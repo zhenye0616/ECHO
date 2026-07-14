@@ -155,3 +155,14 @@ An independent `codex-ops` binding/session reviewer binds request bytes/`spec_co
 
 - Do not install or switch the active Project_echo loop.
 - Propose remote/installation/authority transfer separately after local parity.
+
+## Founder disposition (2026-07-14): lane PAUSED
+
+Second codex-ops REJECT (record at feature-branch child c2a33138) surfaced two deep gaps —
+finding C (watcher process-containment/takeover invariants) and finding D (source-plan
+implements 3 of the sealed policy's 14 edge classes) — that require a properly-sized fix
+campaign, not another quick cycle. With the 2026-07-18 demo freeze imminent and Project_echo
+remaining the active loop regardless (per this spec's own scope), the founder paused this lane.
+Item remains in pending_review with the REJECT record standing; target /Users/zhenye/Desktop/echo-loop
+remains INCOMPLETE/UNACCEPTED at 2aeb1ede, authority:false, installed:false, DEV. Resume via a
+founder-authorized fix campaign scoped to findings A-E after the freeze.
