@@ -658,3 +658,47 @@ Project_echo daemon/MCP/live state remain authoritative (authority:false, instal
 
 ### Journal
 - Zero `mcp__echo__*` calls this run (all filesystem/git/node/sandbox-exec). No journal entry owed.
+
+---
+
+## Run 9 (2026-07-14 — R2 fix cycle: codex-ops REJECT F2/F3/F4/F5 resolved)
+
+The independent codex-ops review REJECTED at builder head f8607d2b / review child
+f5596ab3 (verdict affirmed the runtime, partition, all 19 hashes, install proof,
+AC3 aggregate, and the AC8 tsx ceremony; four bounded gaps blocked). All resolved.
+New accepted target HEAD **86a5c40386250a3c87313f39f65273be914b3b93** (tree
+a933781cf669ae6cbdf0c3f240ade248bf90afed), 190 tracked, 72 test files, fsck clean.
+Full suite 72 files / 966 tests pass, tsc clean, lint clean. AC7 re-verified.
+
+- **F5 (MEDIUM, blocking) — AC6 replay/anti-whole-blob unenforced → FIXED.**
+  `tools/check-parity.mjs` now EXECUTES each rewritten row's `replay_patch` (a
+  deterministic unified diff) against the pinned source blob and requires it to
+  reproduce `target_content_sha256`, and REJECTS whole-blob substitution (a
+  rewrite must retain ≥30% of source lines). Added a JS unified-diff applier +
+  exported verifiers. Removed the header comment that had permitted a differing
+  whole-blob replacement. `tests/migration/parity-matrix.test.ts` adds mutation
+  fixtures: whole-blob FAILS, incomplete/mismatched replay FAILS, omitted
+  descriptor FAILS, byte-copy duplicated FAILS. Each of the 7 rewritten rows now
+  carries `replay_patch` + `replay_command`, all verified to reproduce their target.
+- **F2 (LOW) — recent-calls replay row inaccurate → FIXED.** The row's replay is
+  regenerated from the actual source→target diff, so it now includes the
+  coord_emit→search_memories isError substitution and reproduces the bound hash.
+- **AC5 reclassification.** `src/enrich/granola-signals.ts` moved from `rewritten`
+  to the AC5 `duplicated` disposition (authored minimal generic subset, not a
+  byte-diff). Partition is now 144 ported / 7 rewritten / 1 duplicated / 65 excluded;
+  schemas + source-extraction + audit + check-parity all updated; source-derived
+  stays 152.
+- **F3 (MEDIUM, blocking) — adjudication #2 config bytes absent → FIXED.** The
+  updated migration record embeds the exact scratch tsconfig AND scratch eslint
+  config bytes verbatim (fenced), alongside their SHAs (7164ed93… / df912afc…),
+  for byte-identical reviewer replay.
+- **F4 (LOW) — test-file count → FIXED.** Migration record now states 72 test files.
+- **F1 (informational)** — untracked node_modules; no change possible/needed.
+
+Migration record R2 committed on the feature branch on top of the review child:
+new builder head **ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf** (parent f5596ab3;
+delta = the updated builder migration record). head_sha refreshed in BOTH the item
+and builder.md. The codex-ops re-review of ca70b7f2 is the next step (reviewer's leg).
+
+### Journal
+- Zero `mcp__echo__*` calls this run. No journal entry owed.

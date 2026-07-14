@@ -34,23 +34,24 @@ claimed_by: "fable-builder-135"
 claimed_at: "2026-07-14T05:47:41Z"
 branch: "agent/135-echo-context"
 worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
-head_sha: "f8607d2b6b30da111231aa0cfce322db8f794b3d"
+head_sha: "ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf"
 pr_url: ""
 agent_notes: |
-  COMPLETE — all 8 ACs pass (Run 8; Q3 ruled = Founder adjudication #3 = option (b)-refined). Standard builder completion, ready for review.
-  Accepted target: /Users/zhenye/Desktop/echo-context @ HEAD aabf144e156bc6582f4a094b9c668c83aaac935b
-  (tree 899d769ae72e16e940d3879c828ef1a35c3010fc), sole branch migration/2026-07-13-135, no remote,
-  190 tracked files (38 target-only + 152 source-derived, exact-HEAD), fsck clean, no unreachable. authority:false, installed:false.
-  Full suite 66 files / 966 tests pass, tsc clean, lint clean. AC1-AC8 all ✓ + lint ✓.
+  COMPLETE — R2 fix cycle resolves the codex-ops REJECT (F2/F3/F4/F5). All 8 ACs pass. Ready for codex-ops re-review.
+  Accepted target: /Users/zhenye/Desktop/echo-context @ HEAD 86a5c40386250a3c87313f39f65273be914b3b93
+  (tree a933781cf669ae6cbdf0c3f240ade248bf90afed), sole branch migration/2026-07-13-135, no remote,
+  190 tracked files (38 target-only + 152 source-derived, exact-HEAD), fsck clean. authority:false, installed:false.
+  Full suite 72 files / 966 tests pass, tsc clean, lint clean.
+  R2 fixes: F5 — check-parity now EXECUTES each rewritten replay_patch (unified diff → reproduces target hash) + REJECTS whole-blob (≥30% source-line retention); mutation fixtures (whole-blob/incomplete/omitted/byte-copy all FAIL). F2 — recent-calls replay row regenerated from real diff (includes coord_emit→search_memories). AC5 — granola-signals reclassified rewritten→duplicated (partition 144/7/1/65). F3 — migration record now embeds exact scratch tsconfig + eslint bytes verbatim. F4 — 72 test files (not 66).
   AC8 (adjudication #3): tsx pinned devDep; tools/verify-service-parity.mjs launched `node --import tsx …` — real child-process/FD3/
   process-group/loopback ceremony; service-api.v1.json; context-service.test.ts 7/7. AC7 re-verified with tsx (291 pkgs, only better-sqlite3
   rebuilds, artifact 289ac267 unchanged, network denial + loopback both halves). check-runtime-inventory now classifies literal dynamic imports.
-  MIGRATION RECORD: raw/internal/migrations/2026-07-13-135-echo-context.md committed on feature branch agent/135-echo-context; binds source SHA,
-  target HEAD/tree, all 19 provenance/tool hashes, AC3 aggregate 632a7b2f, AC7 results+toolchain, AC8 service results, object-closure, authority/installed,
-  Q1 tsconfig SHA 7164ed93 + eslint SHA df912afc, and adjudication-#2/#3 deviations.
-  head_sha = the FRESH builder feature head f8607d2b6b30da111231aa0cfce322db8f794b3d (delta vs claim commit = exactly the migration record; pushed to origin).
-  This IS the immutable builder head the codex-ops reviewer branches from to add 2026-07-13-135-echo-context-review.md — that reviewer child leg is NOT my scope (comes next, same Option B ceremony as 133/134).
-  Prior structural questions Q1/Q2/Q3 all founder-adjudicated (see item adjudication sections #2, #3 + Q1 record). Full 8-run per-AC map in the run log.
+  MIGRATION RECORD (R2): raw/internal/migrations/2026-07-13-135-echo-context.md updated on the feature branch on top of the review child f5596ab3; binds source SHA,
+  new target HEAD/tree, all 19 refreshed provenance/tool hashes, AC3 aggregate 632a7b2f, AC7 re-verify, AC8 service results, object-closure, authority/installed,
+  the exact scratch tsconfig + eslint BYTES verbatim (F3) + their SHAs, and adjudication-#2/#3 + AC5-duplication deviations.
+  head_sha = the FRESH R2 builder head ca70b7f2857dbd9cca44e6a1f3095674e4d62cbf (parent = review child f5596ab3; delta = exactly the updated migration record; pushed to origin).
+  This IS the immutable builder head the codex-ops reviewer RE-reviews (adds an updated 2026-07-13-135-echo-context-review.md child) — that reviewer leg is NOT my scope (same Option B ceremony as 133/134).
+  Prior structural questions Q1/Q2/Q3 all founder-adjudicated (item adjudication sections #2, #3 + Q1 record now byte-complete in the migration record). Full 9-run per-AC map in the run log.
   NEW STRUCTURAL QUESTION Q3 (do not guess — shapes AC8/AC2/AC3-stdio): AC8's verify-service-parity.mjs + AC3's literal stdio
   runner are plain-node children that must launch the TS retrieval stack, but the target commits only .ts (no dist/, no tsx in the
   38-path policy/deps). Plain node can't import .ts. Options: (a) commit a build/dist to the policy; (b) add pinned tsx dep;
