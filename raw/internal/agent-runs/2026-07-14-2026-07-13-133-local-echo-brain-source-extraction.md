@@ -78,3 +78,45 @@ is clean and no `.gitignore` (which would violate the exact 21 target-only set) 
 
 Feature branch `agent/133-echo-brain` head_sha: `0caef8237c2aefba0d65c5f70000220654ee8f2e`
 (binds the migration record `raw/internal/migrations/2026-07-13-133-echo-brain.md`).
+
+---
+
+## Run 2 (2026-07-14 — codex-builder-133 independent-review remediation)
+
+- **Trigger:** the independent HIGH sidecar proved that arbitrary-RHS array
+  destructuring was accepted as command provenance.
+- **Old reproduction:** target `4a6dcb33…` plus disposable fixture commit
+  `5f80742`; `check-dependencies.mjs` exited 0 with `ok:true` for an
+  attacker-controlled `[command, args]` initializer.
+- **Resolution:** removed generic destructuring trust. Computed commands are
+  now allowed only in the three explicit reviewed owners; literal tuples stay
+  independently enumerated. Added the exact fixture, a same-class literal
+  destructuring adversary, and an explicit-owner positive regression.
+- **Target:** `957ad4680f6c67d15fb3dfa0941b52c2ab9c3110` (tree
+  `0a34ef4aa27ca460b0697773c78a2281ff534f31`), one parentless branch, no
+  remotes, clean, 57 tracked files, 78/78 reachable objects.
+- **Feature handoff:** `b62d160c6deeb77f528e58e0ef49090de7fac72d`, pushed to
+  `origin/agent/133-echo-brain`; its delta from review child `f92af1db` is only
+  the refreshed migration record.
+
+### Verification
+
+- Native dependency/provenance/boundary checkers: PASS.
+- Focused dependency suite: 14/14; full executable target suite: 25/25 across
+  five files; TypeScript and ESLint: PASS.
+- Operator extraction audit, gitleaks, fsck, object equality, no-follow
+  filesystem equality, symlink/gitlink/residue, and lock metadata checks: PASS.
+- B0/B1/B2/builder-R1 strict offline matrix: PASS on first formal execution;
+  six sandboxed argv entries and zero dangerous inherited variables per leg.
+- Shared tuple: tarball `b7708d8f195662a9180347ea0a52e6440af3b572fa2a6248c61e146d65f26e8b`,
+  tree `0a34ef4aa27ca460b0697773c78a2281ff534f31`, lock
+  `9ffc39fa013a67517d95399c80759a4fd359ce1ab1ccc5ee0e957504796ab296`,
+  27 members, manifest digest
+  `f868ad68125b2d0943f98793419784ba7399357eaf3ecd13f770a55d8f25cc24`.
+
+### Handoff boundary
+
+Builder-operated R1 is reproducibility evidence, not independent judgment.
+The existing rejection record and review sidecar remain immutable; a fresh
+reviewer must bind the exact new target OID/tree and feature head. Target stays
+local-only, `authority:false`, and at DEV maturity.
