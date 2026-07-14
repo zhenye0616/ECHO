@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-134-local-echo-loop-source-extraction"
+round: 9
+reviewer: "codex"
+artifact_sha: "5e48df5c8b01480ddc76bb50d4f60aee17cf088b"
+completed_at: '2026-07-14T00:26:37Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC3 — exported API and CLI contract"
+    finding: "The spec names five exports and four subcommands without defining package export paths, TypeScript signatures, input/output and error schemas, transaction or timeout behavior, CLI grammar, stdout/stderr, or exit codes. Add normative API declarations and CLI contracts tied to pinned-source anchors, enforce fixture-only gating for `run-once`, and name exact contract tests; otherwise incompatible implementations or stubs can satisfy AC3."
+  - severity: "high"
+    where: "AC2 source-universe paragraph and AC7 operator audit"
+    finding: "The closure over imports, scripts, schemas, and templates has no executable traversal algorithm, and `source-plan.v1.json` can disagree with `source-extraction.v1.json`. Specify the pinned-tree command and deterministic resolver, supported reference forms, unresolved or dynamic-edge failure behavior, exact exclusions, full target partitioning, manifest reconciliation, and negative tests."
+  - severity: "high"
+    where: "AC3 parity vectors and AC7 operator audit"
+    finding: "The target owns both the parity vectors and their consuming tests, while the separate operator audit has no named implementation or invocation, so coordinated target/vector edits can manufacture parity. Define an independently executed source-oracle command at the pinned source SHA, canonical serialization and hashes, recorded tool versions, an operator-owned audit command and result schema, and a mutation test proving that changing both target behavior and target vectors still fails against the frozen oracle."
+  - severity: "high"
+    where: "AC7 — sandboxed dependency installation"
+    finding: "No sandbox runner, policy, or network mediator is specified, and stock `npm ci` cannot enforce network access only for lock-authorized fetches. Pin the supported sandbox and exact command/flags, allowed read/write roots, cache and config paths, DNS/redirect policy, and fail-closed prerequisites; use integrity-validated prefetch followed by network-denied offline installation or define an equivalent enforceable mediator, with hostile filesystem and unlisted-network tests."
+  - severity: "high"
+    where: "AC1 target acquisition and AC6 fixture containment"
+    finding: "Atomic leaf `mkdir` occurs after a separate parent/symlink check, and revalidating fixture operands immediately before Git execution leaves check/use rename and symlink races. Require no-follow descriptor-based operations or kernel-enforced confinement, or explicitly narrow the concurrency threat model; add two-contender, parent-swap, and fixture-symlink-swap tests proving outside sentinels remain unchanged."
+  - severity: "medium"
+    where: "AC1, AC2, and AC7 — toolchain and recorded-HEAD verification"
+    finding: "Exact Git, Node, and npm versions and binary resolution are undeclared, and cloning with `--no-local --no-hardlinks` alone neither pins the checkout to the recorded SHA nor removes the origin path back to the shared target. Add a toolchain manifest and exact scrubbed bootstrap commands, then prescribe detached recorded-SHA checkout, commit/tree equality checks, origin removal, and the precise aggregate and audit invocations."
+  - severity: "medium"
+    where: "Frontmatter `files_to_modify`, AC1, AC7, and AC8"
+    finding: "Required writes include a sibling archive, the Project_echo agent-run log and agent notes, and the backlog handoff, but the allowlist contains only the target tree and migration record; sibling archival also conflicts with the out-of-scope prohibition. Enumerate the workflow-controlled paths and an archive namespace with owner, naming, collision, and atomic-rename rules, or make target cleanup an explicit founder-owned prerequisite and require the builder to abort on `EEXIST`."
+---
