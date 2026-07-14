@@ -635,3 +635,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478.
 - **Verdict:** ✅ right — active trigger accepted.
 - **Note:** Deviation from the recorded "no r19" fence: the rule targeted open-ended review rounds; promote.py structurally requires the terminal round's SHA to equal current bytes, so a 9-line seal round is the protocol-honest closure. PROMOTE_CONTENT_IDENTITY_MISMATCH ×3 recorded in raw/internal/queue-errors.md (committed) — honest evidence of the refusal.
+
+## 2026-07-13 22:47 PDT — fable-builder-134 claim preflight (echo_ping + recent-work-context)
+
+- **Trigger:** Builder agent (ECHO_AGENT_ID=fable-builder-134) starting the atomic claim of item 134; builder-protocol preflight = confirm MCP up + pull resume context before claiming.
+- **Query inputs:** (1) `echo_ping({message:"fable-builder-134 claim preflight"})`; (2) `get_recent_work_context({format:"minimal", window_hours:24})`.
+- **Returned:** (1) pong ts 2026-07-14T05:47:58Z. (2) 1 cluster returned of 19 (limit-truncated; 18 clusters dropped, warning surfaced), 20 atoms of 115 in window; rank-1 label "work on project_echo", rank_reasons recent_activity/has_open_loop/code_session_anchor/dense/cross_tool.
+- **Sources:** source_breakdown codex 5 / git 55 / claude_code 13 (window total codex 47 / git 55 / claude_code 13); ground-truth git commits show 133+135 claimed, 134 still ready, all three sealed at R19 terminal bytes 0276fed4.
+- **Verdict:** ✅ right — pinned the exact live state I needed (siblings mid-claim, 134 unclaimed, R19 seal converged) with no confabulation; truncation warning honest.
+- **Note:** get_recent_work_context is deprecated (migrate to find_clusters+get_atoms) but still returns; the 18-dropped-cluster warning is the highest-signal part — this window is dense with the parallel review/claim burst. No open loop for 134 itself yet (it is the work I am about to start).
