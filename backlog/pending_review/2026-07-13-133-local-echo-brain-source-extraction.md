@@ -156,3 +156,16 @@ An independent `codex-ops` binding/session reviewer binds request path/bytes, `s
 
 - Do not update the wiki or transfer authority; this is a local DEV candidate.
 - After founder accepts parity, propose private remote creation, branch protection, authority transfer, and old-path freeze separately.
+
+## Founder adjudication (2026-07-13, pre-review)
+
+**Schema-path tension (AC3 vs AC5) — builder reconciliation ACCEPTED.** AC3's byte-identical
+`src/product/config.ts` + `package.json` reference `schemas/product/runtime-config.v1.schema.json`,
+while AC5 names the committed schema `schemas/runtime-config.v1.schema.json` — a spec-internal
+inconsistency that 19 review rounds did not surface. The builder committed at the AC5 path and
+`tools/verify-artifact.mjs` stages the schema into the tarball at `schemas/product/…` so the
+byte-immutable runtime loader resolves it. Accepted because it preserves source byte-identity AND
+the exact 21-path target-only set, and at DEV the packaged artifact is the operative runtime
+contract (packaged smoke passes). Reviewer + merge `review_notes` should cite this section.
+The 8 product tests as unexecuted byte-parity leaves (they reach item-132 CI tooling via literal
+REPO_ROOT joins, not module edges) is likewise accepted for the DEV split.
