@@ -547,3 +547,63 @@ migration record that binds all of it. Q3's pick shapes the AC8 harness form.
 
 ### Journal
 - Zero `mcp__echo__*` calls this run. Per the skip-rule, no journal entry owed.
+
+---
+
+## Run 7 (2026-07-14 — Q3-independent AC6 close-out + lint DONE)
+
+Per the team-lead override I did NOT build the AC8 harness or the migration
+record's AC8 section (a surfaced adjudication question waits for the founder's
+ruling — retracting my earlier "default to (c)"). Completed everything
+Q3-independent. Target advanced to HEAD
+`f1f4616704f76b8259540cd8199f74f128c52760` (tree `4bb1149d...`), 187 tracked
+files, fsck clean, no remote. Full suite 66 files / 959 tests pass, tsc clean,
+lint clean. INCOMPLETE/UNACCEPTED.
+
+### AC6 close-out — DONE (Q3-independent)
+- `provenance/target-only-policy.v1.json` — the exact 38-path target-only set +
+  the ready_content_sha aa9fa9d8….
+- `provenance/source-extraction.v1.json` — the 152 source-derived (ported+rewritten)
+  rows; 38 + 152 = 190 = the accepted tracked-file target.
+- `provenance/schemas/*.schema.json` — the 9 JSON Schemas; every provenance
+  document validates against its schema (ajv) in the parity-matrix test.
+- `tools/check-parity.mjs` — verifies source-evidence OIDs/hashes against the
+  pinned source, ported bytes byte-for-byte, rewritten target hashes + descriptors,
+  and excluded-path absence. Verified: 217 rows; ported=144 rewritten=8 excluded=65.
+- `tools/audit-pinned-extraction.mjs` — independently recomputes the 217/110/107
+  closure + SHA 8b028066… and cross-checks source-evidence/parity coverage.
+- The 4 migration tests all pass: `parity-matrix` (audit + check-parity + schema
+  validation), `committed-source-only` (ported HEAD blobs == source, no CRLF/
+  export-subst; scoped to source-derived files), `source-independence` (no src/
+  import escape; no runtime sibling/live-state read; ECHO_CONTEXT_HOME default),
+  `object-closure` (sole branch, no tags/remotes/reflogs, object-set == reachable,
+  and every tracked file is inside the target-only ∪ source-extraction allowlist —
+  the exact-HEAD safety direction).
+- `runtime-inventory.v1.json` re-emitted to cover all 5 tools (AC2 stays exact).
+
+### Lint — DONE
+- Ran eslint 9.39.5 with a scratch flat config mirroring the source repo's
+  eslint.config.js (@typescript-eslint/parser + plugin recommended) over
+  src/**/*.ts + tests/**/*.ts: exit 0, zero findings. All 5 authored .mjs tools
+  pass `node --check`. Scratch eslint config (not committed, Q1 pattern) SHA-256:
+  df912afc56372010d08414de6421d28fee931b908cdbbf0fd742ecf20e605bba (record for the reviewer).
+
+### State: 187/190 tracked — exactly the 3 AC8 files remain, all Q3-gated
+Missing from the 38-path policy: `schemas/service-api.v1.json`,
+`tests/integration/context-service.test.ts`, `tools/verify-service-parity.mjs`.
+The object-closure allowlist test already tolerates their absence (one-directional);
+exact-HEAD completeness (all 38 present, tracked==190) auto-closes when they land.
+
+### Remaining — ALL Q3-gated (blocked on the founder's Q3 ruling)
+- AC8 service harness: the 3 files above. Team-lead's tabled recommendation is
+  (b)-refined (pinned tsx devDep; `node --import tsx tools/verify-service-parity.mjs`;
+  real child-process + FD3 readiness + process-group TERM/KILL ceremony). Do NOT
+  build until the founder's pick is relayed.
+- AC8 migration record (binds source SHA, target HEAD/tree, every provenance/
+  lifecycle/tool hash, the AC3 aggregate 632a7b2f…, AC7 results, the Q1 tsconfig
+  SHA 7164ed93… + this lint-config SHA df912afc…, and the Q2/echo-home/AC3/Q3
+  deviations, authority:false/installed:false). Best authored as one whole after
+  AC8 lands. NOT the codex-ops reviewer child leg.
+
+### Journal
+- Zero `mcp__echo__*` calls this run. Per the skip-rule, no journal entry owed.
