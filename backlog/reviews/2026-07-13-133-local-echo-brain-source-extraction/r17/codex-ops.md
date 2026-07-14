@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-133-local-echo-brain-source-extraction"
+round: 17
+reviewer: "codex-ops"
+artifact_sha: "e1115daee4ad389bca1bed9b10a43e76df534c19"
+completed_at: '2026-07-14T04:38:03Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC5 and AC7 — offline execution coverage"
+    finding: "Deny-network enforcement explicitly covers install, build, pack, and smoke, but AC7 also runs dependency and provenance checkers, typecheck, lint, full tests, and synthetic E2E under only the sanitized environment. Require every executable B0/B1/B2/R1 phase after cache fill, including the operator audit, to run under an effective deny-network sandbox."
+  - severity: "high"
+    where: "AC5 and AC7 — Project_echo filesystem isolation"
+    finding: "The profile `(allow default) (deny network*)` leaves Project_echo and sibling files readable, contradicting AC7's requirement that only the operator audit receives source-object access. Require a target-phase profile that denies source and sibling reads, plus a separately scoped network-denied audit profile granting read access only to the pinned source Git object database."
+  - severity: "high"
+    where: "AC7 — sanitized Git envelope"
+    finding: "AC7 requires creation, clone, checkout, and target operations to use AC1's envelope, but AC1's only concrete launcher hardcodes `--git-dir=<project-git-dir>`; that form cannot initialize or clone a repository and would direct later operations at the source repository. Specify separate sanitized command forms for source-object reads, repository creation and clone, and target worktree operations."
+  - severity: "high"
+    where: "AC8 — reviewer worktree and child commit"
+    finding: "The reviewer is told to check out the builder's feature branch in another Project_echo worktree, but Git normally refuses because the retained builder worktree still owns that branch. Require a fresh detached worktree at the exact builder SHA, verify a sole-parent child whose tree changes only the review record, and push the explicit child OID to the full feature-branch ref with the exact expected-old lease."
+  - severity: "high"
+    where: "AC8 — Project_echo commit and push envelope"
+    finding: "The review-record commit and push lack the hermetic Git controls applied elsewhere, so inherited hooks, signing, identity, URL rewrites, push defaults, or a dirty index can fail the run or target the wrong destination. Require absolute Git under sanitized config, fixed reviewer identity, signing disabled, an empty hooks path including pre-push, clean index and worktree checks, validated remote identity, and an explicit source/destination refspec; forbid pull, rebase, merge, autostash, and generic force."
+  - severity: "medium"
+    where: "AC5 — sandbox effectiveness probes"
+    finding: "DNS and direct-IP failures alone do not prove sandbox effectiveness when the host is already offline or filtered. Require a controlled loopback listener that succeeds outside the sandbox and fails inside the exact profile used for each phase, with both sides of the control required to pass."
+  - severity: "medium"
+    where: "AC5 and AC8 — failure evidence and push reconciliation"
+    finding: "R1 runs before its review record is created, so an R1 failure can leave no durable evidence; a push can also return nonzero after the server accepted the child. Require durable stage, exit-or-signal, concise stderr, and child-OID evidence for every failed B0/B1/B2/R1 attempt, then reconcile the remote ref after an ambiguous push and treat remote-equals-child as success while preserving any conflicting state without rebasing or creating another child."
+---
