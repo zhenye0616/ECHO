@@ -572,3 +572,48 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
 - **Verdict:** useful.
 - **Note:** first live use of the removal-over-deeper-patching discipline in this item; skill's win condition predicts removal-only rounds converge next round.
+
+## 2026-07-13 13:27 PDT — user-requested connectivity ping
+
+- **Trigger:** Founder explicitly asked for an `echo_ping` invocation with the raw JSON result returned verbatim.
+- **Query inputs:** `echo_ping({})` (no arguments).
+- **Returned:** `{"pong":true,"ts":"2026-07-13T20:27:36.548Z"}` — pong true, timestamp only.
+- **Sources:** n/a (connectivity check, not retrieval) — prod daemon MCP @ 127.0.0.1:38478.
+- **Verdict:** ✅ right — daemon reachable, sub-second ack.
+- **Note:** Nothing surprising; logged per every-MCP-call discipline.
+
+## 2026-07-13 20:14 PDT — codex reviewer-loop state discovery (extraction specs 133/134/135)
+
+- **Trigger:** Founder asked strategist to "use echo and connect to the codex — it is going through a very tough task; review the rounds and pattern."
+- **Query inputs:** `echo_resolve_mru({sources:["codex"]})`; `find_clusters({since:"2026-07-13T00:00:00-07:00"})`; `get_atoms({atom_ids:[8 IDs from the two newest codex/codex-ops clusters], format:"minimal", prefer:"newest_first"})`.
+- **Returned:** MRU resolved to rollout-2026-07-13T19-59-34 (a live r14 reviewer tick). find_clusters returned 49/95 clusters (response-capped): rank 1 = dense cross-tool Project_echo cluster (git 88 / codex 24 / claude_code 29); ranks 3–49 dominated by ~40 short (1–5 atom) codex/codex-ops reviewer-tick sessions spaced ~5–30 min apart, 16:29–20:09 PDT. get_atoms materialized 6/8 bodies (2 dropped under the 25k envelope); bodies were review-queue child prompts + final review emissions (gpt-5.6-sol, ultra effort, read-only sandbox) with findings targeting AC7/AC8 mechanism (base64 receipt caps, FD 3/FD 4 credential contracts, ENOSPC reservations, finalizer state machines).
+- **Sources:** codex + codex-ops rollout JSONLs under ~/.codex/sessions/2026/07/13/ (ephemeral /var/folders worktrees, repo_root=temp — NOT Project_echo-scoped, so repo_path filtering would have missed them); git; claude_code. Ground truth cross-checked against origin/main tree (r14 on all three items).
+- **Verdict:** ✅ right — ECHO surfaced the tick cadence and the finding-content drift before any git read; the wall of near-identical short codex sessions IS the signal (a non-converging review loop), not noise.
+- **Note:** Local checkout was 100+ commits behind origin/main; ECHO's live view flagged activity the stale repo hid. Reviewer worktree atoms carry temp-dir repo_root — machine-scoped no-filter discovery was the correct call. Surprising cost signal: ~78 ultra-effort reviewer sessions on three specs in ~5.5 h with zero convergence.
+
+## 2026-07-13 20:24 PDT — codex new-direction check (r14 pushback → simplification pivot)
+
+- **Trigger:** Founder said "codex is going in a new direction — use echo to check."
+- **Query inputs:** `echo_resolve_mru({sources:["codex","codex-ops"]})`; `find_clusters({since:"2026-07-14T03:09:00Z"})`; `get_atoms({atom_ids:[3 newest codex/codex-ops atoms], prefer:"newest_first", format:"minimal"})`.
+- **Returned:** codex MRU = rollout-2026-07-13T20-19-05 (r15 tick); codex-ops resolved null (no newer non-fs atom in scope). 4 clusters in the 14-min window. Atom bodies showed round-15 ticks at new spec SHA 75b5ce40: codex-ops on 133 returned `verdict: proceed, findings: []` (first clean verdict of the day); codex on 133 returned proceed_after_patches with 5 scoped findings. Cross-checked origin/main: r14 combined_verdict=pushback → watcher commit 75b5ce40 "spec-r14-pushback: simplify to final-repo proof" (−330/+201 across all three extraction specs; 10–11 of 15 findings dispositioned superseded-by-removal).
+- **Sources:** codex + codex-ops rollout JSONLs (~/.codex/sessions, ephemeral worktree repo_roots); git ground truth from origin/main. codex-ops null resolution is a known MRU quirk (newest codex-ops atom likely classified under codex app prefix or fs-only).
+- **Verdict:** ✅ right — ECHO caught the pivot within minutes: reviewer emission content visibly shifted from AC7/AC8 mechanism findings to contract-level findings, and the first zero-findings proceed landed.
+- **Note:** The removal-over-deeper-patching discipline fired at r14-pushback after 13 straight patched rounds. Watch item: r14 combined says escalated_to_founder: false despite pushback verdict — verify whether the §AC4 pushback-boundary escalation rule was satisfied out-of-band or skipped.
+
+## 2026-07-13 21:20 PDT — post-reframe convergence check (r15/r16 progress)
+
+- **Trigger:** Founder asked whether the extraction-spec reviews are progressing properly after the r14 simplification pivot.
+- **Query inputs:** `find_clusters({since:"2026-07-14T03:22:00Z"})`.
+- **Returned:** 12 clusters / 30 atoms in the ~56-min window — codex/codex-ops reviewer ticks at the same ~steady cadence, newest at 04:16Z (possibly r17 in flight). Cross-checked origin/main: r15 complete on all three items; watcher patch 8e233be7 "spec-r15-patches: close runnable extraction contracts"; r16 dispatched 28f8bf57 and all six r16 responses committed.
+- **Sources:** codex rollout JSONLs (ephemeral worktrees); git ground truth origin/main.
+- **Verdict:** ✅ right — cadence + commit stream agree; ECHO adds only the in-flight tick beyond git.
+- **Note:** Post-reframe trajectory is mixed: 135 damping (divergent→both proceed_after_patches), 133 not damping (codex 5→8 findings), 134 codex-ops pushback twice consecutively on load-bearing coord/push-lifecycle contracts. 134 r15 combined has escalated_to_founder: true yet r16 was dispatched — verify the founder checkpoint was actually acknowledged and not skipped.
+
+## 2026-07-13 21:54 PDT — pause verification after founder halted the review loop
+
+- **Trigger:** Founder paused the review loop after r17; asked for current stage + next action.
+- **Query inputs:** `find_clusters({since:"2026-07-14T04:36:00Z"})`.
+- **Returned:** 5 clusters / 16 atoms: 4 codex/codex-ops sessions at 04:37–04:44Z (post-r17 trailing/idle ticks; no output landed on origin) and this claude session. Quiet since 04:44Z — pause is effective.
+- **Sources:** codex rollout JSONLs; claude_code; git ground truth origin/main @ 56180804.
+- **Verdict:** ✅ right — confirmed no r18 dispatch, no r17 combined.md, items still in proposed/; loop is cleanly parked at "r17 responses in, undispositioned."
+- **Note:** Trailing reviewer ticks after a pause burn sessions but publish nothing when no eligible request exists — harmless but visible in ECHO.

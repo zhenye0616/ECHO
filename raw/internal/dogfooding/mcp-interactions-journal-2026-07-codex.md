@@ -818,6 +818,77 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
 
+### 2026-07-13 12:04 PDT - repo-scoped current-state discovery
+
+- **Trigger:** Founder asked Codex to use ECHO and understand the current state of Project ECHO.
+- **Query inputs:** `find_clusters({repo_path:"/Users/zhenye/Desktop/Project_echo", since:"2026-07-11T00:00:00-07:00", view:"rich"})`.
+- **Returned:** One dense cross-tool cluster, `ctx_b8ebc733`, spanning 2026-07-11 14:50 PDT through 2026-07-13 04:59 PDT, with source breakdown `git:131`, `codex:102`, `claude_code:53`. It ranked first because of an unresolved open loop, code-session anchoring, density, and cross-tool evidence. The result contained 286 atoms but exposed only 200 IDs due to response caps; one open-loop hint remained unresolved.
+- **Sources:** `git`, `codex`, and `claude_code`, repo-filtered to `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** partial - ECHO confirms substantial coordinated activity and one unresolved thread, but the cluster is too broad and ID-truncated to identify the project's authoritative product/backlog state without targeted hydration and repository reads.
+- **Note:** The generated label `discussion about project_echo` is generic metadata, not a project status summary. Next retrieval will target the newest cross-tool atoms and the unresolved open-loop atom rather than hydrating the full cluster.
+
+### 2026-07-13 12:06 PDT - hydrate cluster open-loop evidence
+
+- **Trigger:** The initial current-state cluster was broad and response-capped, so Codex needed bodies for the cluster's resolved and unresolved open-loop hints.
+- **Query inputs:** `get_atoms({atom_ids:[19 cluster open-loop IDs], format:"minimal", prefer:"newest_first", view:"rich"})`.
+- **Returned:** Seven newest bodies fit the envelope and 12 were deterministically dropped. The returned cross-client history captures the transition from the earlier G1/G2 halt through the decision to target two repositories (`echo-team` plus `echo-dev-platform`, with no permanent third lab) and to prove the product boundary in place before extraction. Several bodies predate the founder's later G2 lift and are therefore historical, not today's authority. The sole `resolved:false` hint, atom `715b283f-a617-4b89-be87-0712a77f3587`, was among the dropped IDs.
+- **Sources:** Six Codex atoms and one Claude Code atom were materialized; the remaining 12 IDs were dropped under the 25k response cap.
+- **Verdict:** partial - useful for the decision trajectory and for rejecting stale pre-lift state, but the unresolved hint still requires a one-atom recovery call and current repository state remains authoritative.
+- **Note:** Returned atom `7ddd1ded-9406-4b62-a9bc-7f5c4afe3e43` had content truncation; its decisive two-repository recommendation and extraction trigger were visible, so verbatim recovery is not needed for this orientation task.
+
+### 2026-07-13 12:07 PDT - inspect the cluster's unresolved hint
+
+- **Trigger:** The only `resolved:false` open-loop hint in the current-state cluster was dropped from the batched hydration response.
+- **Query inputs:** `get_atoms({atom_ids:["715b283f-a617-4b89-be87-0712a77f3587"], format:"minimal", prefer:"as_requested", view:"rich"})`.
+- **Returned:** One complete Claude Code conversation body (metadata projection only). The apparent open loop was a July 12 context-clearing handoff at old main SHA `f77ba415`, stating that Phase 1 was durable and that filter-repo/demo-shape decisions were next. Subsequent repository activity and the founder's later decisions supersede it.
+- **Sources:** Claude Code session `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/b50615c2-ad1d-4667-8db9-24defd33908c.jsonl`.
+- **Verdict:** wrong as a present-tense open loop - ECHO's heuristic correctly found a handoff-shaped prompt but did not resolve supersession across later work in the broad cluster.
+- **Note:** This is a useful failure mode: cluster `resolved` should not be treated as authoritative task state when a later committed decision supersedes an earlier handoff.
+
+### 2026-07-13 12:10 PDT - exact-head freshness check after item 132 closeout
+
+- **Trigger:** Git showed that product-graduation foundation item 132 had completed after the initial ECHO cluster's latest atom, so Codex checked whether ECHO had ingested the exact current `main` head.
+- **Query inputs:** `search_memories({query:"30d3465a", repo_path:"/Users/zhenye/Desktop/Project_echo", limit:10})`.
+- **Returned:** One Claude Code turn at 12:06 PDT matching exact head `30d3465a`. It confirms the founder-approved merge chain (`f316d565` -> `629bddfd` -> `d71dd455` -> `30d3465a`), item 132 cleanup, the three filed review follow-ups, unchanged DEV maturity, rank 2 as the next conversion candidate, and one remaining founder-operated live-checkout bringup because the daemon still serves pre-merge code. The body clipped 61 bytes and projected tool-call metadata, but all decision-bearing state was visible.
+- **Sources:** Claude Code session `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/bd676464-69d0-43ea-8eb5-127c5776c74a.jsonl`, repo-filtered to `/Users/zhenye/Desktop/Project_echo`; no git atom matched the exact SHA in this query.
+- **Verdict:** right - exact-token retrieval found the newest cross-tool closeout and reconciled with local Git, backlog, and item evidence.
+- **Note:** Open-ended clustering lagged the latest closeout, while exact-SHA search recovered it immediately. For fast-moving repo orientation, use Git for the head token and ECHO literal search for the cross-tool intent/handoff around that head.
+
+### 2026-07-13 13:24 PDT - exact-head wedge audit after repository cleanup
+
+- **Trigger:** Founder asked Codex to check what currently exists for the wedge product after clarifying the intended Granola-to-decision-card shape.
+- **Query inputs:** `search_memories({query:"c4dc52db", repo_path:"/Users/zhenye/Desktop/Project_echo", limit:10})`.
+- **Returned:** One complete Claude Code closeout turn at the exact current head. It reports the post-132 cleanup as green (`1,864` repo tests, zero failures), with 60 tracked files and about 14.8k lines removed across eight commits. Removed surfaces were echo-overlay, Fly.io, loop-dashboard, unused `reasoning/causal`, and stale docs; `ceo-slack-responder` was founder-deferred and `intake-terminal` retained through the Jul 24 freeze. Remaining nonurgent work includes six permission-gated remote branch deletions, backlog/archive pruning, and strategist wiki promotion of the shipped product boundary.
+- **Sources:** Claude Code session `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/bd676464-69d0-43ea-8eb5-127c5776c74a.jsonl`, repo-filtered to `/Users/zhenye/Desktop/Project_echo`; no git or Codex atom matched the exact SHA.
+- **Verdict:** right - exact-head retrieval supplies the cleanup intent and test result needed to interpret current wedge code after retired surfaces disappeared.
+- **Note:** This call establishes cleanup context only. The repository's product contracts, runtime code, commands, tests, and backlog remain the authority for the wedge capability audit.
+
+### 2026-07-13 13:34 PDT - resolve the latest Claude cleanup session
+
+- **Trigger:** Founder asked Codex to connect to the Claude session that had just completed a repository-cleanup round before planning the next sprint.
+- **Query inputs:** `echo_resolve_mru({sources:["claude_code"], repo_path:"/Users/zhenye/Desktop/Project_echo"})`.
+- **Returned:** One repo-scoped MRU descriptor for Claude Code, with no warnings. The descriptor is ready for an exact-source tail query.
+- **Sources:** Resolved exact source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/a974e142-9878-4ea4-b88f-fbf447a69f52.jsonl`; filter `repo_path=/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** right - ECHO isolated the newest Claude Code session for this repository without mixing older sessions.
+- **Note:** This is source resolution only; the session body still needs a targeted `search_memories` tail before treating its cleanup handoff as current state.
+
+### 2026-07-13 13:35 PDT - inspect the repo-scoped Claude MRU tail
+
+- **Trigger:** After resolving the latest Claude Code source, Codex needed to verify that it was the repository-cleanup session the founder meant.
+- **Query inputs:** `search_memories({source:"fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/a974e142-9878-4ea4-b88f-fbf447a69f52.jsonl", repo_path:"/Users/zhenye/Desktop/Project_echo", limit:12})`.
+- **Returned:** One complete turn and no warnings. It was only a request to run `echo_ping`, returning `{pong:true}`; captured git state was `main@c4dc52db5b1013658f0ae86ef449f76916d55c80` with three dirty paths.
+- **Sources:** Exact Claude Code source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/a974e142-9878-4ea4-b88f-fbf447a69f52.jsonl`.
+- **Verdict:** wrong for the cleanup handoff - MRU resolved the newest session by time, but that session contains only a connectivity probe.
+- **Note:** Fall back to an exact cleanup head/token across Claude Code sessions rather than assuming the newest source is the newest meaningful work session.
+
+### 2026-07-13 13:36 PDT - reconnect to the meaningful Claude cleanup handoff
+
+- **Trigger:** The repo-scoped Claude MRU was only a connectivity probe, so Codex used the cleanup head token to recover the actual completed session.
+- **Query inputs:** `search_memories({query:"c4dc52db", source_app:"claude_code", repo_path:"/Users/zhenye/Desktop/Project_echo", limit:10})`.
+- **Returned:** One complete cleanup closeout turn and no warnings. Claude reported 1,864 passing tests and zero failures across 182 files, about 2.4 GB reclaimed, 60 tracked files and roughly 14.8k lines removed across eight commits, main plus the preserved `holdout-131` worktree, and the `ceo-slack-responder`/`intake-terminal` deferrals. It listed three nonurgent residuals: six permission-gated remote branch deletions, complete-backlog/queue-error pruning, and strategist wiki promotion/retirement cleanup.
+- **Sources:** Claude Code cleanup session `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/bd676464-69d0-43ea-8eb5-127c5776c74a.jsonl`, repo-filtered to `/Users/zhenye/Desktop/Project_echo`; captured branch `main` at `c4dc52db5b1013658f0ae86ef449f76916d55c80`.
+- **Verdict:** right - exact-head retrieval recovered the meaningful cleanup session and its explicit handoff.
+- **Note:** ECHO shows the cleanup session ended green; local Git and backlog checks are still needed to verify nothing changed after capture and to separate sprint blockers from optional hygiene.
 ### 2026-07-13 14:37 PDT - codex r2 review tick on 2026-07-13-133-local-echo-brain-source-extraction
 
 - **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-07-13-133-local-echo-brain-source-extraction/r2/request.md` and published `backlog/reviews/2026-07-13-133-local-echo-brain-source-extraction/r2/codex.md`.
