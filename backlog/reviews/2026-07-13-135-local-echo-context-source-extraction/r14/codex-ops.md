@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 14
+reviewer: "codex-ops"
+artifact_sha: "58870d8c6dca1ed230cd3af8f9262cd36bc1087c"
+completed_at: '2026-07-14T03:08:58Z'
+verdict: "pushback"
+findings:
+  - severity: "high"
+    where: "AC8 — paragraph beginning Every command and Git probe"
+    finding: "Polling KERN_PROC_ALL cannot prove complete descendant capture. A child can fork, create a new session, and let its intermediate parent exit between polls, leaving a survivor outside the original process group and ancestry ledger; delayed writer or listener activity can also begin after the lsof snapshot. Replace polling-only discovery with race-free containment or an enforceable no-detach policy, and test immediate double-fork/session escape plus delayed activity."
+  - severity: "high"
+    where: "AC1 descriptor inheritance contract and AC8 capsule publisher"
+    finding: "Withholding the failures FD is not filesystem confinement. Children learn the attempt path through HOME, TMPDIR, or PATH and run as the same UID, so they can open, rename, fill, or delete the failures directory by pathname, including exhausting all 100 candidate names. Deny every nonpublisher descendant access to that directory and mutation of its ancestors through an enforced filesystem policy, with an exact-path hostile-child fixture."
+  - severity: "high"
+    where: "AC8 command timeout and handoff sequence"
+    finding: "The universal 900-second command timeout conflicts with nested supervision: the outer handoff command and its sequential preprobe, push, and postprobe each receive the same allowance. The outer watchdog can therefore kill handoff after a remote side effect but before cleanup, the mandatory postprobe, or receipt publication. Define hierarchical deadlines with explicit cleanup and publication reserves, make the outer budget exceed all inner phases, and test each timeout boundary."
+  - severity: "high"
+    where: "AC8 endpoint policy"
+    finding: "The endpoint hash authenticates only the caller-supplied endpoint; no independent trusted datum binds the expected GitHub owner and repository. A wrong repository plus its matching self-hash can pass. Bind the allowed endpoint to pinned, independently approved evidence and add a fixture proving that a wrong GitHub repository with a valid matching hash fails before network access."
+  - severity: "high"
+    where: "AC8 Git HTTPS and configuration isolation"
+    finding: "env -i, GIT_CONFIG_NOSYSTEM, and an empty global config do not neutralize repository-local configuration. Includes, URL rewrites, credential helpers, extra headers, proxy or TLS settings, and hooks can still alter the literal ls-remote or push behavior. Execute network Git from a race-safe sanitized private repository/configuration, explicitly reset helper lists, pin the HTTPS helper and CA closure, and test hostile local configuration and includes."
+  - severity: "high"
+    where: "AC8 credential FD contract"
+    finding: "FD 4 has no defined type, size, encoding, replay, or helper-operation protocol despite three authenticated Git commands and possible get, store, and erase helper calls. A nonseekable FD reaches EOF after preprobe, while inheriting it through Git exposes the secret to unrelated Git descendants. Require bounded one-time ingestion followed by fresh helper-only delivery for each command, strict host/path binding, get-only release, closure and zeroization, and end-to-end nonseekable-FD and descriptor-enumeration fixtures."
+  - severity: "high"
+    where: "AC8 Project_echo staging and commit transaction"
+    finding: "The commit transaction is not isolated from execution-bearing repository state. Git add or commit can invoke filters, fsmonitor, hooks, signing helpers, or local configuration, and env-i removes dependable author identity; a hook can alter an allowlisted blob after the cached-diff check. Use a sanitized isolated index and plumbing transaction with fixed identity and compare exact staged and committed blob hashes, or explicitly disable and reject every execution-bearing feature with hostile fixtures."
+  - severity: "medium"
+    where: "AC8 handoff receipt bounds and publication"
+    finding: "Six streams retaining 262144 raw bytes each expand beyond 2 MiB in base64, contradicting the 1048576-byte receipt cap before metadata. Publication capacity is also not secured before the remote side effect, so collision or ENOSPC can leave a completed push without its required receipt. Define a deterministic aggregate allocator with mandatory-metadata reserve, precreate and reserve the exclusive receipt temp before network access, keep FD 3 out of Git descendants, and test simultaneous maximum streams, collision, and ENOSPC."
+---
