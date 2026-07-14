@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 13
+reviewer: "codex-ops"
+artifact_sha: "69a11b2c6780b759f15ef2944aeb31d0e048793d"
+completed_at: '2026-07-14T02:33:26Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC7 — dependency installation and lifecycle-plan paragraphs"
+    finding: "The required offline npm ci can execute dependency lifecycle scripts by default, before the lifecycle plan and outside the traced default-deny rebuild path. Require direct npm-cli.js ci --offline --ignore-scripts for source and target installs, then execute only plan-listed lifecycle commands under the tracer and sandbox; add a fixture proving an install script cannot write or spawn during ci."
+  - severity: "high"
+    where: "AC1 failures-directory bootstrap and AC8 capsule publisher"
+    finding: "The retained failures directory is opened without O_CLOEXEC, and spawned-child descriptor inheritance is unspecified. A child could inherit the directory capability and mutate retained evidence. Require O_CLOEXEC, an explicit inherited-FD allowlist on every spawn, controlled duplication only into the trusted publisher, and a hostile-child inheritance test."
+  - severity: "high"
+    where: "AC7 native-exec tracing and AC8 command timeout and reap requirements"
+    finding: "Fail-closed tracing lacks a readiness barrier, fatal event-loss contract, and descendant-survivor check, while only selected service and push commands explicitly own process groups. Require tracer acknowledgement before launch, dropped or prematurely ended traces to fail, every command and Git probe to receive bounded group TERM/KILL/wait handling, and an attempt-owned descendant ledger that detects detached grandchildren before disposition."
+  - severity: "high"
+    where: "AC8 — handoff invocation and expected-absent push paragraphs"
+    finding: "The handoff contract never binds the endpoint, credential FD, <commit>, and <full-ref> to an exact invocation or repository; the bootstrap argv supplies none of them, and <commit> could mean either target HEAD or the newly created Project_echo commit. Define the handoff argv and FD mapping, freeze the intended Project_echo HEAD/tree and claimed full ref, revalidate them immediately before pushing, and record those frozen values in the receipt."
+  - severity: "high"
+    where: "AC8 — paragraph beginning Distinct post-verification handoff.mjs owns network/auth"
+    finding: "Literal sanitized endpoint and noninteractive transport do not prevent Git from honoring system or global config, proxies, SSH environment, credential fallbacks, protocol overrides, or ext, file, and scp-style endpoints. Require an explicit endpoint scheme, host, port, and path policy; env-i with isolated Git configuration; disabled unapproved protocols, helpers, proxies, askpass, and SSH commands; and the ephemeral-FD helper as the sole authentication path."
+  - severity: "medium"
+    where: "AC8 — bounded probes and handoff/receipt.v1.json"
+    finding: "The receipt retains raw preprobe and postprobe data without encoding or byte limits, so a noisy or non-UTF-8 remote can exhaust evidence storage or prevent JSON publication. Specify streaming hashes and byte counts, bounded retained segments, truncation flags, base64 for binary data, and an aggregate receipt cap; publish every terminal receipt with no-follow create-new semantics, file fsync, no-replace rename, and parent-directory fsync."
+  - severity: "medium"
+    where: "AC8 — Project_echo clean commit preparation"
+    finding: "The specified git diff --check runs after staging and therefore checks only unstaged content, which is already required to be empty; staged conflict markers or whitespace errors can still be committed. Require git diff --cached --check and compare the NUL-delimited staged path set with exact per-attempt paths rather than accepting the raw/internal/agent-runs/** wildcard."
+---
