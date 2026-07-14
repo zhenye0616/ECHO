@@ -607,3 +607,54 @@ exact-HEAD completeness (all 38 present, tracked==190) auto-closes when they lan
 
 ### Journal
 - Zero `mcp__echo__*` calls this run. Per the skip-rule, no journal entry owed.
+
+---
+
+## Run 8 (2026-07-14 — Q3 RULED (adjudication #3); AC8 built; ITEM COMPLETE, 8/8 ACs)
+
+Founder ruled Q3 = option (b)-refined (tsx child). Built AC8 in the ruled shape
+and closed the item. **All 8 ACs pass.** Accepted target HEAD
+`aabf144e156bc6582f4a094b9c668c83aaac935b` (tree `899d769ae72e16e940d3879c828ef1a35c3010fc`),
+190 tracked files (38 target-only + 152 source-derived), sole branch, no remotes,
+fsck clean. Full suite 66 files / 966 tests pass, tsc clean, lint clean.
+
+### AC8 — context service (Founder adjudication #3, option (b)-refined)
+- `tsx` pinned as a devDependency (lock hygiene preserved; adds no install script;
+  only the adjudicated better-sqlite3 rebuild executes — AC7 re-verified: 291 pkgs,
+  artifact SHA-256 289ac267… unchanged, network denial + loopback-control both halves).
+- `tools/verify-service-parity.mjs` — plain `.mjs` child launched
+  `node --import tsx tools/verify-service-parity.mjs --home <scratch> --host 127.0.0.1
+  --port 0 --ready-fd 3`; dynamically imports the real TS retrieval stack (SqliteStorage,
+  searchMemories, getRecentWorkContext, waitForNewTurns); loopback-only listener; exactly
+  one canonical JSON-LF FD3 readiness record; process-group leader; SIGTERM graceful teardown.
+  The `--import tsx` prefix is the invocation deviation (recorded in the migration record).
+- `schemas/service-api.v1.json` — GET /v1/ping + POST /v1/{capture,search,clusters,atoms,wait}
+  with unknown-field rejection.
+- `tests/integration/context-service.test.ts` — 7/7: readiness, ping, capture→search→atoms
+  round-trip, clusters/wait, unknown-field 400, loopback-only, process-group SIGTERM teardown.
+- `check-runtime-inventory.mjs` extended to classify literal dynamic imports
+  (repository_dynamic_literal_import) so verify-service-parity's src edges resolve; runtime-inventory
+  re-emitted for all 6 tools.
+
+### Exact-HEAD closed
+- `provenance/target-only-policy.v1.json` (all 38 now present) + `source-extraction.v1.json` (152);
+  `object-closure` test asserts tracked==190==38∪152 exactly (both directions), sole branch,
+  no tags/remotes/reflogs, object-set==reachable, fsck clean.
+
+### Migration record (AC8 builder leg)
+- `raw/internal/migrations/2026-07-13-135-echo-context.md` committed on the feature branch
+  `agent/135-echo-context` (the immutable builder head the reviewer branches from). Binds
+  source SHA, target HEAD/tree, all 19 provenance/tool hashes, every verification command +
+  result, the AC3 aggregate 632a7b2f…, AC7 results + toolchain, AC8 service results, object-closure
+  + no-remotes + clean checks, `authority:false` / `installed:false`, the Q1 tsconfig SHA 7164ed93…
+  + eslint SHA df912afc…, and the adjudication-#2 (Q2/echo-home) + adjudication-#3 (Q3/tsx) deviations.
+- **Builder feature head (fresh): `f8607d2b6b30da111231aa0cfce322db8f794b3d`** — delta vs the
+  claim commit is exactly the migration record. NOT the codex-ops reviewer child leg (that comes
+  next, same Option B ceremony as 133/134).
+
+### AC status — COMPLETE
+AC1 ✓ AC2 ✓ AC3 ✓ AC4 ✓ AC5 ✓ AC6 ✓ AC7 ✓ AC8 ✓ + lint ✓. Passing proves only a local split;
+Project_echo daemon/MCP/live state remain authoritative (authority:false, installed:false).
+
+### Journal
+- Zero `mcp__echo__*` calls this run (all filesystem/git/node/sandbox-exec). No journal entry owed.

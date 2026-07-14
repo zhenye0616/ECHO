@@ -34,19 +34,23 @@ claimed_by: "fable-builder-135"
 claimed_at: "2026-07-14T05:47:41Z"
 branch: "agent/135-echo-context"
 worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
-head_sha: "8d5ae35e502fb6105f17ae9088b51f750f721cc2"
+head_sha: "f8607d2b6b30da111231aa0cfce322db8f794b3d"
 pr_url: ""
 agent_notes: |
-  CHECKPOINT (Run 7, Q3-independent AC6 close-out + lint DONE) — only the Q3-gated AC8 harness + migration record remain.
-  Target: /Users/zhenye/Desktop/echo-context @ HEAD f1f4616704f76b8259540cd8199f74f128c52760
-  (tree 4bb1149d755539eada342e6617ada8c13d33a71e), branch migration/2026-07-13-135, no remote,
-  187 tracked files (of 190 at completion), fsck clean, no unreachable. node_modules + scratch tsconfig/eslint NOT tracked. NOT accepted.
-  Run 7: AC6 close-out DONE — target-only-policy(38) + source-extraction(152) + 9 schemas + check-parity + audit-pinned-extraction
-  + 4 migration tests (parity-matrix/committed-source-only/source-independence/object-closure, all pass, incl. schema-validation +
-  exact-HEAD allowlist safety). Lint DONE — eslint (source-mirrored flat config) exit 0 on src+tests *.ts; 5 tools node --check clean.
-  Full suite 66 files/959 tests green, tsc clean, lint clean. Lint-config SHA df912afc… (scratch, not committed, Q1 pattern).
-  ALL Q3-INDEPENDENT WORK COMPLETE. Only the 3 Q3-gated AC8 files remain (schemas/service-api.v1.json, tools/verify-service-parity.mjs,
-  tests/integration/context-service.test.ts) + the migration record. Per team-lead override I did NOT build them or default Q3.
+  COMPLETE — all 8 ACs pass (Run 8; Q3 ruled = Founder adjudication #3 = option (b)-refined). Standard builder completion, ready for review.
+  Accepted target: /Users/zhenye/Desktop/echo-context @ HEAD aabf144e156bc6582f4a094b9c668c83aaac935b
+  (tree 899d769ae72e16e940d3879c828ef1a35c3010fc), sole branch migration/2026-07-13-135, no remote,
+  190 tracked files (38 target-only + 152 source-derived, exact-HEAD), fsck clean, no unreachable. authority:false, installed:false.
+  Full suite 66 files / 966 tests pass, tsc clean, lint clean. AC1-AC8 all ✓ + lint ✓.
+  AC8 (adjudication #3): tsx pinned devDep; tools/verify-service-parity.mjs launched `node --import tsx …` — real child-process/FD3/
+  process-group/loopback ceremony; service-api.v1.json; context-service.test.ts 7/7. AC7 re-verified with tsx (291 pkgs, only better-sqlite3
+  rebuilds, artifact 289ac267 unchanged, network denial + loopback both halves). check-runtime-inventory now classifies literal dynamic imports.
+  MIGRATION RECORD: raw/internal/migrations/2026-07-13-135-echo-context.md committed on feature branch agent/135-echo-context; binds source SHA,
+  target HEAD/tree, all 19 provenance/tool hashes, AC3 aggregate 632a7b2f, AC7 results+toolchain, AC8 service results, object-closure, authority/installed,
+  Q1 tsconfig SHA 7164ed93 + eslint SHA df912afc, and adjudication-#2/#3 deviations.
+  head_sha = the FRESH builder feature head f8607d2b6b30da111231aa0cfce322db8f794b3d (delta vs claim commit = exactly the migration record; pushed to origin).
+  This IS the immutable builder head the codex-ops reviewer branches from to add 2026-07-13-135-echo-context-review.md — that reviewer child leg is NOT my scope (comes next, same Option B ceremony as 133/134).
+  Prior structural questions Q1/Q2/Q3 all founder-adjudicated (see item adjudication sections #2, #3 + Q1 record). Full 8-run per-AC map in the run log.
   NEW STRUCTURAL QUESTION Q3 (do not guess — shapes AC8/AC2/AC3-stdio): AC8's verify-service-parity.mjs + AC3's literal stdio
   runner are plain-node children that must launch the TS retrieval stack, but the target commits only .ts (no dist/, no tsx in the
   38-path policy/deps). Plain node can't import .ts. Options: (a) commit a build/dist to the policy; (b) add pinned tsx dep;
