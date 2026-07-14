@@ -158,3 +158,98 @@ Reproduces `8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37`.
 Preserved here so it survives founder archival of the incomplete target. Also at
 `/Users/zhenye/Desktop/echo-context/tools/emit-source-inventory.mjs` and
 `<session-scratchpad>/inv-emit.txt` (its 217-line output).
+
+---
+
+## Run 2 (2026-07-14 — founder-endorsed in-place continuation)
+
+Founder decision on the Run 1 escalation: continue in place (target NOT archived;
+the archive rule governs fresh attempts). Item re-claimed to `backlog/claimed/`.
+This run materialized the extraction and committed a founder-endorsed INCOMPLETE
+milestone in the target.
+
+### Verified this run
+
+**Import-graph analysis → final disposition partition (172 / 3 / 42).** Scanned
+the 217-file closure for import edges; computed transitive taint from the
+forbidden-capability seeds with edge-cuts at rewrite/duplicate nodes.
+- **172 ported** (byte-exact copies).
+- **3 rewritten:**
+  - `src/mcp/server.ts` — deletion-only rewrite to register EXACTLY the 8 context
+    tools (echo_ping, search_memories, get_recent_work_context, find_clusters,
+    get_atoms, wait_for_new_turns, get_atom, echo_resolve_mru). Removed all coord
+    machinery (imports `../coord/*` are outside the roots), get-role-state /
+    list-task-states / pending-decisions / coord-emit/status/invoke, DeadlineTracker,
+    and the optional propose-decision loader (reaches `src/surfaces`, product).
+  - `src/enrich/granola-signals.ts` — AC5 recorded deliberate duplication: the full
+    1230-line product worker module is NOT copied (item-133-owned); a minimal
+    generic-retrieval subset is authored (GRANOLA_SIGNAL_SOURCE,
+    GRANOLA_SIGNAL_INDEX_SOURCE, filterToCurrentSignalRuns +
+    resolveCurrentGranolaSignalRuns + parseManifest) so `search_memories` stays
+    byte-ported. Recorded in parity-matrix as deliberate duplication, not silent
+    double-claim.
+  - `tests/mcp/tools/search-memories.test.ts` — deletion-only: excised the
+    decision-store import (`src/surfaces/ceo-slack-responder`, outside roots) and
+    the item-112 cross-source-join describe block (its 2 cases need
+    createTeamDecisionStore). Generic search + item-115 filterToCurrentSignalRuns
+    coverage preserved (1647 → 1525 lines).
+- **42 excluded:** coord/product/loop MCP tools, product enrich workers
+  (decision-drift, granola-intake*, dispatch, worker-heartbeat, granola-signals-cli,
+  post-meeting-brief), the whole onboarding wizard subtree (reaches `src/daemon`
+  outside roots), and the brain-retrieval test (reaches `src/brain`, item-133).
+- **Import closure verified: 0 unresolved local imports** among ported+rewritten.
+
+**Provenance + target-only scaffold authored and committed:**
+- `provenance/source-evidence.v1.json` — 217 rows {path, mode, blob_oid,
+  content_sha256}; inventory SHA bound.
+- `provenance/parity-matrix.v1.json` — per-row disposition; rewrite rows bind
+  source OID + target_content_sha256 + rewrite kind + replay note.
+- `context-tools.v1.json` — exact 8-tool roster.
+- `package.json` — Node 22.22.1 / npm 10.9.4 pins; runtime deps derived from the
+  23 bare specifiers the closure actually imports.
+- `tools/emit-source-inventory.mjs` (from Run 1).
+
+**First target commit (INCOMPLETE/UNACCEPTED):**
+- Target HEAD `e49f87da18c12db90700938666ea4bff1b6e7e53`, tree
+  `0918788b8d7c3d3d4497904c1885b7e81106b25a`, 181 tracked files, branch
+  `migration/2026-07-13-135`, no remote.
+- AC1 checks on the real commit: `git fsck --full` OK; after `gc --prune=now`,
+  `git fsck --full --no-reflogs --unreachable` is empty (amend dangling cleaned).
+- A stray `.DS_Store` was caught and removed before finalizing.
+
+### Two genuine spec-partition open questions (surfaced, not guessed)
+
+1. **`tsconfig.json` is not in the AC6 38-path target-only policy**, yet AC7
+   requires `typecheck`/`lint` from the private clone, and every source file
+   imports via `.js` specifiers (NodeNext). A provisional NodeNext/ES2022 strict
+   tsconfig (mirroring source) is kept in the builder's scratch, NOT committed, to
+   avoid violating the exact-HEAD partition. Reconcile: supply TS/lint config via
+   CLI flags at check time, or add the config paths to the 38-path policy.
+2. **AC4's `src/state/paths.ts`** (new, `ECHO_CONTEXT_HOME` distinct default) is
+   neither in the 38-path target-only policy nor a source-extracted path
+   (`src/state/` is not among the 20 roots; the closure ships
+   `src/echo-home/state-paths.ts`). Clarify whether AC4 intends a rewrite/rename of
+   `echo-home/state-paths.ts`, an added target-only path, or reuse of the ported
+   module.
+
+### Remaining before acceptance (updated map)
+- Standalone build green: AC7 install (native better-sqlite3 rebuild under
+  `sandbox-exec` deny-network; only that rebuild executes), typecheck, lint, ~107
+  tests; committed `package-lock.json`.
+- `provenance/target-only-policy.v1.json` (exact 38-path list + ready SHA),
+  `source-extraction.v1.json` partition, the 9 provenance schemas; exact HEAD
+  equality.
+- `provenance/runtime-inventory.v1.json` + `tools/check-runtime-inventory.mjs`
+  (AC2 closed edge grammar).
+- `tests/fixtures/context-tool-parity.v1.json` + `tools/verify-context-tools.mjs`
+  + `provenance/context-tool-parity.v1.json` + schema (AC3 stdio parity, 10 cases).
+- `src/state/paths.ts` (pending Q2), `schemas/service-api.v1.json`,
+  `tools/verify-service-parity.mjs`, `tests/integration/context-service.test.ts`
+  (AC4/AC8).
+- `provenance/lifecycle-expected/observed.v1.json`, `native-toolchain.v1.json`
+  (AC7); the six `tests/migration/*.test.ts`; migration record; codex-ops reviewer
+  feature-branch child-push handoff (AC8).
+
+### Journal
+- Zero `mcp__echo__*` calls this run (all filesystem/git/node analysis). Per the
+  CLAUDE.md skip-rule, no dogfooding-journal entry is owed.

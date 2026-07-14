@@ -2,7 +2,7 @@
 task_id: 2026-07-13-135-local-echo-context-source-extraction
 role: builder
 writer: fable-builder-135
-last_updated: 2026-07-14T05:57:34Z
+last_updated: 2026-07-14T06:58:08Z
 handoff_branch: agent/135-echo-context
 handoff_head_sha: 8d5ae35e502fb6105f17ae9088b51f750f721cc2
 handoff_run_log: raw/internal/agent-runs/2026-07-14-2026-07-13-135-local-echo-context-source-extraction.md

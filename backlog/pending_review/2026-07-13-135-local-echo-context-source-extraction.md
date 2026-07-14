@@ -37,27 +37,30 @@ worktree: "/Users/zhenye/Desktop/Project_echo--135-echo-context"
 head_sha: "8d5ae35e502fb6105f17ae9088b51f750f721cc2"
 pr_url: ""
 agent_notes: |
-  BLOCKED (incomplete attended build — target unaccepted).
-  Blocker: full acceptance requires a multi-day, byte-exact, cross-validated build
-  (standalone TS package with ~107 green tests, native better-sqlite3 install proof
-  under sandbox-exec network denial, six audit tools, 14 provenance JSON + 9 schemas
-  reproduced identically from an independent reviewer's clone, context-tool + service
-  parity, migration record, and the codex-ops reviewer feature-branch child-push
-  handoff) that exceeds a single attended session; pushing an unverified partial as
-  "complete" would fail the reviewer's from-clone reproduction and misreport status.
-  Tried/done + verified: toolchain matches spec pins (git 2.37.3, node 22.22.1);
-  AC6 inventory binding reproduced byte-for-byte (217 paths=110 src+107 test, SHA-256
-  8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37) via an authored
-  tools/emit-source-inventory.mjs; AC1 isolated repo created (unborn migration/2026-07-13-135,
-  config-free envelope, no remote/reflogs); full exclude/rewrite disposition map produced.
-  Best guess if forced: the continuation is well-specified and low-ambiguity; next
-  step is the import-graph closure over the 217 paths, then materialize ported/rewritten
-  source + author source-evidence/parity-matrix/source-extraction/target-only-policy (confidence high).
-  Why escalated: governing decision 2026-07-13-one-shot-local-extraction-lifecycle.md
-  provisions exactly this — an incomplete attended build is unaccepted and founder-archived
-  before a continued/fresh run; no agent auto-adopts/resumes. head_sha is the claim commit
-  (this item's code lives in the standalone target repo, not the worktree branch). Full
-  detail + per-AC remaining map in the run log.
+  ESCALATION at capacity (Run 2, founder-endorsed in-place continuation) — INCOMPLETE/UNACCEPTED target committed.
+  Target: /Users/zhenye/Desktop/echo-context @ HEAD e49f87da18c12db90700938666ea4bff1b6e7e53
+  (tree 0918788b8d7c3d3d4497904c1885b7e81106b25a), branch migration/2026-07-13-135, no remote,
+  181 tracked files, git fsck --full clean, no unreachable objects. NOT accepted.
+  Done + verified this run: import-graph closure over the 217 paths → final disposition
+  partition 172 ported (byte-exact) / 3 rewritten / 42 excluded, with 0 unresolved local imports.
+  Rewrites: src/mcp/server.ts (deletion-only → EXACTLY the 8 context tools), src/enrich/granola-signals.ts
+  (AC5 minimal generic duplicate — full product module NOT copied, recorded duplication not silent
+  double-claim), tests/mcp/tools/search-memories.test.ts (excised product decision-store import + item-112
+  cases; generic + item-115 coverage kept). Committed provenance/source-evidence.v1.json (217 rows),
+  provenance/parity-matrix.v1.json (dispositions + rewrite hashes/replay), context-tools.v1.json (8 roster),
+  package.json (Node 22.22.1/npm 10.9.4 pins), tools/emit-source-inventory.mjs (reproduces SHA
+  8b0280660ea5eb64851a5ce0d1a9d56b707d6e29ce00d113ec6656b055d72d37). AC1 + AC6-core landed.
+  Two spec-partition questions surfaced (do not guess): (Q1) tsconfig.json is not in the AC6 38-path
+  target-only policy yet AC7 needs typecheck/lint — provisional tsconfig kept in scratch, not committed;
+  (Q2) AC4 src/state/paths.ts is neither in the 38-path policy nor source-extracted (src/state not a root;
+  closure ships src/echo-home/state-paths.ts) — clarify rewrite/rename vs added path vs reuse.
+  Remaining (multi-hour): AC7 clean-install proof (better-sqlite3 rebuild under sandbox-exec deny-network) +
+  package-lock; standalone typecheck/lint/~107 tests green; target-only-policy/source-extraction + 9 schemas +
+  exact HEAD equality; runtime-inventory + check-runtime-inventory (AC2); context-tool + service parity
+  harnesses (AC3/AC8); the 6 migration tests; migration record; codex-ops reviewer child-push handoff.
+  Why escalated: at-capacity per founder instruction; the target is a founder-endorsed incomplete milestone
+  for continuation, not an accepted target. Full detail + updated per-AC map in the Run 2 run log.
+  head_sha is the Project_echo feature-branch head (no code by design — code lives in the standalone target).
 review_notes: ""
 ---
 
