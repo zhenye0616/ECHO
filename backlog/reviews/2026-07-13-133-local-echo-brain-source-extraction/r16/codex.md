@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-13-133-local-echo-brain-source-extraction"
+round: 16
+reviewer: "codex"
+artifact_sha: "8e233be7e2b643b8ebd502ac12b8b61ee5e67acc"
+completed_at: '2026-07-14T03:52:19Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC3 — source seeds and exhaustive target-only set; AC4; Tests"
+    finding: "The four required tests/migration/*.test.ts files are neither declared source rows nor members of the exhaustive target-only set, so AC3's exact-set and full-partition checks forbid tests required by the Tests section. AC4 also requires product/source-boundary.v1.json in the target without giving it an explicit source disposition. Classify all five paths explicitly and update the policy, schema, checker, and audit assertions."
+  - severity: "high"
+    where: "AC3 — raw product/README.md relocation and empty rewrite allowlist; AC5 — README identity"
+    finding: "AC3 requires a byte-preserving product/README.md -> README.md relocation with no rewrites, while AC5 requires extraction-specific source SHA and item ID. If source SHA is the pinned Project_echo commit, that file cannot normally contain the hash of the commit containing itself. Define the exact value and either make README.md generated target-only, permit a reviewed deterministic rewrite, or move the extraction identity into a target-only artifact."
+  - severity: "high"
+    where: "AC5 — artifact identity; AC7 — fresh-clone procedure; AC8 — evidence records"
+    finding: "The artifact matrix requires the original builder artifact, two builder clean-clone rebuilds, and one reviewer rebuild, but AC7 prescribes only one builder clone and one reviewer clone. Specify four distinct run identities and output directories, require two separate builder clones, name the canonical pack and manifest commands, and bind every run's result into the migration and review records."
+  - severity: "high"
+    where: "AC1 — accepted repository state; AC3 — target partition; AC7/AC8 — shared-target audits"
+    finding: "A passing git fsck and one reachable root history do not reject dangling or unreachable objects; abandoned staged blobs or commits could retain forbidden source material while disappearing from fresh clones and HEAD-based partition checks. Require exact accepted-object closure, exact refs, and no reflog-only or unreachable objects, with a named command and parse contract enforced before and after builder and reviewer verification."
+  - severity: "high"
+    where: "AC5 — npm cache fill and lifecycle scripts; AC7 — verification environment"
+    finding: "An online npm ci may execute dependency lifecycle scripts with unrestricted network access, and npm's later offline mode does not prevent child scripts from opening sockets. This does not enforce the claim that network is used only for lock-authorized registry fetches. Separate cache fill from script execution with scripts disabled, run all scripts/builds under an actually network-denied offline phase, or narrow the guarantee and tests accordingly."
+  - severity: "medium"
+    where: "AC1 — Git launcher and repository creation; AC7 — clone and verification commands"
+    finding: "Only source-object reads use the sanitized Git launcher. Target init/add/commit, cloning, status, and fsck can still inherit global or system configuration affecting hooks, filters, signing, templates, object format, and checkout behavior. Define a pinned sanitized launcher plus exact flags/config overrides for every Git operation; also decide whether inherited Git variables are rejected by a parent preflight or merely sanitized by env -i, and make the fixtures match."
+  - severity: "medium"
+    where: "AC2 — dependency partition; AC5 — reviewed dependency/toolchain plan"
+    finding: "The spec requires literal helpers and resolved executables to match pinned toolchain rows, but names no owning plan file, schema, or existing field, and the exhaustive target-only set contains no such plan. Name and schema the authoritative rows in an existing artifact or add a plan and schema to the exact target-only set, then require both check-dependencies and the independent audit to validate the same rows."
+  - severity: "medium"
+    where: "AC1 — reviewer read-only access; AC8 — independent review record"
+    finding: "The reviewer mutation boundary is incomplete: ordinary git status may refresh the shared target index, while the required Project_echo review record has no owning ref or commit workflow. Require read-only plumbing or GIT_OPTIONAL_LOCKS=0 for every shared-target check and specify the branch/commit that owns the review record, the immutable builder head it binds, and how that evidence enters the eventual merge."
+---
