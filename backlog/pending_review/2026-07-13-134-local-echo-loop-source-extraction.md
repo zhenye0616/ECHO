@@ -35,28 +35,28 @@ claimed_by: "fable-builder-134"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "1519a18ed4f1c05344a1ddbd7f102779c8553843"
+head_sha: "ee3bc0e9616a2ea9699ad673856518e8ba90744c"
 pr_url: ""
 agent_notes: |
-  BUILDER PASS COMPLETE (moved to pending_review as a completion, not a
-  checkpoint). AC1-AC7 implemented + green: 61 tests (coord 28, watcher 21,
-  workflows 4, migration 8); tsc --noEmit clean; dual-route inner projections
-  byte-identical (ea6d1112), verdict pass; offline install matrix green
-  (sandbox-exec deny-network denies DNS+direct-IP, offline npm ci from
-  lock-authorized cache, sole named better-sqlite3 --offline rebuild from source,
-  binary loads offline). AC8 builder leg done: final migration record binds
-  source SHA + target HEAD/tree + package/lock/edge-fixed-point/watcher/workload
-  hashes + dual-route inner hash + commands/exits + no-remote/clean + exclusions
-  + authority:false + installed:false.
-  Target /Users/zhenye/Desktop/echo-loop: HEAD 8ad7c873, tree 1a6043d1, 13
-  commits, fsck clean, no remote, not installed, UNACCEPTED pending review.
-  head_sha above is the immutable builder feature head (agent/134-echo-loop)
-  carrying the final migration record.
-  NOT done (reviewer's leg, per lane 133): the independent codex-ops
-  child-commit ceremony. Disclosed residuals for review: AC2 lock is a real
-  npm-install lock (no drift/extraneous verified) not a hand-minimized closure;
-  AC5 own-pgid isolation + crash/gc/both-orders/mismatched-digest fixtures not
-  yet written (the CAS edges they target are implemented + serialized).
+  FIX CYCLE complete (codex-ops REJECT ca82e523 addressed); re-handoff for
+  re-review, not a completion claim. All four HIGH + one MEDIUM resolved with
+  green tests: 97 tests / 21 files, tsc clean, dual-route 14-row roster
+  byte-identical (8c81ece2) verdict pass.
+  F1: tests/task-state/ + tests/review-queue/ substantive suites (test:task-state
+  and test:review-queue exit 0). F2: verification-workload.v1.json = full sealed
+  roster, recursion solved via vitest.workload.config.ts. F3:
+  source-seed-fixture.test.ts with independent oracle. F4: AC5 recovery fixtures
+  (crash-before/after-push, gc-anchor-survival, both-orders,
+  mismatched-digest-after-transition) + own-pgid isolation (detached spawn +
+  deadline-bound reap). F5: npm route binds outer launcher argv + npm banner.
+  Portability: python-invoking tests run under arch -arm64 (node here is
+  x86_64/Rosetta; jsonschema wheel is arm64).
+  Target /Users/zhenye/Desktop/echo-loop UNACCEPTED pending re-review, no remote,
+  not installed; HEAD 2aeb1ede, tree a56fe5e0, 14 commits, fsck clean. head_sha
+  above is the fix-cycle builder head (agent/134-echo-loop), rebased onto the
+  reviewer child ca82e523. Non-blocking design note (not a residual): lock is
+  npm-generated (no drift/extraneous), not hand-minimized. Reviewer child-commit
+  ceremony is the independent reviewer's leg.
 review_notes: ""
 ---
 

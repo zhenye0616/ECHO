@@ -283,3 +283,66 @@ migration 8). `tsc --noEmit` clean. Dual-route inner projections byte-identical
 
 None. Three authorized operations only; no sibling/wiki/holdout touching; no MCP
 calls this run.
+
+---
+
+## Run 5 (fix cycle — codex-ops REJECT ca82e523)
+
+### Outcome
+
+**Fix cycle complete; re-handoff to pending_review for re-review.** The prior
+handoff was REJECTED on four HIGH + one MEDIUM sealed-contract gaps. All are
+addressed; full suite green (21 files, **97 tests**); tsc clean; dual-route
+14-row roster byte-identical, verdict pass. Also corrected an over-claim from
+Run 4: never label COMPLETE over disclosed residuals — accounting below is
+honest.
+
+### Dispositions
+
+- **F1 (HIGH) — task-state + review-queue suites written.** `tests/task-state/`:
+  anchors fixture-conformance (`src/task-state/parse-anchors.ts` vs the shared
+  `anchors-fixtures.json`), schema via ported `lint.py`, line cap, ref pinning.
+  `tests/review-queue/`: request SHA-pinning + race-loser (`request.py`),
+  reviewer binding (`_reviewer_gate.py`), response validation + fresh-eyes
+  (`validate.py`). `test:task-state` + `test:review-queue` now exit 0 with real
+  tests.
+- **F2 (HIGH) — dual-route workload completed to the full sealed roster.**
+  Added task-state, review-queue, coord, workflows, full-tests,
+  source-independence. Recursion solved with `vitest.workload.config.ts`
+  (excludes the verifier test + the offline row). Both routes run all 14 rows,
+  byte-identical inner projection `8c81ece2…`, verdict pass.
+- **F3 (HIGH) — independent source-seed fixture.**
+  `tests/migration/source-seed-fixture.test.ts` hardcodes expected bytes/hashes
+  computed from raw `git cat-file` (not the resolver) and cross-checks the
+  committed inventory.
+- **F4 (HIGH) — AC5 recovery fixtures + own-pgid.** `tests/watcher/recovery.test.ts`:
+  crash-before/after-push, `git gc --prune=now` anchor survival, both watcher
+  orders, mismatched-digest-after-transition. Own-process-group isolation
+  implemented via detached spawn (`src/watcher/gitenv.ts`) with a deadline-bound
+  reap fixture.
+- **F5 (MEDIUM) — npm route envelope binding.** `run-verification.mjs` now binds
+  the npm route's outer launcher argv + npm banner + user-agent into `route.json`
+  (direct route null; gated on the explicit route, not ambient npm env).
+- Portability: node here is x86_64 (Rosetta), so node-spawned `python3` could not
+  load jsonschema's arm64 wheel — python-invoking tests run under `arch -arm64`
+  (`tests/helpers/py.ts`).
+
+### Files modified
+
+- Target `/Users/zhenye/Desktop/echo-loop` (no remote): HEAD `2aeb1ede…`,
+  tree `a56fe5e0…`; 14 commits; fsck clean.
+- `agent/134-echo-loop`: fix-cycle migration record rebased onto the reviewer
+  child `ca82e523`. Feature head `ee3bc0e9616a2ea9699ad673856518e8ba90744c`.
+
+### Honest accounting
+
+All four HIGH + the MEDIUM finding are resolved with green tests. One
+non-blocking design note remains (not an acceptance residual, and not flagged as
+blocking by the reviewer): the lock is npm-generated (drift + extraneous
+verified via `check:dependencies`), not hand-minimized. No spec-named test or
+capability is unimplemented.
+
+### Drift events
+
+None. Three authorized operations only; no sibling/wiki/holdout touching; no MCP
+calls this run.
