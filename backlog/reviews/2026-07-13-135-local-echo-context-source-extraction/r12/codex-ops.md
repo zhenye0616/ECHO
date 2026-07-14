@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 12
+reviewer: "codex-ops"
+artifact_sha: "83ba8a0ec42306b58948b7a942a16521962a89ad"
+completed_at: '2026-07-14T02:01:29Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC7 network confinement and AC8 final handoff publication"
+    finding: "AC7 grants network only to fetch-lock-deps and says all later phases deny it, while AC8 later requires remote ls-remote and push. With env-i, attempt-local HOME, forbidden credential reads, and restricted PATH, a normal SSH or HTTPS origin cannot connect and authenticate. Define a distinct post-verification handoff network sandbox with an explicit noninteractive authentication boundary and transport executable closure, or move publication to a wrapper that owns those capabilities; prove extraction phases cannot access them."
+  - severity: "high"
+    where: "AC8 — pre-push probe and single push"
+    finding: "The null probe followed by a plain non-force push is not create-only publication. If another actor creates the ref before push advertisement with an ancestor of the intended commit, Git can fast-forward it and the post-probe then falsely declares success. Require an atomic expected-absent lease or CAS such as --force-with-lease=<ref>: while continuing to forbid unconditional force; a failed, ambiguous, or unreachable pre-probe must perform no push. Add a fast-forward-compatible competing-update fixture."
+  - severity: "high"
+    where: "AC8 — origin resolution and Git subprocess isolation"
+    finding: "The probes and push do not necessarily address the same endpoint: ls-remote origin may use remote.origin.url while push origin uses pushurl or URL rewrites. Hooks, push.followTags, submodule recursion, and credential prompts can also add side effects or stall. Resolve and freeze one sanitized literal push endpoint, use it for both probes and the push, isolate Git configuration, disable hooks and implicit ref or submodule publication, force noninteractive transport, and add pushurl, hook, and configuration-drift fixtures."
+  - severity: "high"
+    where: "AC8 — migration record and post-push reconciliation"
+    finding: "The committed migration record cannot contain its own exact commit OID, and push results and post-probe status do not exist until after that record is committed. No separate durable receipt is named. Define an atomically published retained handoff receipt outside the pushed commit containing attempt ID, endpoint hash, commit, ref, pre-probe, push exit or signal, post-probe, and final status. A reachable missing ref after timeout or disconnect must remain unknown because the remote receive-pack may complete after the single probe; add a delayed-remote-completion fixture."
+  - severity: "medium"
+    where: "AC8 — Project_echo feature-worktree commit preparation"
+    finding: "The spec does not prove that the isolated worktree and index start clean or that only enumerated item paths enter the handoff commit. Residual staged, unstaged, or untracked state from an interrupted lane can therefore be committed and pushed. Require a recorded clean baseline, explicit path-allowlisted staging, staged and unstaged diff verification, untracked-file verification, and parent/diff checks after commit; unrelated state must abort without stash, reset, or cleanup."
+  - severity: "medium"
+    where: "AC7 — native-toolchain discovery and clean rebuild"
+    finding: "Poisoned-PATH shims observe only bare executable lookup, while static generated-file scans do not observe absolute or dynamically constructed execs. A default-deny sandbox enforces an allowlist but does not itself establish the promised complete execution trace. Require a fail-closed process-exec tracer for configure and both clean rebuilds, compare every observed executable realpath and hash to the manifest, and fail when tracing is unavailable."
+  - severity: "medium"
+    where: "AC7 — fetch-lock-deps quarantine downloader"
+    finding: "Exact-host and integrity checks do not bound redirect depth, individual response bytes, or aggregate quarantine bytes. Cyclic lock-listed redirects or an oversized response can run until timeout or exhaust the filesystem needed for failure evidence. Require visited-URL and hop limits, streaming byte ceilings and an aggregate attempt quota, partial-file cleanup, and fixtures proving cyclic and oversized responses fail while capsule space remains available."
+---
