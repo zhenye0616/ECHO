@@ -411,3 +411,74 @@ layer), `[outside-roots + sibling-reach]` (brain-retrieval test → src/brain).
 ### Journal
 - Zero `mcp__echo__*` calls this run (all filesystem/git/node/sandbox-exec). Per the
   skip-rule, no journal entry owed.
+
+---
+
+## Run 5 (2026-07-14 — AC3 context-tool parity done; structural question Q3 surfaced)
+
+Target advanced to HEAD `8d1252bb5a4dc05f2b007e2e2f675f7b2b3db0b6`
+(tree `28e60324edf6416105fd0ecb98fa04520ab259b5`), fsck clean, no remote. Still
+INCOMPLETE/UNACCEPTED. Full suite: 66 files / 942 tests pass, typecheck clean.
+
+### AC3 — context-tool parity: DONE and verified
+- `tests/api/context-only-roster.test.ts` — asserts the live MCP roster is EXACTLY
+  the eight context tools and contains none of coord_emit/invoke/status,
+  get_role_state, list_task_states, pending_decisions, propose_decision.
+- `tests/fixtures/context-tool-parity.v1.json` — the 10 immutable ordered cases
+  (ping-empty, resolve-mru-granola, find-empty, find-seeded, get-atom-present,
+  get-atom-missing, get-atoms-mixed, recent-seeded, search-seeded, wait-timeout)
+  with literal inputs + the 3 byte-pinned seed atoms.
+- `tests/migration/context-tool-evidence.test.ts` — seeds the 3 fixed-id atoms,
+  injects a fixed clock (Date/now stub; timers stay real so I/O works), runs the
+  10 cases in order against the real MCP server, canonicalizes each response
+  (sorted keys), hashes, and asserts the per-case + aggregate hashes equal the
+  pinned provenance. Deterministic across 3 runs. Aggregate
+  `632a7b2f2515a68d92e819fcedfa5d26f3960bb631995046ccf3d23de245da90`.
+- `provenance/context-tool-parity.v1.json` — projected 8 tool IDs, case order,
+  per-case response hashes, aggregate.
+- `tools/verify-context-tools.mjs` — the projector: takes a full (mixed) roster,
+  requires the 8 context IDs exactly once, byte-projects them, classifies every
+  ignored non-context ID; fails on missing/duplicated. Verified against a 15-tool
+  source-like roster (projects 8, classifies 7 ignored) and a negative roster.
+
+Deviations recorded for the migration record: (a) AC3's literal "10ms" wait
+timeout maps to the extracted tool's integer-seconds schema as `timeout:0` (the
+tool floors at 0 and polls at 1s; fast empty return preserved). (b) With the
+fixed clock the volatile-pointer allowlist is EMPTY, as AC3 intends. (c) The
+parity run executes under the vitest (TS-capable) runtime rather than a literal
+plain-`node` stdio subprocess — see Q3.
+
+### Q3 (structural, surfaced not guessed) — plain-node tools vs TS source
+AC8 specifies `tests/integration/context-service.test.ts` runs
+`node tools/verify-service-parity.mjs ... --ready-fd 3` where that plain-`node`
+child stands up the `/v1/*` service; AC3's literal form launches "source MCP over
+stdio" as a plain-`node` child. But the target commits only `.ts` source — there
+is no `dist/`, and no `tsx`/TS-loader is in the 38-path target-only policy or the
+deps. Plain `node` cannot import `.ts`, so a plain-node subprocess cannot exercise
+the real storage/retrieval stack. (I worked around this for AC3 parity by running
+under vitest and recording the deviation.) Resolution options:
+  (a) add a committed build (`dist/`) to the 38-path target-only policy;
+  (b) add a pinned TS loader (`tsx`) as a dependency + document invocation;
+  (c) run these harnesses under the test runtime (vitest, in-process), and make
+      `verify-service-parity.mjs` a JSON/HTTP validator rather than the TS service host.
+Recommend (c) (matches the AC3 approach) or (b). This shapes AC8's service harness,
+AC3's literal stdio-subprocess form, and any AC2 entrypoint that must EXECUTE src —
+so a call is needed before building the plain-node vs in-process shape.
+
+### Remaining (Q3-independent pieces can proceed regardless of the Q3 call)
+- AC2: `provenance/runtime-inventory.v1.json` + `tools/check-runtime-inventory.mjs`
+  (static edge-grammar analysis of the tools/*.mjs + package.json — does NOT need
+  to execute src) + `tests/migration/dependency-set.test.ts`.
+- AC6 close-out: `target-only-policy.v1.json` (exact 38) + `source-extraction.v1.json`
+  + the 9 provenance schemas + `check-parity.mjs` + `audit-pinned-extraction.mjs`
+  + the migration tests (`parity-matrix`, `committed-source-only`, `source-independence`,
+  `object-closure`, `dependency-set`) + exact-HEAD equality — all git/provenance
+  analysis, Q3-independent.
+- AC8 (Q3-gated shape): `schemas/service-api.v1.json` + `tools/verify-service-parity.mjs`
+  + `tests/integration/context-service.test.ts`.
+- lint (scratch eslint config, Q1 pattern).
+- AC8 migration record (binds every hash incl. the AC3 aggregate above + AC7 results,
+  the Q1 scratch-tsconfig SHA, and the Q2/echo-home/AC3/Q3 deviations).
+
+### Journal
+- Zero `mcp__echo__*` calls this run. Per the skip-rule, no journal entry owed.
