@@ -35,30 +35,27 @@ claimed_by: "fable-builder-134"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "15e391f5f0f6785dc1be887cd7d87ff4b82f49b8"
+head_sha: "4d4f1c9ef50233bd1444b95a81f8eab59ae50bf5"
 pr_url: ""
 agent_notes: |
-  BLOCKED (session-limit escalation; not a completion). AC1 + AC2 deterministic
-  core DONE and verified; AC2-rest, AC3, AC4, AC5, AC6/AC7 NOT done; AC8 partial
-  (migration record written; reviewer child-commit step not reached).
-  Blocker: this R17 / 5d spec's remaining ACs are novel from-scratch concurrency
-  protocols (better-sqlite3 publication store + atomic init; watcher
-  force-with-lease CAS state machine; dual-route byte-identical verifier) plus
-  full green suites + offline native rebuild — ~8-10k LOC of verification-heavy
-  code that reviewers rerun from fresh clones. Not completable to reviewer-passing
-  state in one attended session.
-  Tried: quantified scope by inspecting the pinned source (148-row inventory, 68
-  .ts rewrite lanes) and the sealed policy; completed the deterministic,
-  verifiable foundation (repo creation + byte-exact extraction + provenance).
-  Best guess if forced: re-scope 134 into sequential attended sessions or per-AC
-  sub-items (AC2-closure / AC3-coord / AC5-watcher / AC6-AC7-verifier); archive
-  this partial target first per the one-shot-lifecycle decision.
-  Why escalated: process-backlog "Session-limit / token-cap escalation" +
-  integrity "no fake green". No spec ambiguity — only single-session capacity.
-  Target /Users/zhenye/Desktop/echo-loop is INCOMPLETE/UNACCEPTED; founder-archive
-  before a fresh run (lifecycle: no auto-adopt/resume/repair). Feature head_sha
-  above is the immutable builder head; migration record at
-  raw/internal/migrations/2026-07-13-134-echo-loop.md on agent/134-echo-loop.
+  CHECKPOINT (multi-session build, founder chose continue-in-place; not yet a
+  completion). Session 2 progress on top of the kept Run 1 foundation.
+  DONE + verified: AC1 (repo); AC3 (./coord better-sqlite3 publication protocol
+  + atomic init, 28 tests green, builds to ./coord export); AC4 (templates +
+  empty queue); AC2 core + check:provenance green (sealed policy + 76 ports
+  byte-identical). tsc --noEmit clean.
+  NOT done: AC2 rest (edge-record schema + source-plan closed-edge fixed point,
+  dependency-set minimal derived lock, full verify:extraction, excluded-capability
+  edge disposition); AC3 refinement (native build via the exact named
+  `npm rebuild better-sqlite3 --offline --foreground-scripts` row); AC5 (watcher
+  force-with-lease CAS); AC6/AC7 (fixture loop + dual-route byte-identical
+  verifier + source-independence); AC8 (final binding + reviewer child-commit).
+  Target /Users/zhenye/Desktop/echo-loop remains INCOMPLETE/UNACCEPTED, no
+  remote, not installed; HEAD 2dcb0f9, tree 141925b0, fsck clean. head_sha above
+  is the current immutable builder feature head (agent/134-echo-loop) carrying
+  the refreshed migration record raw/internal/migrations/2026-07-13-134-echo-loop.md.
+  Next session resumes from the run log's "Remaining map"; no spec ambiguity —
+  only build volume. Not for merge; this is an iterate-again checkpoint.
 review_notes: ""
 ---
 
