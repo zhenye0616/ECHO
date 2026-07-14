@@ -120,3 +120,114 @@ Builder-operated R1 is reproducibility evidence, not independent judgment.
 The existing rejection record and review sidecar remain immutable; a fresh
 reviewer must bind the exact new target OID/tree and feature head. Target stays
 local-only, `authority:false`, and at DEV maturity.
+
+---
+
+## Run 3 (resumed at 2026-07-14T22:48:44Z — scope-shadow rejection remediation)
+
+### Previous state reconciled
+
+- Read the committed builder pointer first, then the canonical project instructions, item,
+  every `spec_ref`, fresh rejection sidecar, immutable rejection record at reviewer child
+  `1caf83fc63c83f044a2f0d2608a85bcf4759bbcc`, and prior run history. No ECHO MCP call was made.
+- Fast-forwarded the clean feature worktree from builder head `b62d160c…` to the exact reviewer
+  child before editing. Preserved the target boundary, the three reviewed computed-command
+  owners, and the unchanged artifact payload. Superseded the rejected target root and discarded
+  only scratch outputs from incomplete harness attempts; no rejected target code was retained as
+  acceptance evidence.
+
+### What I implemented
+
+- Removed file-global literal-name authorization from `tools/check-dependencies.mjs`. Outside
+  the unchanged three `computed_command_owners`, every nonliteral executable now fails closed;
+  binding syntax is not executable provenance.
+- Extended child-process spawner recognition across aliased named imports, namespace/default
+  imports, named/namespace `require` bindings, and dot or literal-bracket member calls without
+  adding an owner or allowed command.
+- Added four regressions: the reviewer's exact same-name shadow fixture, reassigned `let`
+  command, aliased named child-process import, and namespace-member child-process call. The
+  prior arbitrary-RHS and literal-destructure regressions remain.
+- Rebuilt the target as the parentless root
+  `41c28171c64710b3ad23392a2606d75cfe8e7b2c`, tree
+  `5691ab527de8eb622ed1d333ed867a2191afdf8a`, and regenerated extraction hashes.
+
+### Files modified and publication identity
+
+- Target old-to-new delta is exactly three modified paths, with no additions/deletions:
+  `tools/check-dependencies.mjs` (235 lines),
+  `tests/migration/dependency-set.test.ts` (228 lines), and
+  `provenance/source-extraction.v1.json` (529 lines).
+- Project_echo feature delta from reviewer child is only
+  `raw/internal/migrations/2026-07-13-133-echo-brain.md` (718 lines after refresh).
+- Feature branch `agent/133-echo-brain` head
+  `08f0441703a4b44e82dcea7e456129c4507d3cab`, sole parent `1caf83fc…`, was pushed with an exact
+  lease and literal remote readback.
+
+### Decisions
+
+- Chose the reviewer's conservative option: fail closed on every nonliteral executable outside
+  the three whole-file owners, instead of adding scope/mutation analysis or another trust path.
+- Kept direct literal commands and literal tuples independently classified.
+- Builder R1 is labeled mechanical reproducibility evidence only and cannot satisfy AC8 reviewer
+  independence. Authority remains false and maturity remains DEV.
+
+### Acceptance status
+
+- AC1: PASS — parentless, one-branch, no-remote target; clean 57-file tree; fsck empty; all
+  objects equal reachable objects (78/78).
+- AC2: PASS — dependency checker reports `ok:true`, 43 locked packages, expected commands, and
+  errors `[]`; all requested adversarial command-provenance fixtures fail closed.
+- AC3: PASS — provenance reports `ok:true`, 56 partition rows and 21 target-only files; operator
+  audit PASS against the pinned Project_echo object database.
+- AC4: PASS — boundary reports `ok:true`, closure 23, external packages exactly `ajv` and
+  `better-sqlite3`.
+- AC5/AC7: PASS for builder evidence — B0/B1/B2/builder-R1 strict offline lifecycle matrix is
+  green and produces one exact tuple.
+- AC6: PASS — executable target suite and synthetic end-to-end proof are green.
+- AC8: PENDING — fresh independent review of this exact OID/tree is required.
+
+### Test and evidence output
+
+Focused dependency suite:
+
+```text
+Test Files  1 passed (1)
+Tests       18 passed (18)
+Duration    114.53s
+```
+
+Definitive full suite:
+
+```text
+Test Files  5 passed (5)
+Tests       29 passed (29)
+Duration    46.26s
+```
+
+- TypeScript: PASS, no diagnostics. Exact scratch-config ESLint: PASS, zero findings.
+- Operator audit: PASS; source tree 2,847; target 57; partition 56; target-only 21; errors `[]`;
+  output SHA-256 `ec19e08a89650d278a788ade116b9a3a4087b37b5b73fd32570d07f87ed70a96`.
+- Gitleaks 8.30.1: PASS, one target commit, no leaks. Target fsck: empty; object closure 78/78.
+- B0/B1/B2/builder-R1: every leg passed offline `npm ci`, build+pack, lint, clean-prefix
+  install, `validate-config`, and `selftest` under strict `env -i` plus deny-network. Per leg:
+  six argv records, 24 DNS/direct-IP denial probes, two loopback controls, and a zero-byte
+  dangerous-environment capture.
+- Shared tuple: tarball
+  `b7708d8f195662a9180347ea0a52e6440af3b572fa2a6248c61e146d65f26e8b`; lock
+  `9ffc39fa013a67517d95399c80759a4fd359ce1ab1ccc5ee0e957504796ab296`; 27 members; canonical
+  manifest `f868ad68125b2d0943f98793419784ba7399357eaf3ecd13f770a55d8f25cc24`.
+
+The first full-suite attempt lacked target runtime/type provisioning (23 tests passed, two
+packaged tests failed, and one suite could not load Ajv). A separate unsanitized diagnostic
+matrix attempt failed lint resolution from a copied scratch-config location. Both were discarded
+as harness setup misses, all scratch state was reset, no target byte changed, and the definitive
+strict runs above passed.
+
+### Open questions and drift
+
+- No builder-blocking question remains. Fresh independent review must bind target
+  `41c28171…` / tree `5691ab52…` and feature head `08f04417…`.
+- The recorded TypeScript/typescript-eslint peer-range mismatch remains qualification debt, not
+  a blocker for this local DEV extraction.
+- Drift events: none. No sidecar/review record, wiki, docs index, adjacent item, release state,
+  authority, or maturity was changed.

@@ -1,13 +1,23 @@
+---
+last_updated: 2026-07-14T22:50:45Z
+handoff_branch: agent/133-echo-brain
+handoff_head_sha: 08f0441703a4b44e82dcea7e456129c4507d3cab
+handoff_run_log: raw/internal/agent-runs/2026-07-14-2026-07-13-133-local-echo-brain-source-extraction.md
+---
 ## current_thesis
 
-The independent HIGH computed-command provenance finding is remediated at target `957ad4680f6c67d15fb3dfa0941b52c2ab9c3110` (tree `0a34ef4aa27ca460b0697773c78a2281ff534f31`). The exact old fail-open now fails closed, all builder proofs are green, and feature handoff `b62d160c6deeb77f528e58e0ef49090de7fac72d` is pushed. Fresh independent review is the next action.
+The independent HIGH scope-shadow command-provenance finding is remediated at target `41c28171c64710b3ad23392a2606d75cfe8e7b2c` (tree `5691ab527de8eb622ed1d333ed867a2191afdf8a`). The exact same-name fail-open and residual probes now fail closed, all builder proofs are green, and feature handoff `08f0441703a4b44e82dcea7e456129c4507d3cab` is pushed. Fresh independent review is the next action.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 08f0441703a4b44e82dcea7e456129c4507d3cab.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
 - Binding syntax alone is never executable provenance.
 - Computed spawn commands are allowed only in `src/product/spawn-sanitized-child.ts`, `tools/verify-artifact.mjs`, and `tools/product/toolchain-preflight.mjs`.
 - Literal command tuples remain independently enumerated and classified.
-- B0/B1/B2/builder-R1 share tarball `b7708d8f…`, 27 members, manifest `f868ad68…`, tree `0a34ef4a…`, and lock `9ffc39fa…`.
+- B0/B1/B2/builder-R1 share tarball `b7708d8f…`, 27 members, manifest `f868ad68…`, tree `5691ab52…`, and lock `9ffc39fa…`.
 - Target remains parentless, one-branch, clean, no-remote, `authority:false`, and `maturity:DEV`.
 - Builder-operated R1 is evidence only and cannot satisfy reviewer independence.
 
@@ -24,8 +34,5 @@ The independent HIGH computed-command provenance finding is remediated at target
 
 ## canonical_anchors
 
-- decision: raw/internal/decisions/2026-07-13-one-shot-local-extraction-lifecycle.md
 - spec: backlog/pending_review/2026-07-13-133-local-echo-brain-source-extraction.md
-- migration_record: raw/internal/migrations/2026-07-13-133-echo-brain.md
-- handoff_head_sha: b62d160c6deeb77f528e58e0ef49090de7fac72d
 - reviews: backlog/reviews/2026-07-13-133-local-echo-brain-source-extraction/
