@@ -166,3 +166,15 @@ remaining the active loop regardless (per this spec's own scope), the founder pa
 Item remains in pending_review with the REJECT record standing; target /Users/zhenye/Desktop/echo-loop
 remains INCOMPLETE/UNACCEPTED at 2aeb1ede, authority:false, installed:false, DEV. Resume via a
 founder-authorized fix campaign scoped to findings A-E after the freeze.
+
+## Founder disposition #2 (2026-07-14): lane RESUMED — findings A-E campaign authorized
+
+The founder re-authorized this lane ahead of the earlier post-freeze plan (lanes 133/135 both
+reached ACCEPT and their merges are handled separately). Campaign scope = the second review
+record's findings A-E in full, anchored on D (the real 14-edge-class source-plan resolver per
+the sealed policy) and C (the seven watcher containment/takeover/recovery gaps), with A
+(validating, non-overwriting edge-record verification), B (envelope-invariant dual-route
+projection), and E (a new immutable migration record with complete AC8 bindings) closing behind
+them. Multi-run attended cycle with INCOMPLETE banking and honest escalation, per the
+established pattern; executor rerun + codex-ops re-judgment follow; new-class-rejection
+circuit breaker remains armed.
