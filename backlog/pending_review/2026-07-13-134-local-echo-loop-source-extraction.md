@@ -31,34 +31,49 @@ spec_refs:
   - tools/review-queue/reviewer-bindings.json                 # current bindings
   - tools/review-queue/reviewers.json                         # current roster
   - raw/internal/migrations/2026-07-13-134-echo-loop-source-policy.v1.json # SEALED read-only: blob dd9d78abbbecf01d5de6ab7edbc8bace07e4f50a, sha256 44bef194b379b83185aab3f7055ce547c7a51a7b6df18764022a6f565cbde52a
-claimed_by: "fable-builder-134"
+claimed_by: "fable-builder-134b"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "7f89b291bb76086bb011575899a67d54043b1704"
+head_sha: "b8e4fe23f53db95b385eec748ce326269f9bf934"
 pr_url: ""
 agent_notes: |
-  INCOMPLETE checkpoint of the A-E campaign (second codex-ops review c2a33138);
-  re-handoff for continuation, not a completion. LANDED + green (112 tests / 21
-  files, tsc clean, dual-route full-roster byte-identical + envelope-invariant):
-  Finding D (real 14-class resolver: sealed policy by OID, whole-tree TS/shell/
-  python scan, binding contexts, precedence, fail-closed computed/unknown reject,
-  repo edges -> path@blob-oid; closure 516 edges/9 classes vs old 3/78; sealed
-  fixture roster); Finding A (--check verify-not-overwrite, fail-closed on drift,
-  workload row + test use it, tree stays clean); Finding B (envelope-invariant
-  inner hash via <HOME>/<TMPDIR> tokenization).
-  REMAINING (next run): Finding C — 7 watcher gaps (group-directed kill(-pgid) +
-  termination evidence; recovery fixture with a real descendant; takeover needs
-  prior-owner group-termination before attemptPush; candidate.ts must use
-  gitEnv() not ambient env; APPLYING revalidates token+repoIdentity+fullRef;
-  enforce next_attempt_at + escalate ambiguous post-push; delete prepared/-base
-  refs on terminal state). Finding E — new immutable AC8 migration record
-  (commands/exits, path/branch, policy-copy OID/SHA, clean-status, corrected
-  fixed point 6a8f6a61, envelope-invariant dual-route hash).
-  Target /Users/zhenye/Desktop/echo-loop UNACCEPTED, no remote, not installed;
-  HEAD 3fe5383b, tree 95754d74, 22 commits, fsck clean, tree clean. head_sha above
-  is the checkpoint builder head (agent/134-echo-loop), rebased onto reviewer
-  child c2a33138. Remaining map + successor notes in run log Run 6.
+  A-E CAMPAIGN COMPLETE — normal builder handoff to pending_review for
+  re-review. Successor builder `fable-builder-134b` adopted the cleanly-
+  checkpointed in-claim run of `fable-builder-134` (session-exhaustion recovery;
+  claim continuous). Prior checkpoint landed Findings D/A/B; this run completes
+  Findings C and E and re-verifies A/B on disk. All five second-review findings
+  (A-E) are resolved on disposable fixtures only.
+  Green at target HEAD 171fdfc724f74f7cd6d4b8502e03264a517816d9 (tree
+  8f636631db2160370f051caaba1754ea30cb6d69, 26 commits, no remote, fsck exit 0,
+  tree clean): full `vitest run` = 22 files / 121 tests pass; `tsc --noEmit`
+  clean; lint/check:provenance/check:dependencies/check:skills exit 0;
+  `build-source-plan.mjs --check` exit 0 (committed edge record == HEAD closure,
+  538 rows / 9 classes, fixed_point d1d0bc612fa1e914011f714d842bd69d28fe2d323ebc143a547657d7ee345c33).
+  - Finding C (DONE): 7 AC5 watcher gaps implemented in src/watcher/* (reaper.ts
+    group-directed TERM-then-KILL via kill(-pgid) + termination evidence;
+    takeover reaps prior-owner owner_pgid before attemptPush; candidate.ts uses
+    gitEnv() config-free env; APPLYING revalidates approval token + repoIdentity
+    + fullRef; next_attempt_at enforced + repeated-failure/ambiguous-post-push
+    ESCALATE; prepared/-base refs deleted on terminal) with 9 REAL fixtures in
+    tests/watcher/containment.test.ts (real descendants + real orphaned process
+    groups + disposable file:// remotes; asserts descendant PID death and
+    isGroupAlive==false, not elapsed-time proxies).
+  - Finding E (DONE): new immutable feature-head migration record
+    raw/internal/migrations/2026-07-13-134-echo-loop.md with full AC8 bindings —
+    exact commands + exit results (restored `## Commands + exits`), target
+    path/branch, target-policy-copy OID dd9d78ab.../sha256 44bef194..., truthful
+    clean-status, corrected fixed point d1d0bc61..., envelope-invariant dual-
+    route inner hash eb614a430ad5355addba076df9a2216e5b903b205c097fba67576fdf868b1483
+    (byte-identical direct+npm; independently reproduced under a distinct scratch
+    HOME/TMPDIR), authority:false, installed:false.
+  - Finding A re-verified: --check validates the committed record and leaves the
+    tree clean (no overwrite). Finding B re-verified: dual-route hash reproduces
+    under a scratch envelope (no founder-HOME coupling).
+  Target /Users/zhenye/Desktop/echo-loop UNACCEPTED, no remote, not installed,
+  DEV; authority:false. head_sha above is the immutable builder head
+  b8e4fe23... on agent/134-echo-loop (built on prior checkpoint 7f89b291,
+  itself on reviewer child c2a33138). Campaign detail in run log Run 7.
 review_notes: ""
 ---
 

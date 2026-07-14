@@ -404,3 +404,77 @@ green; tsc clean; dual-route full roster byte-identical + envelope-invariant.
 
 None. Three authorized operations only; no sibling/wiki/holdout touching; no MCP
 calls this run.
+
+---
+
+## Run 7 (A–E campaign COMPLETE — successor fable-builder-134b)
+
+### Succession
+
+Successor builder `fable-builder-134b` adopted the cleanly-checkpointed in-claim
+run of `fable-builder-134` after that session exhausted (protocol-sanctioned
+exhaustion recovery; the claim stays continuous — the item never left
+`claimed/`). Verified on disk before writing: item in `backlog/claimed/`,
+worktree `~/Desktop/Project_echo--134-echo-loop` @ `7f89b291`, target
+`~/Desktop/echo-loop` @ `171fdfc` clean. Confirmed the predecessor had already
+landed the Finding C watcher **source** changes (commit `a1eda8f` reaper.ts +
+takeover reap + config-free candidate env + revalidation + backoff/escalation +
+ref cleanup, plus 9 fixtures) and the Finding A edge-record regeneration
+(`171fdfc`) after the Run 6 log entry was written.
+
+### Outcome
+
+**A–E campaign complete; normal builder handoff to `pending_review`.** All five
+second-review (`c2a33138`) findings resolved on disposable fixtures only. Target
+remains UNACCEPTED, no remote, not installed, DEV, `authority:false`.
+
+### Verified state (target HEAD `171fdfc724f74f7cd6d4b8502e03264a517816d9`)
+
+- Tree `8f636631db2160370f051caaba1754ea30cb6d69`; 26 commits; no remote;
+  `git fsck --full --strict` exit 0; `git status --porcelain` empty.
+- Full `vitest run`: **22 files / 121 tests pass** (112 predecessor + 9 new
+  containment fixtures); `tsc --noEmit` clean.
+- `lint`, `check:provenance` (76 ports / 148 rows), `check:dependencies` (5
+  declared / 132 locked), `check:skills` (13 ported) all exit 0.
+- `build-source-plan.mjs --check` exit 0 — committed edge record == HEAD closure,
+  **538 rows / 9 classes**, fixed_point
+  `d1d0bc612fa1e914011f714d842bd69d28fe2d323ebc143a547657d7ee345c33`.
+- Dual-route verifier: 14-row roster, both routes verdict pass, inner projection
+  byte-identical, SHA-256
+  `eb614a430ad5355addba076df9a2216e5b903b205c097fba67576fdf868b1483`;
+  independently reproduced under a distinct scratch `HOME`/`TMPDIR` (Finding B
+  envelope-invariance confirmed on disk this run).
+
+### Findings this run
+
+- **Finding C — DONE.** Verified the seven watcher gaps are implemented in
+  `src/watcher/*` (reaper.ts group-directed TERM-then-KILL via `kill(-pgid)` +
+  `TerminationEvidence`; `apply.ts` reaps prior-owner `owner_pgid` before
+  `attemptPush`; `candidate.ts` config-free `gitEnv()`; APPLYING revalidates
+  approval token + `repoIdentity` + `fullRef`; `next_attempt_at` enforced +
+  repeated-failure/ambiguous-post-push ESCALATE; prepared/`-base` refs deleted on
+  terminal) and covered by 9 REAL fixtures in `tests/watcher/containment.test.ts`
+  (real backgrounded descendant asserted dead; real orphaned process group
+  asserted `isGroupAlive==false`; disposable `file://` remotes — no elapsed-time
+  proxies).
+- **Finding E — DONE.** Wrote the new immutable feature-head migration record
+  `raw/internal/migrations/2026-07-13-134-echo-loop.md` with full AC8 bindings:
+  restored `## Commands + exits`, target path/branch, target-policy-copy OID
+  `dd9d78ab…`/sha256 `44bef194…`, truthful clean-status, corrected fixed point,
+  envelope-invariant dual-route hash, per-artifact OID/SHA-256 table,
+  `authority:false`, `installed:false`.
+- **Finding A / B — re-verified on disk** (see state above): `--check` validates
+  without overwriting; dual-route hash reproduces under a scratch envelope.
+
+### Handoff
+
+- Migration record committed on `agent/134-echo-loop`; feature head
+  **`b8e4fe23f53db95b385eec748ce326269f9bf934`** pushed to origin.
+- Item moved `claimed/ → pending_review/`; `head_sha` + task-state
+  `handoff_head_sha` set to the feature head; `claimed_by` = `fable-builder-134b`.
+
+### Drift events
+
+None. Three authorized operations only (pinned read-only Project_echo source
+reads already done by predecessor; local no-remote target; feature-branch push).
+No sibling / wiki / holdout-131 touching. No `mcp__echo__*` calls this run.
