@@ -1,14 +1,14 @@
-# Independent AC8 third review — echo-brain local source extraction (item 133)
+# Independent AC8 fourth review — echo-brain local source extraction (item 133)
 
-**Verdict: REJECT**
+**Verdict: ACCEPT**
 
-This third judgment supersedes the earlier REJECT records published at feature-branch commits `90fb2b649c62418d947f91a7e8d1bdfaab38aae1` and `4e43c99682ee94de2f9ef2ea9205e0cf5d6d0533`.
+This fourth judgment supersedes the three earlier REJECT records published at feature-branch commits `90fb2b649c62418d947f91a7e8d1bdfaab38aae1`, `4e43c99682ee94de2f9ef2ea9205e0cf5d6d0533`, and `2b4ebbe8283ac9343eeff362479133888bff0ae0`.
 
 ## Reviewer identity and independence
 
-- **Reviewer:** `codex-ops` binding, content-only session, completed `2026-07-14T09:37:01Z`.
+- **Reviewer:** `codex-ops` binding, content-only session, completed `2026-07-14T17:46:43Z`.
 - **Independence:** This reviewer is not builder `fable-builder-133`, did not create or modify the accepted target, and is independent of the neutral R1 executor.
-- **Option B split:** A neutral executor performed the write-heavy R1 mechanics and captured evidence; this `codex-ops` session independently inspected the accepted tree, migration record, builder matrix, R1 evidence, and artifacts and authored the judgment. The wrapper owns publication as the one-path, sole-parent child of the immutable builder head.
+- **Option B split:** A neutral executor performed the write-heavy R1 mechanics and captured evidence; this `codex-ops` session independently inspected the accepted tree, migration record, scoped delta, R1 evidence, checker behavior, fixture, and artifacts and authored the judgment. The wrapper owns publication as the one-path, sole-parent child of the immutable builder head.
 - This session performed read-only inspection only. It did not write files, mutate Git state, commit, or push.
 
 ## Bound inputs
@@ -17,26 +17,29 @@ This third judgment supersedes the earlier REJECT records published at feature-b
 |---|---|
 | Item | `2026-07-13-133-local-echo-brain-source-extraction` |
 | Sealed item path | `backlog/pending_review/2026-07-13-133-local-echo-brain-source-extraction.md` |
-| Pending-review re-handoff commit | `2e27eff8bef027670ee3a745384087a314008551` |
+| Pending-review re-handoff / sealed-spec commit | `2e27eff8bef027670ee3a745384087a314008551` |
 | Sealed item blob / bytes / SHA-256 | Git blob `13e19484ae35f0ae1bf401adb1e35ebeb32da37e`; 31,526 bytes; `c2b3498ba323972e398d7bca87d6d511eaf376798fbea4dec747c47decbcfe26` |
 | `ready_content_sha` | `832be81341f2c523fd42918206774ec8a51f54de653a323ad56d612e0ea47748` |
 | Requested-reviewer roster | `["codex", "codex-ops"]`; this reviewer is a roster member |
 | Builder | `fable-builder-133` (`Claude Code` / `claude` actor) |
-| Immutable builder feature head | `3a693a7369c46a15f07f5704dec033b1a7230af5`; tree `921b530b70ec4ce5ca81d65d5d19d43b97da6722` |
-| Builder-head ancestry | Sole parent `4e43c99682ee94de2f9ef2ea9205e0cf5d6d0533`, preserving the second REJECT record |
-| Migration record | `raw/internal/migrations/2026-07-13-133-echo-brain.md` at builder head `3a693a7369c46a15f07f5704dec033b1a7230af5` |
-| Migration-record blob / bytes / SHA-256 | Git blob `e00bd6664c472b551a45ee02503ed9c582803170`; 24,022 bytes; `458d7f50a0e16e929912fed24e79f97c451a689dee3d367c685f2ca84260f697` |
+| Immutable builder feature head | `20c8135a37e123f1735dd07023ccc0bfc184b624`; tree `c2492883ac74829b453d79959a0ae0b0f2ef4436` |
+| Builder-head ancestry | Sole parent `2b4ebbe8283ac9343eeff362479133888bff0ae0`, preserving the third REJECT record |
+| Migration record | `raw/internal/migrations/2026-07-13-133-echo-brain.md` at builder head `20c8135a37e123f1735dd07023ccc0bfc184b624` |
+| Migration-record blob / bytes / SHA-256 | Git blob `8fbf32d26a51eb1cf83061747f73a436652c68b2`; 28,855 bytes; `364069c06ac1306f4a33a282619bb352f211fbb9a957c342747829f060de3e9c` |
 | Prior REJECT #1 | Commit `90fb2b649c62418d947f91a7e8d1bdfaab38aae1`; blob `e76586e8705e616000090f04c091607798719590`; 13,162 bytes; SHA-256 `dd645a4977673682165ecd39cbf3cfad91205bc4dcf7760bab9e0532dda21df4` |
 | Prior REJECT #2 | Commit `4e43c99682ee94de2f9ef2ea9205e0cf5d6d0533`; blob `6c3769e795c1978c3d17a70e8012213090a816a6`; 17,402 bytes; SHA-256 `c86e33e584b8d90d2501feafcf63d8b6e60f0cbac9983def2c08deec29c3837a` |
+| Prior REJECT #3 | Commit `2b4ebbe8283ac9343eeff362479133888bff0ae0`; blob `dc256879ed6b6c878043e1c891d7a30461f2ea5a`; 13,709 bytes; SHA-256 `51b42a643cb086546cfbe778d80345cc54e55f3eb408f202d4ffead7585dc7cd` |
 | Pinned source SHA | `2971310441b69735cbe759293abd8c4d044bf347` |
 | Accepted target path / branch | `/Users/zhenye/Desktop/echo-brain`; `migration/2026-07-13-133` |
-| Accepted target HEAD / tree | `ffc11b45ca42fba19e25582f00e92dbaa63c9a3c`; `27250ad06e90d6ed4534dc6e50f880874818e659` |
+| Accepted target HEAD / tree | `4a6dcb33d2e73f718e36832941b4fa2bc34c7285`; `e2466238d90691cc4488b9909ec31064a1b3df33` |
 | Target state | Parentless root commit; one branch; no remote; 57 tracked files; zero untracked files or symlinks; empty fsck; 78 objects equal 78 reachable objects |
 | Target authority / maturity | `authority:false`; `maturity:DEV` |
-| Builder matrix evidence | `scratchpad/matrix/legfc2-B{0,1,2}` |
-| R1 evidence directory | `/private/tmp/claude-501/-Users-zhenye-Desktop-Project-echo/f96bfcee-3199-472c-adf2-9b7367d03b4d/scratchpad/r1-evidence-133-rerun2` |
-| R1 summary | 11,222 bytes; SHA-256 `320243077bf68af6ba4f7ae9445a076503d1a021ab0eb72f60c7a7ecd92539ce` |
-| Review request | 3,666 bytes; SHA-256 `b3ceb17824bfde71192dcf0173d7729de4916bd4df491495545ba77d2d17eab2` |
+| Authorized micro-cycle delta | Exactly `tools/check-dependencies.mjs`, `tests/migration/dependency-set.test.ts`, and regenerated `provenance/source-extraction.v1.json`; no added or removed paths |
+| Regenerated extraction SHA-256 | `1db0a00eb6a2cf1a06c10b0fe66c8b8157ab94e420333dd49bc62ebd210c8ff9` |
+| Builder matrix evidence | `/private/tmp/claude-501/-Users-zhenye-Desktop-Project-echo/f96bfcee-3199-472c-adf2-9b7367d03b4d/scratchpad/matrix/legmicro-B{0,1,2}` |
+| R1 evidence directory | `/private/tmp/claude-501/-Users-zhenye-Desktop-Project-echo/f96bfcee-3199-472c-adf2-9b7367d03b4d/scratchpad/r1-evidence-133-rerun3` |
+| R1 summary | 8,574 bytes; SHA-256 `a674afedf0c4d3a479a278e919cba43190c85d20ea2e9261bf5f6d4ba638798f` |
+| Fourth-review request | 3,344 bytes; SHA-256 `7dbbfbeec612d8d66873674d36e34a31886dc3d0630452dfefb411762493a6ed` |
 | Feature ref / publication endpoint | `refs/heads/agent/133-echo-brain`; `https://github.com/zhenye0616/ECHO.git`; publication remains wrapper-owned and was not performed here |
 
 ## Founder-adjudication bindings
@@ -45,65 +48,63 @@ This third judgment supersedes the earlier REJECT records published at feature-b
 
 2. **Founder adjudication #2** governs the Option B split among the neutral executor, independent `codex-ops` judgment author, and publishing wrapper.
 
-3. **Founder adjudication #3** authorizes the scratch-config lint design and the sole semantically verified `package.json` npm-pin transform. It does not waive AC2/AC5’s exhaustive, fail-closed command-edge partition or AC7’s mandatory-command behavior.
+3. **Founder adjudication #3** governs the scratch-config lint design and the sole semantically verified `package.json` npm-pin transform. It does not waive AC2/AC5’s exhaustive, fail-closed command-edge partition or AC7’s mandatory-command behavior.
 
-The standing third-rejection rule applies to a rejection on a new finding class. The remaining blocker below is a continuation of the existing F2/N2 checker-enforcement class, not a new class.
+4. **Founder-authorized surgical micro-cycle:** The only substantive correction after the third REJECT was the N2 `DESTRUCTURE_RE` fix and its exact regression fixture, plus mechanically regenerated extraction provenance. The independent tree comparison confirms that scope held.
 
-## Third-pass outcomes
+## Fourth-pass outcomes
 
 | Step | Executor outcome | Independent reviewer determination |
 |---|---|---|
-| 1 — Shared-target PRE audit | `PASS` | **PASS.** HEAD/tree, sole branch, no remotes, clean 57-file worktree, empty fsck, and equal 78-object object/reachable sets were verified. |
+| 0 — Authorized-scope comparison | `PASS` | **PASS.** Both trees contain 57 paths. Exactly three mode-preserving blobs changed: `tools/check-dependencies.mjs`, `tests/migration/dependency-set.test.ts`, and `provenance/source-extraction.v1.json`; nothing was added or removed. |
+| 1 — Shared-target PRE audit | `PASS` | **PASS.** HEAD/tree, sole branch, no remotes, clean 57-file worktree, zero symlinks, empty fsck, and equal 78-object object/reachable sets were verified. |
 | 2 — Sanitized R1 clone | `PASS` | **PASS.** The clone used `--no-local --no-hardlinks --no-checkout`, detached the accepted OID, removed origin, and verified clean/no-remote/no-alternate/no-promisor/no-replace state. |
-| 3 — Offline lifecycle plus lint | `PASS` | **PASS.** Exact manifest-pinned toolchain integrities were verified before lint; the resolvable scratch config was present from the start; the inner runner used `set -euo pipefail` plus an `ERR` trap; lint ran exactly once and exited zero. Six lifecycle commands ran under strict `env -i` with denial probes and loopback controls. |
-| 4 — AC7 battery | `PASS`; 21/21 tests | **FAIL for acceptance.** The mechanical battery passed and `/sbin/mount` appears in `used_commands`, but the accepted checker retains a computed-command evasion described below. The three new fixtures do not cover it. |
+| 3 — Offline lifecycle plus lint | `PASS`, first attempt | **PASS.** All six manifest-bound toolchain integrities matched before lint. The fail-fast runner used strict `env -i`; all six lifecycle commands ran under the deny-network sandbox with pre/post denial probes and both loopback-control halves. Lint ran exactly once, exited zero, and no lifecycle phase was retried. |
+| 4 — AC7 battery | `PASS`; 22/22 tests | **PASS.** `check-dependencies`, boundary, provenance, parity, typecheck, source-independence, and fsck checks passed. The exact ordinary-array N2 evasion now fails closed; the accepted genuine `for (const [name, args] …)` tuple destructure still classifies; `used_commands` includes `/sbin/mount`, `clang++`, `xcode-select`, and `xcrun`. |
 | 5 — Transform-aware operator audit | `PASS` | **PASS.** Verdict `PASS`, zero errors, 57 target blobs, 56 partition rows, 21 target-only paths, correct reviewed-spec hash, and only the adjudicated `engines.npm="10.9.4"` transform. |
-| 6 — Tuple comparison | All five fields match | **PASS.** B0/B1/B2/R1 match on target/tree, tarball, lock, member count, and canonical `String.localeCompare`-ordered manifest digest. |
-| 7 — Shared-target POST audit | `PASS` | **PASS.** HEAD, tree, refs, fsck, worktree, object set, and reachable set were unchanged from PRE. |
+| 6 — Tuple comparison | All five fields match | **PASS.** B0/B1/B2/R1 match on accepted HEAD/tree, tarball, lock, member count, and canonical `String.localeCompare`-ordered manifest digest. |
+| 7 — Shared-target POST audit | `PASS` | **PASS.** HEAD, tree, refs, worktree, fsck, object set, and reachable set were unchanged from PRE. |
 
-## Third-pass identity tuple
+## Fourth-pass identity tuple
 
 | Field | Builder B0/B1/B2 | R1 | Determination |
 |---|---|---|---|
-| Target HEAD | `ffc11b45ca42fba19e25582f00e92dbaa63c9a3c` | `ffc11b45ca42fba19e25582f00e92dbaa63c9a3c` | Match |
-| Target tree | `27250ad06e90d6ed4534dc6e50f880874818e659` | `27250ad06e90d6ed4534dc6e50f880874818e659` | Match |
+| Target HEAD | `4a6dcb33d2e73f718e36832941b4fa2bc34c7285` | `4a6dcb33d2e73f718e36832941b4fa2bc34c7285` | Match |
+| Target tree | `e2466238d90691cc4488b9909ec31064a1b3df33` | `e2466238d90691cc4488b9909ec31064a1b3df33` | Match |
 | Tarball SHA-256 | `b7708d8f195662a9180347ea0a52e6440af3b572fa2a6248c61e146d65f26e8b` | `b7708d8f195662a9180347ea0a52e6440af3b572fa2a6248c61e146d65f26e8b` | Match |
 | Lock SHA-256 | `9ffc39fa013a67517d95399c80759a4fd359ce1ab1ccc5ee0e957504796ab296` | `9ffc39fa013a67517d95399c80759a4fd359ce1ab1ccc5ee0e957504796ab296` | Match |
 | Ordered members | 27 | 27 | Match |
 | Canonical member-manifest digest | `f868ad68125b2d0943f98793419784ba7399357eaf3ecd13f770a55d8f25cc24` | `f868ad68125b2d0943f98793419784ba7399357eaf3ecd13f770a55d8f25cc24` | Match |
 
-All four actual tarballs rehash to the recorded tarball digest. Compact serialization of each emitted member array, without a trailing newline, reproduces `f868ad68…`.
+The tarball, lock, ordered members, and manifest digest correctly remain unchanged because none of the three authorized changed paths is a tarball member. Only the accepted Git tree advances from `27250ad0…` to `e2466238…`.
 
 ## Cumulative F1–F7 and N1–N6 dispositions
 
-| Finding | Severity | Third-pass disposition | Determination |
+| Finding | Severity | Fourth-pass disposition | Determination |
 |---|---:|---|---|
-| F1 — AC7 lint absent/unrunnable | HIGH | **FIXED** | Scratch-config lint is runnable, exact-pinned, integrity-verified, resolvable from the start, and passed in one invocation. |
-| F2 — Dependency/toolchain enforcement incomplete | HIGH | **NOT FULLY FIXED; remains open as N2** | The original missing helpers, build inputs, and integrity bindings are fixed. The exhaustive command checker still admits an unlisted computed executable through the residual N2 regex defect. |
-| F3 — npm 10.9.4 not pinned | MEDIUM | **FIXED** | `package.json` pins npm `10.9.4`; the sole transform is founder-authorized and operator-audit verified. |
-| F4 — Target not literally clean | LOW | **FIXED** | PRE/POST and direct inspection show zero untracked files or symlinks. |
-| F5 — Option B adjudication absent from sealed bytes | MEDIUM | **FIXED** | Founder adjudication #2 is durable in the sealed item. |
-| F6 — Exact argv/environment traceability incomplete | LOW | **FIXED** | Builder B0/B1/B2 have sanitized outer transcripts and six exact command/environment echoes per leg. R1 records six command forms, its sanitized outer environment, and the `env -i` lifecycle allowlist. |
-| F7 — Truncated digest / unspecified serialization | INFO | **FIXED** | The full digest and compact serialization are recorded and reproduced; the record correctly names `String.localeCompare`. |
-| N1 — R1 lint not fail-closed or toolchain-bound | HIGH | **FIXED** | All six package integrities, including `typescript-eslint@8.20.0`, were independently matched before lint. The inner runner is fail-fast; the config is resolvable; lint ran once and passed. |
-| N2 — Checker misses helper/computed-command edges | HIGH | **NOT FULLY FIXED; acceptance-blocking** | `/sbin/mount` and `spawnSanitizedChild` are now covered, but `DESTRUCTURE_RE` misclassifies ordinary array construction as proven tuple destructuring and still permits an unlisted computed executable. |
-| N3 — Builder evidence lacks strict `env -i` | MEDIUM | **FIXED** | All 18 recorded builder lifecycle invocations use `env -i`; each leg has a sanitized outer transcript and six argv echoes. |
-| N4 — Migration record retains stale hashes | MEDIUM | **FIXED** | All eight fresh hashes match the blobs at `ffc11b45`, including package, lock, README, policy, plan, extraction, parity, and toolchain records. |
-| N5 — README claims byte-identical package relocation | LOW | **FIXED** | README lines 16–22 state the sole founder-adjudicated npm-pin transform and semantic audit. |
-| N6 — Comparator named incorrectly | INFO | **FIXED** | The record names `String.prototype.localeCompare`; `verify-artifact.mjs` is unchanged and retains SHA-256 `3ef643821f782033a6acdd67782040f9d7e047542eda6a68697efc78e0e446a9`. |
+| F1 — AC7 lint absent/unrunnable | HIGH | **FIXED; stable** | Scratch-config lint is runnable, exact-pinned, integrity-verified, resolvable from the start, and passed in one invocation. |
+| F2 — Dependency/toolchain enforcement incomplete | HIGH | **FIXED; closed through N2** | Missing helpers, build inputs, integrity bindings, sanitized-spawner coverage, and computed-command enforcement are fixed. The sole remaining `DESTRUCTURE_RE` evasion now fails closed. |
+| F3 — npm 10.9.4 not pinned | MEDIUM | **FIXED; stable** | `package.json` pins npm `10.9.4`; the sole transform remains founder-authorized and operator-audit verified. |
+| F4 — Target not literally clean | LOW | **FIXED; stable** | PRE/POST and direct inspection show zero untracked files or symlinks. |
+| F5 — Option B adjudication absent from sealed bytes | MEDIUM | **FIXED; stable** | Founder adjudication #2 remains durable in the sealed item. |
+| F6 — Exact argv/environment traceability incomplete | LOW | **FIXED; stable** | Builder and R1 evidence record sanitized environments and all six lifecycle command forms. |
+| F7 — Truncated digest / unspecified serialization | INFO | **FIXED; stable** | The full digest and compact serialization are recorded and reproduced using `String.localeCompare` ordering. |
+| N1 — R1 lint not fail-closed or toolchain-bound | HIGH | **FIXED; stable** | The fail-fast executor verified all six toolchain integrities before a single successful lint invocation, with no retry-to-green. |
+| N2 — Checker misses helper/computed-command edges | HIGH | **FIXED; closed** | The binding-keyword regex no longer treats ordinary array construction as tuple destructuring. The exact prior evasion fails closed, genuine declaration destructuring remains recognized, and the complete suite passes 22/22. |
+| N3 — Builder evidence lacks strict `env -i` | MEDIUM | **FIXED; stable** | Every sandboxed lifecycle command uses strict `env -i`; dangerous inherited variables are absent, and all six argv forms are recorded. |
+| N4 — Migration record retains stale hashes | MEDIUM | **FIXED; refreshed** | The migration record contains a complete hash table for `4a6dcb33…`; regenerated `source-extraction.v1.json` hashes to `1db0a00e…`, with the other seven bound hashes unchanged. |
+| N5 — README claims byte-identical package relocation | LOW | **FIXED; stable** | README states the founder-adjudicated npm-pin transform exception. |
+| N6 — Comparator named incorrectly | INFO | **FIXED; stable** | The record correctly names `String.prototype.localeCompare`; the artifact algorithm and digest remain unchanged. |
 
-## Acceptance-blocking residual — N2
+## Closed residual — N2
 
-The positive N2 corrections are present: the manifest declares `/sbin/mount`, `spawnSanitizedChild` is recognized, `used_commands` includes the mount edge, exactly three new tests were added, and Vitest reports 21/21.
+The third judgment rejected because the prior expression:
 
-The remaining defect is in `tools/check-dependencies.mjs:154,166,174-180`:
+```js
+/\[\s*([A-Za-z_$][\w$]*)\s*,/g
+```
 
-- `DESTRUCTURE_RE` is `/\[\s*([A-Za-z_$][\w$]*)\s*,/g`.
-- That expression matches any bracketed array beginning with an identifier, not only a destructuring binding.
-- Every captured identifier is added to `destructuredVars`.
-- A computed spawn is accepted whenever `destructuredVars.has(tok)` is true.
-
-Therefore this non-owner file evades the checker:
+matched any bracketed array beginning with an identifier. It therefore treated the ordinary array construction in this exact evasion as proven tuple destructuring:
 
 ```js
 import { spawnSync } from 'node:child_process';
@@ -112,9 +113,17 @@ const unrelated = [c, ['--version']];
 spawnSync(c, []);
 ```
 
-The ordinary array expression records `c` as “destructured,” after which `spawnSync(c, [])` is accepted without classifying the executable or requiring a manifest row. The new unrelated-tuple fixture uses a literal `'git'` tuple and therefore does not exercise this same-variable false proof.
+The accepted checker now uses:
 
-This contradicts the stated “directly tuple-destructured variable” rule and AC2/AC5’s requirement that unlisted or computed executables fail closed. It is the same checker-enforcement finding class as prior F2/N2 and remains acceptance-blocking even for the local DEV split.
+```js
+/\b(?:const|let|var)\s+\[\s*([A-Za-z_$][\w$]*)\s*,/g
+```
+
+The binding keyword must immediately precede the destructuring pattern. `const unrelated = [c, …]` therefore does not add `c` to `destructuredVars`, and the later computed spawn exits nonzero with `computed spawn command`. The new fixture drives that exact sequence and asserts both failure and diagnostic text.
+
+Independent regex behavior checks confirmed that ordinary constructions such as `const arr = [cmd, extra]` and `arr = [cmd, extra]` do not bind `cmd`, while `const [cmd, args]`, `let [name, rest]`, `var [x, y]`, and the accepted target’s `for (const [name, args] of commandChecks)` do bind their first elements.
+
+The sole F2/N2 acceptance blocker is therefore closed. The sealed AC2/AC5 executable partition is enforced to the standard demanded by the prior N2 finding.
 
 ## Executor-disclosure dispositions
 
@@ -122,20 +131,26 @@ This contradicts the stated “directly tuple-destructured variable” rule and 
 
 **Disposition: recordable, not acceptance-blocking for this local DEV split.**
 
-`typescript-eslint@8.20.0` declares TypeScript `>=4.8.4 <5.8.0`, while the manifest pins TypeScript `5.9.2`. Exact installation therefore required `--legacy-peer-deps`. The executor nevertheless installed the exact recorded versions, independently matched all six package integrities, and ran lint cleanly.
+`typescript-eslint@8.20.0` declares TypeScript `>=4.8.4 <5.8.0`, while the manifest pins TypeScript `5.9.2`. Exact installation therefore requires `--legacy-peer-deps`. The executor installed the recorded versions, independently matched all six package integrities before lint, and ran lint cleanly.
 
-This is manifest/toolchain compatibility debt that should be reconciled before a qualification or portability claim. It does not invalidate the observed lint result at `authority:false`, `maturity:DEV`.
+This compatibility debt must be reconciled before any qualification or portability claim. It does not invalidate the observed local result at `authority:false`, `maturity:DEV`.
 
-### Initial sanitizer-regex abort
+### Sanitizer-regex exclusions
 
-**Disposition: accepted as a pre-lifecycle harness correction, not a lifecycle retry.**
+**Disposition: disclosed harness behavior, not acceptance-blocking.**
 
-The sanitizer assertion executes before phase 1 and before argv entry #1. The initial `^GIT_` expression matched the harness’s benign `GIT_BIN` path pointer and aborted at that preflight point. Tightening the expression and restarting could not have retried a lifecycle command because none had run. The original aborted transcript was overwritten, so this conclusion rests on the disclosed failure point plus the preserved runner ordering.
+The executor harness deliberately excludes the benign path-pointer variables `GIT_BIN`, `NODE_BIN`, and `NPM_CLI` from its dangerous-variable sanitizer. This preserves the correction made after the earlier pre-lifecycle `^GIT_` abort. The exclusion is baked into this fourth-pass harness, did not re-trigger, and did not permit inherited Git/npm behavior variables through the strict `env -i` lifecycle allowlist. No lifecycle command was retried.
+
+### Copied evidence-header labels
+
+**Disposition: recordable, not acceptance-blocking.**
+
+Three log headers retain copied prior-run labels: `battery-A.log` says `rerun2 @ffc11b45`, `audit.log` says `rerun @493b558f`, and `tuple.log` initially says `rerun2 @ffc11b45` before an appended correction. Their actual commands, accepted OIDs, trees, hashes, and results bind `4a6dcb33…` / `e2466238…`; no payload mismatch was found.
 
 ## Final verdict
 
-**Verdict: REJECT.**
+**Verdict: ACCEPT.**
 
-N1 and N3–N6 are fixed; F1 and F3–F7 remain fixed; the target is clean and stable; the operator audit passes; and B0/B1/B2/R1 share the complete artifact tuple. Rejection remains required because N2’s command checker is still not fail closed and therefore does not establish the sealed AC2/AC5 exhaustive executable partition.
+F1–F7 and N1–N6 are fixed and stable. The authorized micro-cycle remained within exactly three files, the prior N2 ordinary-array evasion now fails closed, genuine tuple destructuring remains classified, the AC7 battery passes 22/22, the operator audit passes, the target is unchanged across PRE/POST, and B0/B1/B2/R1 share the complete accepted identity tuple.
 
-This is a continuation of the existing F2/N2 finding class, not a new finding class. This judgment does not transfer authority, create or authorize a remote, approve cutover, client installation, publication, deployment, or release, or advance maturity. The target remains `authority:false` and `maturity:DEV`.
+This acceptance proves only the local DEV split. It does not transfer authority, create or authorize a remote, approve cutover, client installation, publication, deployment, or release, or advance maturity. The target remains `authority:false` and `maturity:DEV`.
