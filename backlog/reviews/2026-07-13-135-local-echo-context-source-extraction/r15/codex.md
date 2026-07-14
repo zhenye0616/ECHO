@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-135-local-echo-context-source-extraction"
+round: 15
+reviewer: "codex"
+artifact_sha: "75b5ce407a8b680a7a53ac280d26281ff73e2387"
+completed_at: '2026-07-14T03:35:33Z'
+verdict: "pushback"
+findings:
+  - severity: "high"
+    where: "frontmatter: requested_reviewers"
+    finding: "The proposal requests only codex and codex-ops, so this round cannot satisfy the founder-locked cross-vendor proposal gate or the required codex/cursor proposal default. Select a cross-vendor pair and run a fresh review round; this round cannot promote the item."
+  - severity: "medium"
+    where: "between ## Why this spec exists and ### AC1"
+    finding: "The mandatory ## Acceptance Criteria section is absent, leaving AC1 through AC8 nested under ## Why this spec exists. Insert the required heading before AC1 to restore the canonical proposal structure."
+  - severity: "high"
+    where: "AC6 — Preserve capture, storage, and retrieval behavior"
+    finding: "The asserted 211/109/102 closure and e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62 hash are not independently reproducible: matching test roots and LF-sorted raw-tree output do not define literal pathspecs, ls-tree flags and fields, delimiters or quoting, locale and sort rules, or terminal-newline treatment. Add the exhaustive roots and one canonical byte-producing and hashing command."
+  - severity: "high"
+    where: "AC7 — Prove dependencies, provenance, and source independence"
+    finding: "The accepted HEAD must contain lifecycle-plan.v1.json, but the authoritative builder private-clone install occurs only after that HEAD and is also supposed to supply actual commands, toolchain inputs, and outputs. The spec additionally provides no independent mechanism for discovering every lifecycle hook or detecting secondary unpinned downloads. Separate the immutable expected plan from post-commit observed evidence, and prescribe the verified fetch/unpack, exact npm flags and network policy, hook/process/output/toolchain capture, and plan-versus-observation comparison."
+  - severity: "high"
+    where: "AC3 — Pin and prove the context-only retrieval surface"
+    finding: "The fixture cases, volatile JSON pointers, serialization bytes, aggregate framing, and case order remain builder-selected. Source and target can therefore match while masking semantic differences or exercising an incomplete matrix. Pin the fixture IDs and inputs, synthetic-state setup, exhaustive volatile-pointer allowlist, encoding and framing rules, aggregate order, and immutable source baseline hashes or equivalent evidence."
+  - severity: "medium"
+    where: "AC6 — source-extraction.v1.json target-only partition"
+    finding: "The allowed target-only set uses open-ended categories such as provenance/check tools instead of exact relative paths, so extra final-HEAD blobs can be relabeled rather than rejected. Require an exhaustive committed allowlist or pinned manifest and exact set equality against the accepted HEAD."
+  - severity: "medium"
+    where: "AC8 — Prove local service parity and record the normal builder handoff"
+    finding: "The service test invokes capture even though the exact eight-tool MCP roster has no capture operation, without defining capture as a separate service-only API. It also omits the service endpoint/request schema, readiness-FD framing, numeric timeouts, process-group creation, and signal escalation. Specify that protocol and the exact private-clone verification entry point so builder and reviewer reruns are deterministic."
+---
