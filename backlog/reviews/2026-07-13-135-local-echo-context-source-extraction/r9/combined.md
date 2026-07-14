@@ -6,8 +6,8 @@ codex_response: codex.md
 cursor_response: null
 codex-ops_response: codex-ops.md
 claude_response: null
-patch_commit_sha: null
-next_round: null
+patch_commit_sha: 8327efe7d291f2dbe431000773c5782f13a88b76
+next_round: 10
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 ---
@@ -24,15 +24,14 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | HIGH | codex-ops | AC7 — isolated npm installation | _strategist fills_ | _strategist fills_ |
-| 2 | HIGH | codex-ops | AC7 and AC8 — service sandbox | _strategist fills_ | _strategist fills_ |
-| 3 | MEDIUM | codex-ops | AC2 and AC7 — runtime inventory and PATH isolation | _strategist fills_ | _strategist fills_ |
-| 4 | MEDIUM | codex-ops | AC7 — private review clone | _strategist fills_ | _strategist fills_ |
-| 5 | MEDIUM | codex-ops | AC3 — parity sidecar and framing | _strategist fills_ | _strategist fills_ |
-| 6 | MEDIUM | codex-ops | AC3, AC7, and AC8 — asynchronous child lifecycle | _strategist fills_ | _strategist fills_ |
-| 7 | MEDIUM | codex-ops | AC8 — failed-stop evidence and scratch cleanup | _strategist fills_ | _strategist fills_ |
+| 1 | HIGH | codex-ops | AC7 — isolated npm installation | patched | `8327efe7` separates integrity-verified acquisition from sealed-cache `npm ci --offline --ignore-scripts --no-audit --no-fund`. |
+| 2 | HIGH | codex-ops | AC7 and AC8 — service sandbox | patched | `8327efe7` splits server/client profiles, readiness-FD sequencing, exact endpoint access, and denial probes. |
+| 3 | MEDIUM | codex-ops | AC2 and AC7 — runtime inventory and PATH isolation | patched | `8327efe7` restricts launches to process.execPath, target-local bins, or pinned absolute tools and requires poisoned-PATH tripwires. |
+| 4 | MEDIUM | codex-ops | AC7 — private review clone | patched | `8327efe7` records exact HEAD/tree, clones/detaches that commit, removes origin, verifies object state, and rechecks shared HEAD. |
+| 5 | MEDIUM | codex-ops | AC3 — parity sidecar and framing | patched | `8327efe7` fixes sidecar bytes, case-ID alphabet/order, canonical response bytes, volatile-field failure, and aggregate framing. |
+| 6 | MEDIUM | codex-ops | AC3, AC7, and AC8 — asynchronous child lifecycle | patched | `8327efe7` adds subscription/service readiness barriers plus bounded TERM/KILL/wait/reap and survivor checks. |
+| 7 | MEDIUM | codex-ops | AC8 — failed-stop evidence and scratch cleanup | patched | `8327efe7` retains bounded failure capsules, publishes summaries with retry, and containment-tests scratch-only cleanup. |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
-
+needs R10 — focus_hints: verify fixture framing, offline install, split service sandbox, exact clone, process cleanup, and durable failure handoff.
