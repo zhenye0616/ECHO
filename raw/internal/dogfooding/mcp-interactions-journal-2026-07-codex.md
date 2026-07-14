@@ -1356,3 +1356,38 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-07-13-135-local-echo-context-source-extraction/r19/request.md`; artifact `backlog/proposed/2026-07-13-135-local-echo-context-source-extraction.md@0276fed4749229d70a8b76bce98769c5e97ce6a9`; response `backlog/reviews/2026-07-13-135-local-echo-context-source-extraction/r19/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-2DA922F4-9B5C-4AFC-A8C3-BB0C077A5DD3/raw/internal/review-queue/3d2668e9-2208-46aa-a109-aebefebf11da/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-2DA922F4-9B5C-4AFC-A8C3-BB0C077A5DD3/raw/internal/review-queue/3d2668e9-2208-46aa-a109-aebefebf11da/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+### 2026-07-13 22:30 PDT - repo-scoped current-state discovery
+
+- **Trigger:** Founder asked Codex to use ECHO and understand the current state of Project_echo.
+- **Query inputs:** `find_clusters({repo_path:"/Users/zhenye/Desktop/Project_echo", view:"rich", format:"skeleton"})`.
+- **Returned:** One untruncated rank-1 cluster (`ctx_32e0ba10`, label `work on project_echo`) covering 120 atoms in the default four-hour lookback, with rank reasons `recent_activity`, `has_open_loop`, `code_session_anchor`, `dense`, and `cross_tool`; two open-loop hints were both marked resolved; no warnings.
+- **Sources:** `source_breakdown={git:105, claude_code:14, codex:1}`; time range `2026-07-14T01:32:43Z` to `2026-07-14T05:30:09Z`; repo scope `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** partial - discovery clearly found the live cross-tool thread, but its generic label and body-free skeleton do not yet reveal the substantive current state.
+- **Note:** The cluster is heavily git-weighted, so the next retrieval should hydrate a small newest-first sample and reconcile it with canonical decision/backlog files and live git.
+
+### 2026-07-13 22:31 PDT - hydrate live review-and-promotion thread
+
+- **Trigger:** Follow-up body fetch for the rank-1 repo cluster from the current-state discovery.
+- **Query inputs:** `get_atoms({atom_ids:ctx_32e0ba10.atom_ids.slice(0,50), format:"minimal", prefer:"newest_first", view:"rich"})`.
+- **Returned:** 9 newest atoms fit the response envelope and 41 older requested IDs were prefix-dropped; no warnings. The freshest Claude Code atom reported five of six r18 reviews in, with context and loop trending toward `proceed_after_patches` while brain still had one `pushback`; adjacent git atoms contained the relevant r18 reviewer responses. Several git bodies and one Claude body were content-truncated, while the key progress atom was complete.
+- **Sources:** returned sample comprised Claude Code session `f96bfcee-3199-472c-adf2-9b7367d03b4d` and `git:/Users/zhenye/Desktop/Project_echo`; timestamps `2026-07-14T05:15:57Z` through `2026-07-14T05:23:06Z`.
+- **Verdict:** partial - the body fetch exposed the substantive live handoff (close r18, promote 133/134/135, launch builders), but it captured the moment before the sixth response and subsequent repo state must decide whether that handoff completed.
+- **Note:** ECHO was useful for intent and operator context; the 41 dropped atoms and content truncations make live git/backlog inspection mandatory for completion status.
+
+### 2026-07-13 22:36 PDT - exact-token lookup for topology-order supersession
+
+- **Trigger:** Canonical product docs require isolated FOUNDER LIVE before repository extraction, while the July 13 follow-up calls the reverse order a founder topology supersession; exact context was needed before classifying the discrepancy.
+- **Query inputs:** `search_memories({query:"before remote publication or FOUNDER LIVE", repo_path:"/Users/zhenye/Desktop/Project_echo", limit:20})`.
+- **Returned:** One match, no warnings: git commit `46330623023be48afcbfd81fb52eaff1b0dafccb` (`propose: local echo-brain loop context extraction`). The match included the follow-up line and the proposal/task-state/index change set, but 79,668 content characters were elided.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo` only; timestamp `2026-07-13T21:30:29Z`; referenced the three 133/134/135 proposals, their strategist pointers, `_followups.md`, and `docs/BACKLOG.md`.
+- **Verdict:** partial - ECHO proves the reverse ordering entered the repository as a single proposal commit labeled founder supersession, but it did not recover an independent conversation/decision atom establishing who authorized the supersession or why.
+- **Note:** Treat the ordering as an unresolved authority/documentation conflict unless a separate founder record is found; the exact-token result is git-only and heavily truncated.
+
+### 2026-07-13 22:36 PDT - recover founder source-topology decision context
+
+- **Trigger:** The first exact-token lookup was git-only, so a bounded pre-proposal search was needed to determine whether repository extraction before FOUNDER LIVE was actually founder-directed.
+- **Query inputs:** `search_memories({query:"echo-context", repo_path:"/Users/zhenye/Desktop/Project_echo", since:"2026-07-13T00:00:00-07:00", until:"2026-07-13T14:30:28-07:00", limit:20})`.
+- **Returned:** Four matches, no warnings. Three were Codex session turns from `019f5cdd-335c-7ae2-89bc-f42890fa0115`; the founder explicitly requested source-repository separation and then fixed the names as `echo-brain` (client product), `echo-loop` (internal orchestration), and `echo-context` (context layer). The captured response explicitly said this supersedes waiting for FOUNDER LIVE before extraction and that FOUNDER LIVE should run from standalone `echo-brain`. A later founder turn authorized parallel extraction with Project_echo as migration source/backup, subject to three reviewed proposals and no remote/authority transfer. One older git match was unrelated implementation history. Returned bodies were content-truncated but retained the load-bearing statements.
+- **Sources:** Codex JSONL `fs:/Users/zhenye/.codex/sessions/2026/07/13/rollout-2026-07-13T12-03-48-019f5cdd-335c-7ae2-89bc-f42890fa0115.jsonl` (turns 12, 13, and 15) plus `git:/Users/zhenye/Desktop/Project_echo`; timestamps `2026-07-13T10:25:22Z` to `2026-07-13T21:23:25.533Z`.
+- **Verdict:** right - ECHO recovered the missing founder-originated context and resolves the intended ordering: local standalone repo parity comes before FOUNDER LIVE, while remote creation and authority cutover remain later gates.
+- **Note:** The intent is clear cross-tool, but canonical repo documents such as `product/README.md` and the shipped 132 handoff still state the superseded order; the repository needs an explicit ratification/update to remove that documentation conflict.
