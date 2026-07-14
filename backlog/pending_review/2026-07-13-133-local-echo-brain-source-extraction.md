@@ -34,9 +34,40 @@ claimed_by: "fable-builder-133"
 claimed_at: "2026-07-14T05:46:05Z"
 branch: "agent/133-echo-brain"
 worktree: "/Users/zhenye/Desktop/Project_echo--133-echo-brain"
-head_sha: ""
+head_sha: "0caef8237c2aefba0d65c5f70000220654ee8f2e"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Builder fable-builder-133 (Claude Code). Attended one-time extraction; no migration
+  controller/evidence-publisher built (per one-shot-lifecycle decision).
+
+  Target: /Users/zhenye/Desktop/echo-brain, branch migration/2026-07-13-133, single root
+  commit HEAD 54259ef67eb90b5a1412bf15bac716180e822c72, tree e13b0cc57365acf9600f06882750982e02412c5a,
+  no remote, clean tree. Migration record on feature head 0caef8237c2aefba0d65c5f70000220654ee8f2e.
+
+  VERIFIED GREEN this session:
+  - AC1 sanitized-envelope repo creation; 36 source-derived blobs byte-identical (hash-object==source OIDs);
+    fsck --no-reflogs --unreachable empty; object-set==reachable-set (78 objs).
+  - AC2 check-dependencies exit 0; AC4 check-boundary exit 0 (closure resolves locally, external={ajv,better-sqlite3}).
+  - AC3 check-provenance exit 0 + independent audit-pinned-extraction verdict PASS (0 byte divergences vs pinned
+    source object DB), 56-row partition, exact 21 target-only set, empty transform/exclusion allowlists.
+  - AC6 test-parity records the 8 byte-identical parity leaves; synthetic e2e passes.
+  - vitest 14/14 (5 files) incl packaged-product proving B0==B1 identical tarball SHA-256
+    d8abbae572bac1a00c93522263d9e8f94112fe582aa7ef2ddf992267e39c970f (27 members) + offline clean-prefix install;
+    source-independence (no symlink/submodule/remote/sibling-escape) green.
+
+  REMAINING (documented, not run): AC5/AC7 formal offline sandbox-exec 4-clone matrix (B0/B1/B2/R1 across
+  separate clones under '(deny network*)' with DNS/direct-IP probes + isolated cache fill) — determinism +
+  offline install demonstrated with B0/B1 but the four-clone sandbox matrix was not executed. AC8 codex-ops
+  reviewer leg is the reviewer's responsibility.
+
+  QUESTION FOR REVIEWER/FOUNDER — AC3<->AC5 schema path: byte-identical src/product/config.ts:55 + package.json
+  files field reference schemas/product/runtime-config.v1.schema.json, but AC5 names schemas/runtime-config.v1.schema.json.
+  Reconciled by committing at the AC5 path and having verify-artifact.mjs stage into the tarball at schemas/product/...
+  so the unchangeable runtime loader resolves it. Confirm this reconciliation or direct a same-path copy instead.
+
+  Also flagged: 8 product tests treated as byte-parity leaves (not executed); their runtime join(REPO_ROOT,'<literal>')
+  references are recorded parity-only, not module edges. Executed suite = tests/migration/** + end-to-end-synthetic.
+  Full details in raw/internal/migrations/2026-07-13-133-echo-brain.md and the agent-run log.
 review_notes: ""
 ---
 
