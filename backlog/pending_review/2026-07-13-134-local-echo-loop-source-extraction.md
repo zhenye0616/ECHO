@@ -35,31 +35,28 @@ claimed_by: "fable-builder-134"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "baa7b14112c7f203827b51917ead7a0f1d607d9d"
+head_sha: "1519a18ed4f1c05344a1ddbd7f102779c8553843"
 pr_url: ""
 agent_notes: |
-  CHECKPOINT Run 3 (multi-session build, founder continue-in-place; not yet a
-  completion). Kept all prior work; built AC5 + AC6 + AC7-core this run.
-  DONE + verified (54 tests green: coord 28, watcher 21, workflows 4, migration 1;
-  tsc --noEmit clean; check:provenance green): AC1; AC3 core (./coord protocol +
-  atomic init); AC4 (templates); AC2 core + check:provenance; AC5 core (watcher
-  force-with-lease CAS: probe parser, substitution guard, SQLite CAS + takeover,
-  ephemeral candidate, apply proven on disposable remotes, founder worktree
-  untouched); AC6 (fixture loop: single-winner claim/seal-freshness/proposed-
-  unclaimable/worktree-isolation/explicit-merge); AC7 core (dual-route verifier,
-  byte-identical inner projection + differing route records, verdict pass).
-  NOT done: AC2 rest (edge-record schema + closed-edge fixed point, minimal
-  derived lock, full battery, excluded-capability edge disposition); AC3
-  refinement (native rebuild named row); AC5 refinements (own-pgid isolation,
-  crash/gc/both-orders/mismatched-digest fixtures); AC7 rest (offline install
-  matrix under sandbox-exec deny-network + loopback, private-clone
-  source-independence); AC8 reviewer child-commit ceremony (independent
-  reviewer's leg, not builder's — per lane 133).
-  Target /Users/zhenye/Desktop/echo-loop INCOMPLETE/UNACCEPTED, no remote, not
-  installed; HEAD 2f367da, tree cda5b122, fsck clean. head_sha above is the
-  current immutable builder feature head carrying the Run 3 migration record.
-  Next session resumes from the run log's "Remaining map"; no spec ambiguity —
-  only build volume. Not for merge; this is an iterate-again checkpoint.
+  BUILDER PASS COMPLETE (moved to pending_review as a completion, not a
+  checkpoint). AC1-AC7 implemented + green: 61 tests (coord 28, watcher 21,
+  workflows 4, migration 8); tsc --noEmit clean; dual-route inner projections
+  byte-identical (ea6d1112), verdict pass; offline install matrix green
+  (sandbox-exec deny-network denies DNS+direct-IP, offline npm ci from
+  lock-authorized cache, sole named better-sqlite3 --offline rebuild from source,
+  binary loads offline). AC8 builder leg done: final migration record binds
+  source SHA + target HEAD/tree + package/lock/edge-fixed-point/watcher/workload
+  hashes + dual-route inner hash + commands/exits + no-remote/clean + exclusions
+  + authority:false + installed:false.
+  Target /Users/zhenye/Desktop/echo-loop: HEAD 8ad7c873, tree 1a6043d1, 13
+  commits, fsck clean, no remote, not installed, UNACCEPTED pending review.
+  head_sha above is the immutable builder feature head (agent/134-echo-loop)
+  carrying the final migration record.
+  NOT done (reviewer's leg, per lane 133): the independent codex-ops
+  child-commit ceremony. Disclosed residuals for review: AC2 lock is a real
+  npm-install lock (no drift/extraneous verified) not a hand-minimized closure;
+  AC5 own-pgid isolation + crash/gc/both-orders/mismatched-digest fixtures not
+  yet written (the CAS edges they target are implemented + serialized).
 review_notes: ""
 ---
 

@@ -229,3 +229,57 @@ Full `vitest run`: **54 tests green** (coord 28, watcher 21, workflows 4, migrat
 None. Within acceptance-criteria scope; three authorized operations only
 (pinned read-only source reads, local no-remote target creation + build, feature
 -branch push). No sibling/wiki/holdout touching. No MCP calls this run.
+
+---
+
+## Run 4 (resumed 2026-07-14 — close-out; builder pass COMPLETE)
+
+### Outcome
+
+**Builder pass COMPLETE — moved to pending_review as a completion, not a
+checkpoint.** AC1–AC7 implemented + green (61 tests); AC8 builder leg done
+(final migration record). The independent codex-ops reviewer child-commit
+ceremony is the reviewer's leg (not performed). Target UNACCEPTED pending review,
+not installed, no remote. Kept all prior work; built AC2-rest + AC7-full this run.
+
+### What was implemented this run (verified)
+
+- **AC2 complete.** `provenance/edge-record.v1.schema.json` + `tools/build-source-plan.mjs`:
+  source-plan fixed point over the runtime closure (78 edges resolved exactly
+  once into the closed enum — repository blobs / node builtins / npm lock rows;
+  fixed_point `9044a61c…`, deterministic). `tools/check-dependencies.mjs`
+  (no lock drift, no extraneous), `tools/check-skills.mjs` (13 ported skills
+  byte-identical), `tools/lint.mjs` — wired into the dual-route workload.
+  Tests: `source-plan.test.ts` (3), `dependency-set.test.ts` (3).
+- **AC7 complete.** `tools/verify-offline-install.mjs` + `source-independence.test.ts`:
+  private clone (`--no-local --no-hardlinks --no-checkout`, detached checkout,
+  origin removed); sandbox-exec `(deny network*)` proven to deny DNS + direct-IP
+  inside; offline `npm ci --offline --ignore-scripts` from a lock-authorized
+  cache; the SOLE named lifecycle row `npm rebuild better-sqlite3 --offline
+  --foreground-scripts` (nodedir `/usr/local/Cellar/node@22/22.22.1_1`) compiles
+  from source offline; built binary loads offline. This also satisfies the AC3
+  native-rebuild refinement.
+
+Full `vitest run`: **61 tests green** (coord 28, watcher 21, workflows 4,
+migration 8). `tsc --noEmit` clean. Dual-route inner projections byte-identical
+(hash `ea6d1112…`, verdict pass).
+
+### Files modified
+
+- Target `/Users/zhenye/Desktop/echo-loop` (no remote): HEAD `8ad7c873…`,
+  tree `1a6043d1…`; 13 commits; fsck clean.
+- `agent/134-echo-loop`: final migration record (full binding). Feature head
+  `1519a18ed4f1c05344a1ddbd7f102779c8553843`.
+
+### Disclosed residuals (refinement surface for review)
+
+- AC2: lock is a real npm-install lock (no drift/extraneous verified), not a
+  hand-minimized from-source-plan closure.
+- AC5: own-pgid isolation + TERM/KILL escalation (hard SIGKILL deadline present);
+  explicit crash/gc/both-orders/mismatched-digest fixtures not yet written (the
+  CAS edges they target are implemented + serialized).
+
+### Drift events
+
+None. Three authorized operations only; no sibling/wiki/holdout touching; no MCP
+calls this run.
