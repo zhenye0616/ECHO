@@ -16,16 +16,18 @@ Materialize capture, normalization, storage, retrieval, and context APIs as a so
 - Raw Granola capture may be copied generically; product decision/card/brief/approval logic stays out.
 - Candidate inventory is exactly 211 paths (109 source, 102 test/fixture), pinned aggregate SHA-256 `e1fde9ae3f2730572dfaec621dc6531665594696917d81b31b9d997d5fd08f62`.
 - Every source row has provenance and ported/rewritten/excluded disposition; standalone parity needs no source access.
-- Registry-endpoint fetch is sandboxed then lock-integrity admitted; separate sealed seeds feed offline installs, and a lifecycle plan explicitly rebuilds/verifies native dependencies such as better-sqlite3 with pinned tools.
+- A host-aware Node fetch runner validates lock URLs/TLS/redirects, quarantines and integrity-admits tarballs; npm is offline-only and separate sealed seeds feed installs.
+- JavaScript verification uses pinned Node plus absolute entries, never npm-run/.bin; native rebuilds pin Node headers plus the traced executable/SDK closure and reject unexpected execs.
 - Shared target stays read-only; verifier records exact HEAD/tree, clones that commit privately, detaches, removes origin, checks object independence, and rechecks shared HEAD/tree.
 - Stdio, service-server, and service-client profiles are distinct: server only binds/accepts loopback and reports readiness by FD; client connects only after readiness to that exact endpoint.
-- A top-level finalizer atomically publishes numerically bounded capsules for every nonzero/catchable-signal path; publication failure retains scratch/worktree, and target cleanup remains founder-owned.
+- After anchored failures-dir bootstrap, a single-entry finalizer uses descriptor-relative `RENAME_EXCL`, collision/reentry handling, byte-safe outer budgeting, and full stream hashes.
+- Project_echo handoff uses one bounded push, process-group reap, and one remote-OID probe; ambiguous probe becomes unknown with no retry.
 - Synthetic loopback service tests prove capture/retrieval behavior; no live state migration or service cutover.
 - The migration record pins target HEAD/tree, hashes, commands, tests, no-remotes, clean state, false authority, and no-live-state.
 
 ## open_questions
 
-- R11 by independent `codex` and `codex-ops` must confirm descriptor parity, endpoint-scoped fetch plus lifecycle plan, pinned JS entrypoints/temp roots, top-level atomic capsules, and no-rewrite push policy.
+- R12 by independent `codex` and `codex-ops` must confirm host-aware quarantine fetch, direct JS entries/traced native closure, anchored no-replace capsules and byte budgeting, plus single-push OID reconciliation.
 - Later cutover decides remote, install, live-state migration/rollback, and echo-brain's versioned read-only contract.
 
 ## dont_touch
