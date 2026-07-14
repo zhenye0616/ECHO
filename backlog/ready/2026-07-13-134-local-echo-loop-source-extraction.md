@@ -9,6 +9,7 @@ blocked_by:
   - 2026-07-13-132-product-graduation-foundation
 task_state_ref: 2026-07-13-134-local-echo-loop-source-extraction
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 135bab0fd87554cc4ff3c052764d98b90debded4056ed8532c2cac0b9ebcb086
 files_to_modify:
   - /Users/zhenye/Desktop/echo-loop/**                         # NEW standalone internal orchestration repository; local only
   - raw/internal/migrations/2026-07-13-134-echo-loop.md        # NEW Project_echo provenance/parity record
