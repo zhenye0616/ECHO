@@ -478,3 +478,94 @@ remains UNACCEPTED, no remote, not installed, DEV, `authority:false`.
 None. Three authorized operations only (pinned read-only Project_echo source
 reads already done by predecessor; local no-remote target; feature-branch push).
 No sibling / wiki / holdout-131 touching. No `mcp__echo__*` calls this run.
+
+---
+
+## Run 8 (A–E round-2 residuals CLOSED — fable-builder-134b)
+
+### Trigger
+
+Third codex-ops judgment (feature-branch child `770b101f`) REJECTed with
+same-class residuals in C, D, E; A and B confirmed repaired and all 18 bound
+hashes reproduced. Founder-authorized precise fix cycle. Item re-opened to
+`backlog/claimed/` (main `ea61017f`); no re-claim (continuous claim). New builder
+commits stack on the review child `770b101f`.
+
+### Outcome
+
+**All three residuals closed on disposable fixtures only; normal builder handoff
+to `pending_review`.** Target remains UNACCEPTED, no remote, not installed, DEV,
+`authority:false`.
+
+### Verified state (target HEAD `d69c003ae4146140d3d0ee3fe945778781ae5a43`)
+
+- Tree `ca77fbda46887a4b7e6170029cd5615e2feefad8`; 29 commits; no remote;
+  `git fsck --full --strict` exit 0; `git status --porcelain` empty.
+- Full `vitest run`: **22 files / 143 tests pass** (was 121; +D fixture roster,
+  +C live-group/crash-window fixtures, +fail-closed/tamper fixtures); `tsc
+  --noEmit` clean; lint / check:provenance / check:dependencies / check:skills
+  exit 0.
+- `build-source-plan.mjs --check` exit 0 — committed edge record == HEAD closure,
+  **584 rows / 9 classes**, fixed_point
+  `203f53420fb50ce82d0064ef238b568371a7095d8f7d2fff52256f7875a8dac8`.
+- Dual-route verifier: 14-row roster, both routes verdict pass, inner projection
+  byte-identical, SHA-256
+  `b47d8c8d2bc0c99fbdd1550b4930a7199468360cb04f0f03c9332373840e3f9d`;
+  reproduced under a distinct scratch `HOME`/`TMPDIR` (envelope-invariant).
+
+### Finding D residual (CLOSED)
+
+`tools/build-source-plan.mjs` stops discarding the policy (`void policy` gone);
+the sealed policy object drives the accepted `edge_classes` set + fail-closed
+reject flags, and `policy_sha256` is bound into the fixed point. Rows are
+`(from, from_blob, specifier, edge_class, resolution, context_hash)`;
+`source_blobs` binds all 103 executable code-file blobs (incl. the verifier),
+`manifest_blobs` binds manifest context → tamper-evident fixed point (verified: a
+1-byte change to `build-source-plan.mjs` and a policy-sha change each move it).
+`context_hash` hashes canonical manifest/context BYTES (verified via lock-row
+version). Fail-closed `EdgeReject` on unresolved repository-capable
+file/schema/worker/script/exec + computed; extractor precision fixed
+(script-extension boundary guard + heredoc-body skipping) so the real tree yields
+zero rejects. Workspace exports / package exports / tsconfig `extends` / `baseUrl`
+/ `references` resolve (workspace-only `@acme/foo` fixture passes). Fixture roster
+completed (dynamic import, CommonJS require, schema/template, npm JS CLI, python
+script, worker entry, baseUrl, fail-closed rejects, policy-driven flags,
+tamper-evidence).
+
+### Finding C residual (CLOSED)
+
+Transport children write their process-group id to a durable `pgid_file` as their
+FIRST action, before contacting the remote (an `sh` shim: `echo $$ > file; exec
+git …`), closing the crash window where `owner_pgid` was persisted only after the
+synchronous child returned. Takeover reaps the ACTUAL prior group (`owner_pgid`,
+or the `pgid_file` on crash) with a group-directed TERM/KILL and requires
+termination evidence before `attemptPush`; evidence stored durably.
+`setOwnerPgid` + takeover CAS are owner-token-predicated (a resurfacing prior
+owner cannot clobber the new owner). State schema adds `pgid_file` +
+`termination_evidence` (+ forward-migration). Fixtures couple a LIVE prior-owner
+group (orphaned to init — no zombie, modelling a crashed prior owner) to an
+expired APPLYING lease and assert reap-before-apply; a crash-window fixture proves
+recovery via the durable `pgid_file` alone.
+
+### Finding E residual (CLOSED)
+
+New migration record `raw/internal/migrations/2026-07-13-134-echo-loop.md` binds
+the literal publication endpoint `https://github.com/zhenye0616/ECHO.git` + full
+ref `refs/heads/agent/134-echo-loop`, and states concrete route argv (no
+`<dir>`/`<npm-cli>` placeholders), alongside the full artifact OID/SHA-256 table,
+corrected fixed point, envelope-invariant dual-route hash, `authority:false`,
+`installed:false`.
+
+### Handoff
+
+- Migration record committed on `agent/134-echo-loop`; feature head
+  **`375bdf694d8bd71bf383b6ae7416d69990ab3092`** (sole parent review child
+  `770b101f`) pushed to origin.
+- Item moved `claimed/ → pending_review/`; `head_sha` + task-state
+  `handoff_head_sha` set to the feature head.
+
+### Drift events
+
+None. Three authorized operations only (pinned read-only Project_echo source
+reads; local no-remote target; feature-branch push). No sibling / wiki /
+holdout-131 touching. No `mcp__echo__*` calls this run.

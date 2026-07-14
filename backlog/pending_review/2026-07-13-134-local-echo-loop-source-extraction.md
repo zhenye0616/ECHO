@@ -35,45 +35,51 @@ claimed_by: "fable-builder-134b"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "b8e4fe23f53db95b385eec748ce326269f9bf934"
+head_sha: "375bdf694d8bd71bf383b6ae7416d69990ab3092"
 pr_url: ""
 agent_notes: |
-  A-E CAMPAIGN COMPLETE — normal builder handoff to pending_review for
-  re-review. Successor builder `fable-builder-134b` adopted the cleanly-
-  checkpointed in-claim run of `fable-builder-134` (session-exhaustion recovery;
-  claim continuous). Prior checkpoint landed Findings D/A/B; this run completes
-  Findings C and E and re-verifies A/B on disk. All five second-review findings
-  (A-E) are resolved on disposable fixtures only.
-  Green at target HEAD 171fdfc724f74f7cd6d4b8502e03264a517816d9 (tree
-  8f636631db2160370f051caaba1754ea30cb6d69, 26 commits, no remote, fsck exit 0,
-  tree clean): full `vitest run` = 22 files / 121 tests pass; `tsc --noEmit`
+  A-E ROUND-2 RESIDUALS CLOSED — normal builder handoff to pending_review for
+  re-review (builder fable-builder-134b). The third codex-ops review (child
+  770b101f) confirmed A+B repaired and all 18 hashes reproduced, and raised
+  same-class residuals in C, D, E. This round closes all three on disposable
+  fixtures only. New builder head stacks on the review child 770b101f.
+  Green at target HEAD d69c003ae4146140d3d0ee3fe945778781ae5a43 (tree
+  ca77fbda46887a4b7e6170029cd5615e2feefad8, 29 commits, no remote, fsck exit 0,
+  tree clean): full `vitest run` = 22 files / 143 tests pass; `tsc --noEmit`
   clean; lint/check:provenance/check:dependencies/check:skills exit 0;
   `build-source-plan.mjs --check` exit 0 (committed edge record == HEAD closure,
-  538 rows / 9 classes, fixed_point d1d0bc612fa1e914011f714d842bd69d28fe2d323ebc143a547657d7ee345c33).
-  - Finding C (DONE): 7 AC5 watcher gaps implemented in src/watcher/* (reaper.ts
-    group-directed TERM-then-KILL via kill(-pgid) + termination evidence;
-    takeover reaps prior-owner owner_pgid before attemptPush; candidate.ts uses
-    gitEnv() config-free env; APPLYING revalidates approval token + repoIdentity
-    + fullRef; next_attempt_at enforced + repeated-failure/ambiguous-post-push
-    ESCALATE; prepared/-base refs deleted on terminal) with 9 REAL fixtures in
-    tests/watcher/containment.test.ts (real descendants + real orphaned process
-    groups + disposable file:// remotes; asserts descendant PID death and
-    isGroupAlive==false, not elapsed-time proxies).
-  - Finding E (DONE): new immutable feature-head migration record
-    raw/internal/migrations/2026-07-13-134-echo-loop.md with full AC8 bindings —
-    exact commands + exit results (restored `## Commands + exits`), target
-    path/branch, target-policy-copy OID dd9d78ab.../sha256 44bef194..., truthful
-    clean-status, corrected fixed point d1d0bc61..., envelope-invariant dual-
-    route inner hash eb614a430ad5355addba076df9a2216e5b903b205c097fba67576fdf868b1483
-    (byte-identical direct+npm; independently reproduced under a distinct scratch
-    HOME/TMPDIR), authority:false, installed:false.
-  - Finding A re-verified: --check validates the committed record and leaves the
-    tree clean (no overwrite). Finding B re-verified: dual-route hash reproduces
-    under a scratch envelope (no founder-HOME coupling).
-  Target /Users/zhenye/Desktop/echo-loop UNACCEPTED, no remote, not installed,
-  DEV; authority:false. head_sha above is the immutable builder head
-  b8e4fe23... on agent/134-echo-loop (built on prior checkpoint 7f89b291,
-  itself on reviewer child c2a33138). Campaign detail in run log Run 7.
+  584 rows / 9 classes, fixed_point 203f53420fb50ce82d0064ef238b568371a7095d8f7d2fff52256f7875a8dac8).
+  - Finding D residual (CLOSED): resolver is policy-driven (void policy removed;
+    policy object drives edge_classes + fail-closed reject flags; policy_sha256
+    bound into fixed point). Rows are (from, from_blob, specifier, edge_class,
+    resolution, context_hash); source_blobs binds all 103 executable code file
+    blobs (incl. the verifier itself) + manifest_blobs → tamper-evident fixed
+    point (verified: 1-byte change to build-source-plan.mjs AND policy-sha change
+    each MOVE the fixed point). context_hash hashes canonical manifest/context
+    BYTES (verified: same target, different lock row → different context_hash).
+    Fail-closed EdgeReject on unresolved repository-capable file/schema/worker/
+    script/exec + computed (no silent null-skip); extractor precision fixed
+    (script-ext boundary guard + heredoc skipping) → real tree = 0 rejects.
+    Workspace exports/pkg exports/tsconfig extends/baseUrl/references resolve
+    (workspace-only @acme/foo fixture passes). Full fixture roster added.
+  - Finding C residual (CLOSED): transport children write their pgid to a durable
+    pgid_file BEFORE contacting the remote (sh shim), closing the crash window
+    where owner_pgid was persisted only after the synchronous child returned;
+    takeover reaps the ACTUAL prior group (owner_pgid or pgid_file) with
+    termination evidence BEFORE attemptPush; owner-token-predicated setOwnerPgid +
+    takeover CAS; state adds pgid_file + termination_evidence (+ forward-migrate).
+    Fixtures couple a LIVE prior-owner group (orphaned to init) to an expired
+    lease + a crash-window recovery-via-pgid_file fixture.
+  - Finding E residual (CLOSED): migration record binds the literal publication
+    endpoint https://github.com/zhenye0616/ECHO.git + full ref
+    refs/heads/agent/134-echo-loop, and states concrete route argv (no <dir>/
+    <npm-cli> placeholders). Dual-route inner hash
+    b47d8c8d2bc0c99fbdd1550b4930a7199468360cb04f0f03c9332373840e3f9d (byte-
+    identical direct+npm; envelope-invariant under a distinct scratch HOME/TMPDIR).
+  A + B remain repaired (re-verified on disk). Target /Users/zhenye/Desktop/
+  echo-loop UNACCEPTED, no remote, not installed, DEV; authority:false. head_sha
+  above is the immutable builder head 375bdf69... on agent/134-echo-loop, sole
+  parent the review child 770b101f. Campaign detail in run log Run 8.
 review_notes: ""
 ---
 
