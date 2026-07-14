@@ -13,14 +13,15 @@ Materialize the reviewed item-132 product closure as a source-independent local 
 - Copy only the item-132 product closure plus source/test/build necessities; hash every copy/relocation/rewrite/exclusion.
 - No symlink, submodule, workspace, path/Git dependency, import, or runtime read may reach Project_echo or siblings.
 - The target owns package/lock, config, state paths, build, artifact, boundary, tests, and provenance.
-- Exact eight-file product test parity plus a new synthetic meeting-to-manual-gate-to-brief test prove behavior.
+- The exact eight pinned product tests remain byte-identical at identical paths with cross-manifest equality; a new synthetic meeting-to-manual-gate-to-brief test proves the standalone composition.
 - Verification uses read-only target inspection plus unique private clones, sanitized/sandboxed install, and a read-only operator audit recomputing every pinned source blob/rewrite.
-- Unique atomic 0700 attempt evidence retains phase profiles/probes/artifact and NOT_ACCEPTED→handoff states; final state follows pushed handoff and migration record pins all hashes.
+- Unique atomic 0700 attempt evidence has a write-ahead, fsync/rename, monotonic receipt; builder records exact commit/ref, founder may idempotently reconcile only the post-push receipt window, and evidence is not cleaned by this item.
+- Npm uses pinned absolute Node plus npm-cli, a tool-bin/private-.bin-only PATH, pinned shell, immutable fetch seed, separate writable offline cache, and recorded executable probes.
 - Project_echo remains backup/authority; no remote, release, real data, or maturity advance.
 
 ## open_questions
 
-- R10 by independent `codex` and `codex-ops` must confirm env-i phase profiles/offline install, attempt receipt lifecycle, source-only substitution audit, Git isolation, and workflow paths.
+- R11 by independent `codex` and `codex-ops` must confirm byte-identical test parity, monotonic receipt/reconciliation, explicit npm invocation/cache handoff, parent-chain contract, and retained evidence.
 - A later authority-transfer item decides remote creation, branch protection, and old-path freeze.
 
 ## dont_touch
