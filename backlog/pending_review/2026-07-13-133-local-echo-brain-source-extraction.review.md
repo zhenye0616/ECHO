@@ -1,25 +1,20 @@
 ---
 item_id: 2026-07-13-133-local-echo-brain-source-extraction
-verdict: redo before merge
-reviewed_at: '2026-07-14T22:01:16Z'
+verdict: merge as-is
+reviewed_at: '2026-07-14T23:11:55Z'
 test_counts:
-  passed: 25
-  failed: 1
+  passed: 29
+  failed: 0
 producer: review-pending-orchestrator
 ---
 ## Verdict
-Redo before merge. Fresh independent AC8 review of target 957ad4680f6c67d15fb3dfa0941b52c2ab9c3110 rejected the candidate: the file-global command-literal map in tools/check-dependencies.mjs lets an attacker-controlled inner command inherit authorization from an unrelated outer same-name literal binding. AC2, AC5, and AC7 remain unmet. The immutable rejection record is published as sole-parent review child 1caf83fc63c83f044a2f0d2608a85bcf4759bbcc.
+Fresh independent review APPROVED exact builder head `08f0441703a4b44e82dcea7e456129c4507d3cab` and immutable review child `cc12b8fbf2f453fedf913720510e7845a164c2d4` for merge as-is. The prior scope-shadow command-provenance finding is closed; only the three spec-authorized computed-command owners remain, and the accepted target remains `authority:false` at DEV.
 
 ## Pre-merge fixups
-- [ ] Replace the file-global command-name map in `tools/check-dependencies.mjs:152-176` with scope- and mutation-correct analysis, or reject every nonliteral executable token outside the explicit computed-command owners.
-- [ ] Commit the exact same-name shadowing fixture from the fresh review as a fail-closed regression alongside the direct arbitrary-RHS fixture.
-- [ ] Produce a new accepted echo-brain target OID/tree, regenerate extraction provenance and the Project_echo migration record, and rerun B0/B1/B2 plus fresh independent R1.
-- [ ] Publish a new immutable builder head and independent sole-parent review child without advancing authority or maturity.
+- None. Merge the exact reviewed remote feature tip `cc12b8fbf2f453fedf913720510e7845a164c2d4`.
 
 ## Expected merge conflicts
-- No textual conflicts are predicted against current `main`; the fresh merge-tree preview was clean.
-- On re-review, preserve current-main backlog, task-state, generated-index, run-log, journal, and sidecar state; do not treat two-dot branch reversions as merge inputs.
+- None observed. Legacy `git merge-tree` against current main `6d52a1ca11c8fe0e1ef391f3e2828ae27a64934d` produced no conflict markers or both-modified paths; preserve current-main workflow files during the no-ff merge.
 
 ## Follow-up items (defer, do not block merge)
-- Reconcile the TypeScript/typescript-eslint peer-range mismatch before qualification.
-- Consolidate superseded identity sections in a later migration-record cleanup.
+- Track the TypeScript/typescript-eslint peer-range mismatch as qualification debt and optionally consolidate superseded identity sections in the migration record. Neither blocks this local DEV repository merge.
