@@ -31,7 +31,7 @@ spec_refs:
   - product/npm-shrinkwrap.json                               # pinned runtime tree
   - product/README.md                                         # DEV commands and inherited debt
 claimed_by: "fable-builder-133"
-claimed_at: "2026-07-14T05:46:05Z"
+claimed_at: "2026-07-14T05:46:05Z"  # reclaimed 2026-07-14 for founder-directed AC5/AC7 four-clone matrix (B0/B1/B2) continuation
 branch: "agent/133-echo-brain"
 worktree: "/Users/zhenye/Desktop/Project_echo--133-echo-brain"
 head_sha: "0caef8237c2aefba0d65c5f70000220654ee8f2e"
