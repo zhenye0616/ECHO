@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-13-134-local-echo-loop-source-extraction"
+round: 15
+reviewer: "codex"
+artifact_sha: "75b5ce407a8b680a7a53ac280d26281ff73e2387"
+completed_at: '2026-07-14T03:29:38Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC2 — source seed and final-edge partition"
+    finding: "The semantic seed phrases and self-verified resolver do not provide an independent source-closure oracle, and the edge classes omit explicit handling for Node built-ins and shell/Python tooling present in the stated roots. Add a literal pinned-SHA seed manifest with directory-expansion and byte-safe Git-object rules, a versioned edge-record schema with resolution precedence for every supported language/sink, and fixtures whose expected seeds and edge classes are independent of the resolver under test."
+  - severity: "high"
+    where: "AC3 — invokeRole identity"
+    finding: "The invocation key excludes the deadline while the deadline only contributes to a payload hash, but existing PENDING or PUBLISHED rows are not required to compare that hash. Define canonical payload serialization and require hash equality before retrying publication or returning duplicate; a mismatch must fail with a named no-mutation conflict for PENDING, PUBLISHED, and concurrent cases. Also make the generic event uniqueness constraint explicitly exclude reserved role.invoked events."
+  - severity: "medium"
+    where: "AC3 — invokeRole publication budget"
+    finding: "The two-second guarantee does not state whether the initial create/read transaction, all busy waits, backoffs, and best-effort error recording share one budget. Define one monotonic deadline beginning at invokeRole entry, one exact attempt/backoff schedule, and clamping of each SQLite timeout and sleep to the remaining budget; add held-lock and fake-clock tests proving bounded PUBLISH_FAILED completion."
+  - severity: "high"
+    where: "AC3 — SQLite initialization"
+    finding: "No exact no-replace primitive or post-crash EEXIST reconciliation is prescribed, and sidecar absence is checked before later reopen/validation steps that can recreate sidecars. Require a same-directory temporary DB and an explicit macOS-compatible atomic primitive with close/fsync/publish/directory-fsync/temp-unlink ordering, then define read-only winner reconciliation and sidecar checks after every validation handle is closed."
+  - severity: "high"
+    where: "AC5 — watcher PREPARED/Git-CAS/terminal transition"
+    finding: "The durable row and git update-ref operate in separate atomicity domains without a serialization rule. A mismatched watcher can mark ESCALATED after another watcher observes ref=old but before that watcher moves the ref, leaving terminal state and Git contradictory. Add conditional state transitions or a recoverable lease around reconciliation, candidate-parent/tree validation, mismatched-digest race fixtures, and an explicit rule for checked-out-ref worktree/index coherence. Also state whether APPLIED denotes the local ref or authoritative upstream state and preserve the founder push checkpoint accordingly."
+  - severity: "high"
+    where: "AC7 — environment isolation and route equivalence"
+    finding: "The requirement that Git variables be absent conflicts with config-free Git because pinned Git 2.37.3 needs a verifier-owned control such as GIT_CONFIG_NOSYSTEM to suppress system configuration. In addition, npm run mutates PATH and injects npm variables that can influence the workload even if ignored during comparison. Define separate route envelopes but one scrubbed canonical workload environment, an exact owned-variable allowlist, isolated per-route clones/install trees/caches, and a versioned canonical serializer; test both route orders plus hostile system config, node_modules/.bin, and npm-variable canaries."
+  - severity: "medium"
+    where: "AC8 and files_to_modify — independent review handoff"
+    finding: "The builder must stop at pending_review, but the later independent binding has no named owner, artifact path, schema, or command, and the allowed paths do not identify where its evidence is persisted. Separate the builder handoff from the independent-review gate and specify the reviewer-owned record location, immutable handoff commit/spec SHA/target HEAD/tree/migration-record bindings, verification command/result, reviewer-independence check, and corresponding allowed path if the result is stored."
+---
