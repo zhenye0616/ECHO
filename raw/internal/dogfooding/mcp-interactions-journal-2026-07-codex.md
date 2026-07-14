@@ -1661,3 +1661,12 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** Claude Code builder-successor and prior reviewer-executor subagent JSONL sources under the Project_echo orchestrator session.
 - **Verdict:** partial but useful — ECHO confirms the new 134 builder handoff, but returns no fresh independent Claude verdict for `b8e4fe23…`.
 - **Note:** Treat 134 as review-pending. Ground cleanup in Git/backlog truth and preserve its feature/target worktrees until a new verdict is committed.
+
+### 2026-07-14 14:18 PDT - check for fresh Claude evidence on remediated 133 and 135 heads
+
+- **Trigger:** Pre-merge cleanup exposed stale rejection sidecars for 133/135; verify whether Claude has produced any newer cross-tool review evidence before declaring the merge gate.
+- **Query inputs:** Two parallel Claude-only exact-SHA searches, each scoped to Project_echo since 10:00 PDT with limit 10: `search_memories(query="b62d160c6deeb77f528e58e0ef49090de7fac72d", ...)` and `search_memories(query="caf4bdde2dc852357410264f00d5ccef20708a11", ...)`.
+- **Returned:** Both searches returned zero matches, no cursors, and no warnings.
+- **Sources:** Claude Code capture lane scoped to `/Users/zhenye/Desktop/Project_echo`; no matching source atoms.
+- **Verdict:** partial — ECHO has no captured Claude judgment bound to either current remediation head; local Git/review artifacts remain the authority for the gate.
+- **Note:** Do not inherit the older ACCEPT records. Fresh independent review children and updated sidecars are still required for 133 and 135.
