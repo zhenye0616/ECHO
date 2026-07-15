@@ -45,7 +45,24 @@ agent_notes: |
   B0/B1/B2/builder-R1 lifecycle legs pass with one identical artifact tuple.
   Builder R1 is mechanical evidence only; fresh independent review is required.
   authority:false; maturity:DEV.
-review_notes: ""
+review_notes: |
+  Merged on 2026-07-15 via founder reconciliation.
+
+  Conflicts resolved:
+  - None; exact reviewed tip cc12b8fbf2f453fedf913720510e7845a164c2d4 merged cleanly.
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Fixups applied:
+  - Founder-supplied verification repair: the aggregate `npm test` script now runs the exhaustive repo, product, and orchestration lanes sequentially with their intended Vitest configs.
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 2,222/2,222 runnable tests pass (21 skipped, 1 todo); lint and typecheck clean post-merge; coupled invariants and skill-sync checks pass.
+
+  Follow-up items (non-blocking):
+  - Track the TypeScript/typescript-eslint peer-range mismatch as qualification debt and optionally consolidate superseded identity sections in the migration record. Neither blocks this local DEV repository merge.
 ---
 
 # Local standalone echo-brain source extraction and parity proof

@@ -42,7 +42,7 @@
     "./README.md"
   ],
   "scripts": {
-    "test": "vitest run",
+    "test": "npm run test:repo && npm run test:product && npm run test:orchestration",
     "test:product": "vitest run --config vitest.product.config.ts",
     "test:repo": "vitest run --config vitest.repo.config.ts",
     "test:orchestration": "vitest run --config vitest.orchestration.config.ts",
