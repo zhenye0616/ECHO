@@ -662,3 +662,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
 - **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
 - **Note:** First 136 round; reframe gate structurally n/a at r1. r2 spec_commit_sha pins a3d83d7d (disposition commit, contains the patched spec bytes from ad53c6c7).
+
+## 2026-07-15 15:50 PDT — 136 r3 verification-round dispatch (coord_invoke ×2)
+
+- **Trigger:** Watcher tick combined 136 r2 (codex proceed_after_patches ×4 MEDIUM, claude proceed + 1 nit; not escalated). Reframe gate TRIGGERED (4 findings target r1-patch mechanisms at ad53c6c7); fresh-context investigator (codex exec read-only) returned propagation_completion; rows 1–4 patched at 0f05a7ce, r3 dispatched at d1f78e5c; 057b post-push hook fires the active trigger for the r3 roster.
+- **Query inputs:** `coord_invoke` ×2 — roles codex + claude on backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r3/request.md, correlation_id from r3 request frontmatter; repo-relative request_path per the pin rule.
+- **Returned:** both ok — reviewer_invoked ids 91c51967… (codex, run-codex-reviewer.sh) and 784579c1… (claude, run-claude-reviewer.sh); wrappers spawned fire-and-forget.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
+- **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
+- **Note:** First reframe-gate firing on the 136 lane; investigator explicitly warned that GitHub environment/artifact/draft-release semantics may not support the immutable-tuple/draft-stage contract as specced — if so the spec's hosting-tier stop path applies, not more prose. r3 spec_commit_sha pins 9cc29b14 (disposition commit; contains patched bytes from 0f05a7ce).
