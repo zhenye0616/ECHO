@@ -8,7 +8,7 @@ created: 2026-07-15
 blocked_by:
   - 2026-07-15-138-echo-context-cutover-substrate-rehearsal
 task_state_ref: 2026-07-15-139-echo-context-founder-mac-authority-activation
-requested_reviewers: ["codex", "cursor"]
+requested_reviewers: ["codex", "claude"]
 files_to_modify:
   - "/Users/zhenye/Library/Application Support/echo-context/**" # exact releases, config, secrets, controller journal, backups, quarantine, and evidence
   - /Users/zhenye/.echo-context/** # final authoritative 0700 context home and state
