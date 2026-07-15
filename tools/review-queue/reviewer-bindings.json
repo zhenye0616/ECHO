@@ -65,7 +65,7 @@
     {
       "reviewer": "claude",
       "mode": "headless-cli",
-      "argv": ["claude", "--dangerously-skip-permissions", "-p"],
+      "argv": ["claude", "--model", "fable", "--dangerously-skip-permissions", "-p"],
       "stdin_from": ".claude/commands/review-queue-{{REVIEWER}}.md",
       "cwd": "{{WT}}",
       "agent_sandbox": "danger-full-access",

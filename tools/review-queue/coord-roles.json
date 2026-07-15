@@ -24,7 +24,7 @@
     {
       "name": "claude",
       "headless": true,
-      "invoke_command": ["claude", "-p"],
+      "invoke_command": ["claude", "--model", "fable", "-p"],
       "events": {
         "reviewer_invoked": { "default_deadline_sec": 90,  "max_deadline_sec": 300,  "expects": "tick_start" },
         "tick_start":       { "default_deadline_sec": 600, "max_deadline_sec": 1200, "expects": "tick_end" }

@@ -30,7 +30,7 @@
       "required": false,
       "timeout_hours": null,
       "slash_command": "review-queue-claude",
-      "invoke_command": "claude --dangerously-skip-permissions -p < {{PROMPT}}"
+      "invoke_command": "claude --model fable --dangerously-skip-permissions -p < {{PROMPT}}"
     }
   ]
 }

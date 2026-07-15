@@ -344,10 +344,16 @@ describe('087 reviewer-bindings.json contract', () => {
       expect(b.argv?.join('\0')).not.toContain('.claude/commands');
     }
     expect(binding('codex').argv?.at(-1)).toBe('-');
-    expect(binding('claude').argv).toEqual(['claude', '--dangerously-skip-permissions', '-p']);
+    expect(binding('claude').argv).toEqual([
+      'claude',
+      '--model',
+      'fable',
+      '--dangerously-skip-permissions',
+      '-p',
+    ]);
   });
 
-  it('resolves codex and codex-ops to read-only argv while leaving claude on its current argv', () => {
+  it('resolves codex and codex-ops to read-only argv while pinning claude to fable', () => {
     expect(legacyReviewer('codex').invoke_command).toBe(
       'codex exec -C {{WT}} --sandbox danger-full-access - < {{PROMPT}}',
     );
@@ -355,7 +361,7 @@ describe('087 reviewer-bindings.json contract', () => {
       'codex exec -C {{WT}} --sandbox danger-full-access - < {{PROMPT}}',
     );
     expect(legacyReviewer('claude').invoke_command).toBe(
-      'claude --dangerously-skip-permissions -p < {{PROMPT}}',
+      'claude --model fable --dangerously-skip-permissions -p < {{PROMPT}}',
     );
 
     const wt = '/tmp/echo wt';
@@ -374,6 +380,8 @@ describe('087 reviewer-bindings.json contract', () => {
     expect(claude.status, claude.stderr.toString()).toBe(0);
     expect(parseNulDelimited(claude.stdout as Buffer)).toEqual([
       'claude',
+      '--model',
+      'fable',
       '--dangerously-skip-permissions',
       '-p',
     ]);
