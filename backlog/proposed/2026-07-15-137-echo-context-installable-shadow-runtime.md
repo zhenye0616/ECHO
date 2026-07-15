@@ -8,7 +8,7 @@ created: 2026-07-15
 blocked_by:
   - 2026-07-15-136-echo-context-canonical-repository-release-substrate
 task_state_ref: 2026-07-15-137-echo-context-installable-shadow-runtime
-requested_reviewers: ["codex", "claude"]
+requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/package.json # runtime build, CLI entrypoint, and prerelease identity
   - /Users/zhenye/Desktop/echo-context/package-lock.json # exact runtime build closure

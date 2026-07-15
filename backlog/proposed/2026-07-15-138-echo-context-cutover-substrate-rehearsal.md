@@ -8,7 +8,7 @@ created: 2026-07-15
 blocked_by:
   - 2026-07-15-137-echo-context-installable-shadow-runtime
 task_state_ref: 2026-07-15-138-echo-context-cutover-substrate-rehearsal
-requested_reviewers: ["codex", "claude"]
+requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/package.json # controller build/rehearsal entrypoints
   - /Users/zhenye/Desktop/echo-context/package-lock.json # exact controller dependency closure

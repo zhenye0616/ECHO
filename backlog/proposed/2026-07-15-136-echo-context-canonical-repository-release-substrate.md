@@ -8,7 +8,7 @@ created: 2026-07-15
 blocked_by:
   - 2026-07-13-135-local-echo-context-source-extraction
 task_state_ref: 2026-07-15-136-echo-context-canonical-repository-release-substrate
-requested_reviewers: ["codex", "claude"]
+requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/.github/workflows/** # NEW least-privilege CI and private source-release workflows
   - /Users/zhenye/Desktop/echo-context/package.json # prerelease identity and self-contained operator scripts
