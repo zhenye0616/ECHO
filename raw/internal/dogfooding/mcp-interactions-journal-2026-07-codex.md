@@ -1688,3 +1688,48 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** Exact Claude Code successor-builder 134b source, with captured Git state clean at main `0496acf5`.
 - **Verdict:** right - the wait condition is cleared; 134 has landed durably and can enter fresh independent review alongside 133 and 135 remediation.
 - **Note:** Reconcile the reported SHAs, branch endpoint, target tree, item frontmatter, and main state directly from Git before taking over the three-item path.
+
+### 2026-07-15 00:48 PDT - resolve the disconnected Codex session
+
+- **Trigger:** User asked to recover the state of the other Codex session before it disconnected.
+- **Query inputs:** `echo_resolve_mru({sources:["codex"], repo_path:"/Users/zhenye/Desktop/Project_echo"})`.
+- **Returned:** Resolved the most-recent Project_echo Codex source to `rollout-2026-07-13T22-29-33-019f5f1a-162d-7353-917c-37155407a8b4.jsonl` with the repo filter; no warnings.
+- **Sources:** Exact Codex session JSONL under `~/.codex/sessions/2026/07/13/`.
+- **Verdict:** right for source discovery; the session tail still needs hydration and repo reconciliation before reporting its state.
+- **Note:** Tail this exact source next. Distinguish the captured terminal intent from durable Git/backlog state because a disconnect may have happened between them.
+
+### 2026-07-15 00:49 PDT - tail the disconnected Codex session
+
+- **Trigger:** Hydrate the resolved session's latest state before its disconnect.
+- **Query inputs:** Source-exact `search_memories` on session `019f5f1a-162d-7353-917c-37155407a8b4`, scoped to Project_echo, limit 10.
+- **Returned:** Ten newest turns with a pagination cursor and no warnings. The latest atom is turn 10 at 00:07:49 PDT: it starts from the user's request to review 134 and, after rejecting multiple exact candidates, reaches a sixth remediation cycle with target `c8ed1b0…`, immutable rejection parent `e9ae6519…`, and a builder/auditor checking scratch-HOME plus system-`jsonschema` isolation. That atom's content is clipped by 19,173 bytes and its tool-call metadata is projected. The prior complete turn records all three items in `pending_review` at handoff `7f0f0911`, before the new 134 review began.
+- **Sources:** Exact Codex rollout JSONL; turns 1-10.
+- **Verdict:** partial — source and broad workflow state are clear, but the latest stopping point is hidden in the clipped portion.
+- **Note:** Use `get_atom` on `3a26160c-bdb8-4445-a4f3-7201f752c37b`, then reconcile the recovered claim against canonical Git/backlog state.
+
+### 2026-07-15 00:50 PDT - recover the disconnected turn verbatim
+
+- **Trigger:** The session-tail search clipped the latest turn's stopping point by 19,173 bytes.
+- **Query inputs:** `get_atom({id:"3a26160c-bdb8-4445-a4f3-7201f752c37b"})`.
+- **Returned:** Verbatim 23,192-byte turn body with no content truncation and no warnings; only tool-call metadata was projected. The turn drove item 134 through a fifth remediation and sixth independent review, rejected builder head `155c48c0…` for scratch-HOME/system-Python portability, published immutable rejection child `e9ae6519…`, committed the sixth rejection sidecar on main at `f4f68da2…`, reclaimed 134 on main at `ff91d4a5…`, then started a sixth bounded remediation. The final captured state says the feature worktree is clean at `e9ae6519…`, the standalone target is clean and untouched at `c8ed1b0…`, and a builder plus read-only auditor are evaluating the portability fix/version-fingerprint boundary. 133 and 135 remained untouched and merge-ready; no merge started.
+- **Sources:** Exact Codex turn 10 from rollout session `019f5f1a-162d-7353-917c-37155407a8b4`.
+- **Verdict:** right for the session's last emitted state; repository/process inspection is still required to detect work performed after the last captured commentary or abandoned by disconnect.
+- **Note:** The recovered turn also records a founder-acknowledgment gate because 133/135 review conflict previews were older than six hours, despite a fresh clean dry run in order 133 → 135.
+
+### 2026-07-15 00:51 PDT - check for a later captured Codex turn
+
+- **Trigger:** Determine whether the disconnected session emitted any newer ECHO atom after the recovered turn.
+- **Query inputs:** Source-exact `search_memories` on the same rollout, scoped to Project_echo, `since:"2026-07-15T07:07:49.067Z"`, limit 10.
+- **Returned:** Zero matches, no cursor, and no warnings.
+- **Sources:** Exact disconnected Codex rollout only.
+- **Verdict:** right — ECHO has no later captured turn; the sixth-remediation identity check is its final observable session state.
+- **Note:** This does not prove its child processes stopped at that instant, so use read-only repository and process evidence to identify any post-commentary mutation.
+
+### 2026-07-15 00:51 PDT - recover disconnected child-session state
+
+- **Trigger:** The parent turn named an active sixth-remediation builder and validator auditor, which could have progressed independently before the parent disconnected.
+- **Query inputs:** Two literal Codex searches for `remediate_134_r6` and `audit_134_validator_design`, repo-scoped since midnight; fallback `find_clusters` for Project_echo from 00:00-00:55 PDT; `get_atoms` newest-first for its 22 atom IDs; then source-exact `search_memories` on remediation rollout `019f6497-7668-7e40-8a4f-bdeaa8c5b331`, limit 10.
+- **Returned:** Literal task-name searches returned zero matches with no warnings. The fallback found one untruncated 22-atom cluster spanning 00:01:57-00:07:49 PDT with source breakdown `{codex:20, git:2}`. Newest-first hydration surfaced the remediation child source and validator-auditor source; 12 older atoms were prefix-dropped, while the parent atom was content-clipped as already recovered separately. The remediation child says the scratch-HOME failure reproduced and its intended patch was absolute schema identity, isolated/pinned validator behavior, and hostile-environment regressions. Exact-source search returned nine turns, no cursor/warnings, with no later ECHO atom than 00:07:46 PDT. The auditor's captured atom only says it began an isolated host-`jsonschema` reproducibility audit.
+- **Sources:** Parent Codex rollout, remediation rollout `019f6497-7668-7e40-8a4f-bdeaa8c5b331`, auditor rollout `019f6499-016f-70c3-968f-0c59f46300d5`, and two Project_echo Git atoms.
+- **Verdict:** partial but decisive when combined with repository evidence — ECHO captured each child's intent and first reproduction, but not a terminal child handoff.
+- **Note:** Direct reconciliation shows no remediation commit or tracked-dirty target survived: feature remains clean at rejection `e9ae6519…`, target clean at `c8ed1b0…`, and no relevant builder/test process remains. The unindexed child tail did contain useful proof: isolated system `jsonschema` is 4.16.0 versus mutable user-site 4.25.1; an absolute HTTPS schema ID validates, while 4.16 requires explicit meta-schema validation with a format checker to reject malformed regex. ECHO captured child intent but not these terminal diagnostics, so treat the sixth remediation as analyzed/reproduced but not implemented.
