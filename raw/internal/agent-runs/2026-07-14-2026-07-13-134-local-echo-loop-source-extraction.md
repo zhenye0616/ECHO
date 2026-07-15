@@ -943,3 +943,178 @@ to make that exact mechanism fail closed. No sibling, wiki, holdout-131,
 target-remote, install, release, item-body, review-sidecar, or docs/BACKLOG
 change occurred. Zero ECHO MCP calls were made, so no MCP journal entry was
 added.
+
+---
+
+## Run 11 (resumed at 2026-07-15T08:26:15Z — sixth-review validator portability CLOSED)
+
+### Trigger and prior state
+
+Fresh independent sixth review at immutable rejection child
+`e9ae6519070144a7dd04f98b5016ebe20b66ef38` accepted the fifth-review watcher
+transport and tracked-clean repairs, then rejected one portability defect: the
+relative edge-record schema identity and inherited Python environment selected
+mutable founder user-site `jsonschema` 4.25.1, while the mandatory scratch-HOME
+system toolchain (`jsonschema` 4.16.0) failed 4 tests. Founder authorized only
+that bounded validator fix and a normal builder handoff.
+
+Kept unchanged: clean feature worktree at the rejection child, clean no-remote
+target at `c8ed1b01435bf0cb9dbf1ff6eec4c42a5202082b`, every accepted watcher,
+coordination, source-boundary, cleanliness, and workflow repair, the claimed
+item body, and the sixth-review sidecar. Discarded: no tracked or untracked
+implementation state; the predecessor session left both worktrees clean.
+
+### What I implemented
+
+- Replaced the relative schema `$id` with absolute reserved HTTPS identity
+  `https://echo-loop.invalid/provenance/edge-record.v1.schema.json`; the JS
+  boundary now rejects non-absolute identity.
+- Launched validator Python with exact `arch -arm64 python3 -I -B -X utf8`, a
+  newly allocated scratch HOME/TMPDIR, and an explicit minimal environment;
+  inherited user-site, `PYTHONPATH`, `PYTHONHOME`, and other Python state are
+  absent.
+- Replaced version-sensitive `check_schema` behavior with deterministic
+  `Draft7Validator.META_SCHEMA` validation using `FormatChecker()`, preserving
+  malformed-regex `invalid_schema` behavior on system `jsonschema` 4.16.0.
+- Added separate scratch-HOME and poisoned-user-site/PYTHONPATH regressions.
+  Expanded the route equivalence test to run direct→npm and npm→direct and
+  compare all four inner results.
+- Regenerated the exact source closure from the committed target tree. No
+  dependency, watcher, product/context, remote, installation, authority,
+  maturity, sibling, wiki, sidecar, or generated `docs/BACKLOG.md` change was
+  made.
+
+### Files modified and commits
+
+Target delta `c8ed1b0..e945e33`: **5 paths, 199 insertions, 74 deletions**:
+
+- `provenance/edge-record.v1.schema.json`
+- `provenance/edge-record.v1.json`
+- `tools/lib/draft7-schema.mjs`
+- `tests/migration/source-plan.test.ts`
+- `tests/migration/verification-result.test.ts`
+
+Target commits:
+
+- `a2d9fb5232c3b8ba6f51f7e116e5ceb62e7f3743` — validator/schema/regressions;
+- `e945e33c498b5bb5689e30eb70952b688a6347df` — regenerated closure.
+
+Final target tree is `bbc6832871655c138aab31420037e9dec480a611`.
+Project_echo feature commit
+`e2ccdf9a22eb272bdb608bf0a86a5a7d119cc915` has sole parent
+`e9ae6519070144a7dd04f98b5016ebe20b66ef38`, tree
+`469dfdc41ef88d02bdfd9664979650a6a5bb0afc`, and changes only
+`raw/internal/migrations/2026-07-13-134-echo-loop.md`. The migration record is
+10,717 bytes, blob `d171c7f2d7e684dbac429b55291f24f5e3fd8395`, SHA-256
+`239f08e3a1271f212a995bf163fb05eb1c20bb649d1c3bf3addca26ed531f35d`.
+
+### Exact closure, route, and topology bindings
+
+- Edge fixed point
+  `b9139e30a55e6b9dcf23bd3ecb3dfaa0fecfc65f58341ee452ebe5c570ae5054`:
+  646 rows / 9 classes / 110 source blobs / 3 manifest blobs. Edge-record blob
+  `d4dc3e22971ee8aaf778b5b9654b3fd2829f0b67`, SHA-256
+  `f7db0c5ce6c2ee3a3bb71abec8342caa3185eb781feb3a3776647a09781cb487`;
+  schema blob `f8fe0ab1c58442dfa2dfb6375a1d3ca7475d52f7`, SHA-256
+  `209c9cea6e04a61ad037d07731b0e0700b75ed7e500bcce1cfb43baf034b702e`.
+- All four inner results are byte-identical SHA-256
+  `84aa6bad2081be452470a0db2fab11d463f479f290f3c46737ad60fa3987944f`.
+  Route hashes: direct `0d1ee2b9…`, npm `c0095e58…`, reverse npm
+  `b4b4d9a3…`, reverse direct `cc6ee025…`.
+- Final target has 43 linear commits, one root/branch, no merges; 487/487
+  reachable objects (43 commits / 185 trees / 259 blobs); 177 tracked files
+  exactly equal 177 non-`.git` files. No remote, tag, alternate, promisor,
+  replacement, graft, shallow, symlink, gitlink, ignored, untracked, staged,
+  or unstaged state remains.
+
+### Test output (verbatim summaries)
+
+Focused source-plan:
+
+```text
+Test Files  1 passed (1)
+Tests       48 passed (48)
+Duration    6.70s
+```
+
+Focused watcher preservation suite:
+
+```text
+Test Files  7 passed (7)
+Tests       53 passed (53)
+Duration    76.53s
+```
+
+Focused review-queue + cleanliness:
+
+```text
+Test Files  4 passed (4)
+Tests       12 passed (12)
+Duration    3.52s
+```
+
+Complete suite with four sealed route workloads:
+
+```text
+✓ tests/migration/verification-result.test.ts (1 test) 469181ms
+  ✓ AC7 dual-route verification equivalence (full roster) > both route orders yield one byte-identical inner projection; route records bind their launchers 469180ms
+
+Test Files  24 passed (24)
+Tests       171 passed (171)
+Duration    571.59s
+```
+
+Static and fixed-point checks:
+
+```text
+lint OK — 46 source files, no stray debug.
+check:provenance OK — sealed policy verified; 76 byte-identical ports intact (of 148 inventory rows).
+check:dependencies OK — 5 declared, 132 locked packages, no root drift.
+check:skills OK — 13 ported skills byte-identical to source (no drift).
+build-source-plan --check OK — committed edge record matches HEAD closure (646 edges, fixed_point b9139e30a55e…)
+build-source-plan --check OK — committed edge record matches HEAD closure (646 edges, fixed_point b9139e30a55e…)
+```
+
+Post-cleanup, the two fixed-point lines repeated exactly; strict fsck exited 0
+with empty stdout, and tracked/filesystem comparison printed:
+
+```text
+tracked=177 filesystem=177 equality=pass
+```
+
+### Acceptance-criteria status and decisions
+
+- **AC1 PASS:** exact clean ordinary local repository/topology/object closure.
+- **AC2 PASS FOR BUILDER HANDOFF:** absolute identity, isolated system
+  validator, deterministic Draft-07 meta/regex behavior, and regenerated
+  646-row fixed point pass. Fresh reviewer still judges acceptance.
+- **AC3 PASS:** all prior coordination and offline native SQLite evidence stays
+  green.
+- **AC4 PASS:** template/product/history boundary is unchanged.
+- **AC5 PASS:** unchanged watcher implementation remains 53/53 green.
+- **AC6 PASS:** disposable workflow fixtures pass inside every route.
+- **AC7 PASS FOR BUILDER HANDOFF:** scratch and poison regressions plus both
+  route orders pass; four route projections are byte-identical.
+- **AC8 BUILDER LEG COMPLETE:** config-isolated strict pre-probe read
+  `e9ae6519…`; one explicit expected-old feature push advanced the literal
+  endpoint/ref to `e2ccdf9a…`; strict post-probe returned exactly the new head.
+  The independent review child is deliberately not created by this builder.
+
+No new design choice widened the spec. The accepted system toolchain remains a
+host toolchain, not a new package dependency; the target remains UNACCEPTED,
+no-remote, not installed, `authority:false`, `installed:false`, and local
+`DEV`.
+
+### Open questions
+
+None for the builder. A fresh independent review may accept or reject exact
+feature head `e2ccdf9a22eb272bdb608bf0a86a5a7d119cc915`; this handoff does not
+inherit or pre-decide a reviewer verdict.
+
+### Drift and ECHO MCP
+
+No drift. The work touched only the sixth-review portability fix, its tests,
+the generated closure, and the workflow-owned migration/run/pointer/item
+handoff surfaces. The existing sixth-review sidecar remains byte-identical at
+SHA-256 `dd30fb2b9678b51503d7099f8e4aa8ff55de3bd352b01cdf83fc29942760b21c`.
+Zero ECHO MCP calls were made, so no MCP journal entry was added.

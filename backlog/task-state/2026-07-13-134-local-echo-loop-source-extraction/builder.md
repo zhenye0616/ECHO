@@ -1,15 +1,15 @@
 ---
-last_updated: 2026-07-15T06:25:47Z
+last_updated: 2026-07-15T08:27:46Z
 handoff_branch: agent/134-echo-loop
-handoff_head_sha: 155c48c0f3b79fb4aad4fa2b1ad95d175f0b0601
+handoff_head_sha: e2ccdf9a22eb272bdb608bf0a86a5a7d119cc915
 handoff_run_log: raw/internal/agent-runs/2026-07-14-2026-07-13-134-local-echo-loop-source-extraction.md
 ---
 ## current_thesis
 
-Claim of 2026-07-13-134 by builder binding `fable-builder-134` (Claude Code). Materialize the internal orchestration protocol as a source-independent local `echo-loop` repo at `/Users/zhenye/Desktop/echo-loop` from pinned Project_echo objects, prove it on disposable fixtures, and hand off at `pending_review` with a migration record. Active Project_echo loop is untouched; target is local, no-remote, not installed.
+Successor builder remediation for 2026-07-13-134. Close only the sixth-review Draft-07 validator portability defect at exact rejection child `e9ae6519…`: absolute schema identity, user-site/Python-state isolation, deterministic system-toolchain meta/regex validation, scratch/poison regressions, both route orders, and refreshed closure/provenance. Preserve all prior watcher and cleanliness fixes. Active Project_echo remains untouched; target is local, no-remote, unaccepted, and not installed.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at 155c48c0f3b79fb4aad4fa2b1ad95d175f0b0601.
+- Lifecycle: COMPLETE — ready for review at e2ccdf9a22eb272bdb608bf0a86a5a7d119cc915.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -22,14 +22,14 @@ Claim of 2026-07-13-134 by builder binding `fable-builder-134` (Claude Code). Ma
 
 ## open_questions
 
-- No open builder question. D1/D2/C1/C2 are closed at target HEAD
-  `38989db78e221a7e15b2adbe859fa76244bf16e4`; feature head
-  `ed41a6685848a0dc6f04d558e00e3c426a9b3166` requires fresh independent
-  review. The target remains UNACCEPTED, `authority:false`, `installed:false`,
-  and local `DEV`.
+- No open builder question. The sixth-review validator portability defect is
+  closed at target HEAD `e945e33c498b5bb5689e30eb70952b688a6347df`;
+  feature head `e2ccdf9a22eb272bdb608bf0a86a5a7d119cc915` requires fresh
+  independent review. The target remains UNACCEPTED, `authority:false`,
+  `installed:false`, and local `DEV`.
 
 <!-- builder-state-handoff-open-questions:start -->
-- No escalation question; see pending-review agent_notes and run log Run 9 for
+- No escalation question; see pending-review agent_notes and run log Run 11 for
   exact evidence.
 <!-- builder-state-handoff-open-questions:end -->
 
