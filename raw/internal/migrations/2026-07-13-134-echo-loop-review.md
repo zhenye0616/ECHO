@@ -1,13 +1,23 @@
-# Independent AC8 fourth judgment — echo-loop local source extraction (item 134)
+# Independent AC8 fifth judgment — echo-loop local source extraction (item 134)
 
 **Verdict: REJECT — redo before merge.**
 
-The round-two implementation reproduces its declared hashes, tests, offline
-lifecycle, and route result. It nevertheless remains acceptance-blocked by two
-same-class residuals: the source-plan record is invalid under its own committed
-schema and remains fail-open for several executable-edge forms; the watcher
-takeover transition does not durably bind termination evidence atomically and
-permits stale-owner terminal mutation after takeover.
+The fourth-review remediation closes the four findings it explicitly names:
+the edge record now validates against its exact Draft-07 schema, the six
+source-plan extraction/context cases fail closed, takeover evidence is written
+in the takeover CAS, and every database mutation of an APPLYING row is
+owner-token fenced. The exact hashes, 153-test suite, offline native install,
+source-independence check, and dual-route inner result all reproduce.
+
+The candidate remains acceptance-blocked by two independently observed
+residuals. First, watcher ownership is checked before each transport spawn but
+is not atomically coupled to child creation. A lease takeover can therefore
+commit no-prior-identity evidence while the old owner is paused between its
+check and spawn; that old owner can resume and start a late probe or push which
+the successor never saw or reaped. Second, the accepted repository tracks two
+Python bytecode-cache files which the normal review-queue tests rewrite, while
+the 14-row verifier checks `git diff-tree HEAD` rather than post-workload
+working-tree cleanliness and false-greens the mutation.
 
 This is a local `DEV` judgment only:
 
@@ -17,225 +27,250 @@ This is a local `DEV` judgment only:
 
 ## Reviewer identity and independence
 
-- Reviewer: fresh independent `codex-ops` session completed
-  `2026-07-14T22:33:35Z`.
-- Builder: `fable-builder-134b`; this reviewer did not create the target or
-  reuse builder judgments.
-- Fresh-eyes discipline: no `backlog/task-state/` pointer was read or written.
+- Reviewer binding/session: fresh independent `codex-ops` reviewer
+  `/root/fresh_review_134_r4`, completed 2026-07-14 PDT.
+- Builder binding/session: `fable-builder-134b` via
+  `/root/remediate_134_r4`; this reviewer did not build the target or reuse the
+  builder's verdict.
+- Fresh-eyes discipline: no file under
+  `backlog/task-state/2026-07-13-134-local-echo-loop-source-extraction/` was
+  read or written.
 - No ECHO MCP call was made.
-- Main, the shared feature worktree, and the accepted target remained
-  read-only. Installs, builds, outputs, fixture repositories, and mutations
-  lived only under `/tmp/echo-review-134.fRzbYv/`.
-- Publication is wrapper-independent AC8 publication: this record is the sole
-  changed path in a detached child whose sole parent is the immutable builder
-  head; the child OID is learned from the literal remote ref, not embedded in
-  this tree.
+- Shared main, shared feature worktree, and accepted target remained read-only.
+  Installs, generated verifier outputs, and fixture repositories lived only
+  under `/tmp/echo134-fresh-review.tPEPgF/` or test-owned system scratch.
+- Publication uses a detached child whose sole parent is the immutable builder
+  head and whose only changed path is this review record. The child OID is
+  learned from the literal remote ref after publication, never embedded in its
+  own tree.
 
 ## Bound inputs
 
 | Binding | Value |
 |---|---|
 | Item | `2026-07-13-134-local-echo-loop-source-extraction` |
-| Pending-review handoff / spec commit | `0496acf5a36694f53aeb52aed95f7ae9d8976507` |
-| Item blob / bytes / SHA-256 | `33cdcaa2ba72af5d72ff067aa987e7774067edf9`; 29,547 bytes; `6bb90a129c168ea0dd8b989f8f4d6a7ea9b4dddc639566e134f2eaf43ac75f2b` |
+| Pending-review handoff / spec commit | `7f0f0911e8c54d21504f4eb7b4b29934e7b6cd8c` |
+| Item blob / bytes / SHA-256 | `51fcfcddce3a0add5fdc0501d374874e2c83726e`; 28,543 bytes; `f684b85c3fe73dfae8ce092ae086a3897e54939e23a0e0ed82ec45527e2ace0d` |
 | `ready_content_sha` | `135bab0fd87554cc4ff3c052764d98b90debded4056ed8532c2cac0b9ebcb086` |
 | Requested reviewers | `["codex", "codex-ops"]`; this binding is requested |
-| Immutable builder head | `375bdf694d8bd71bf383b6ae7416d69990ab3092` |
-| Builder parent / shape | sole parent `770b101fbc17ac48284a58a4ce9ca1ff60d23c1e` |
-| Migration record blob / bytes / SHA-256 | `d65d05970efca060cd3749ad7813132335003ae8`; 12,096 bytes; `babecd62e1a61dca33c7f559583a5679317e015d29f0bc611760934de0ea6984` |
+| Immutable builder head | `ed41a6685848a0dc6f04d558e00e3c426a9b3166` |
+| Builder parent / shape | sole parent `fe26a78f89d130364af5b2207e7b07b41eecb78b`; migration-record-only delta |
+| Migration record blob / bytes / SHA-256 | `275d500416f15c6d01385923e990c254bcdea4b9`; 12,761 bytes; `ade1111973a9d6734444729be59305377bb39957cdb0f420227499e1a4265cae` |
 | Publication endpoint / full ref | `https://github.com/zhenye0616/ECHO.git`; `refs/heads/agent/134-echo-loop` |
-| Expected-old publication OID | `375bdf694d8bd71bf383b6ae7416d69990ab3092` |
+| Expected-old publication OID | `ed41a6685848a0dc6f04d558e00e3c426a9b3166` |
 | Target path / branch | `/Users/zhenye/Desktop/echo-loop`; `migration/2026-07-13-134` |
-| Target HEAD / tree | `d69c003ae4146140d3d0ee3fe945778781ae5a43`; `ca77fbda46887a4b7e6170029cd5615e2feefad8` |
+| Target HEAD / tree | `38989db78e221a7e15b2adbe859fa76244bf16e4`; `76a7bc47a9aaf0196d2a43497d01460b0df86847` |
 | Pinned source | `Project_echo@2971310441b69735cbe759293abd8c4d044bf347` |
+
+The shared-repository config preflight found no active
+`url.*.insteadOf`/`pushInsteadOf`, `remote.*.pushurl`, or config includes under
+the config-isolated Git envelope. A strict literal `ls-remote` returned exactly
+the builder OID for the full feature ref before review publication.
 
 ## Ground-truth audit
 
-- Main was clean at `2e7755a956b29c7ed87b7e0c82e65034c741166a`.
-- The shared feature worktree was clean at the immutable builder head. A strict
-  literal `ls-remote` returned exactly that OID for the full feature ref.
-- Builder head is a commit with exactly one parent, the prior review child
-  `770b101f…`.
-- Target HEAD/tree matched the bindings; history is 29 linear commits with one
-  root and one branch, 355/355 objects reachable, no tags/remotes, no
-  alternates/promisor/replace/shallow state, no symlinks/gitlinks, empty tracked
-  status, and clean `git fsck --full --strict`.
-- The target retained pre-existing ignored local outputs (`node_modules/`,
-  `dist/`, `.DS_Store`, and `.verify-*` directories); no reviewer command
-  touched them.
-- Sealed source-policy blob `dd9d78abbbecf01d5de6ab7edbc8bace07e4f50a`
-  is a Project_echo blob, hashes to
-  `44bef194b379b83185aab3f7055ce547c7a51a7b6df18764022a6f565cbde52a`,
-  and is byte-identical to the target copy.
+- Main and the shared feature worktree were clean at `7f0f0911…` and
+  `ed41a668…` respectively.
+- Builder head has exactly one parent, the immutable fourth rejection
+  `fe26a78f…`; its sole path delta is
+  `raw/internal/migrations/2026-07-13-134-echo-loop.md`.
+- Target HEAD/tree match the binding. History is 34 linear commits, with one
+  root and one local branch; all 400 objects are reachable (34 commits, 147
+  trees, 219 blobs). There are no tags, remotes, alternates, promisor/partial,
+  replace, graft, shallow, symlink, or gitlink states; strict full fsck passes.
+- The accepted target worktree is empty even with untracked and ignored files
+  requested. Its 173 tracked files exactly equal its 173 non-`.git` filesystem
+  files.
+- Sealed source-policy object `dd9d78ab…` is a Project_echo blob, hashes to
+  `44bef194…`, and is byte-identical to the target copy.
 
 ## Acceptance status
 
 | AC | Status | Independent evidence |
 |---|---|---|
-| AC1 | PASS | Exact raw-object identity, ordinary clean/no-remote target, full object closure, and fsck reproduced. |
-| AC2 | **FAIL** | The edge record has 585 schema errors and the resolver remains fail-open/ambiguous under six same-class executable-edge fixtures. |
-| AC3 | PASS | Coordination suite and native SQLite lifecycle pass; declared canonical/publication behavior tests are green. |
-| AC4 | PASS | Provenance/source-independence and tree inspection show orchestration-only closure without Project_echo history/product context. |
-| AC5 | **FAIL** | Existing 38 watcher tests pass, but direct state probes expose a crash window between takeover CAS and evidence persistence and an unguarded stale-owner escalation path. |
+| AC1 | PASS | Exact target identity, ordinary clean/no-remote topology, object closure, modes, and strict fsck reproduced. |
+| AC2 | PASS | Exact Draft-07 validation has zero errors; `--check` is non-writing/fail-closed; 604-row closure and all six former extraction/context residuals pass. |
+| AC3 | PASS | Full coordination/native SQLite lifecycle and declared retry/publication fixtures pass. |
+| AC4 | PASS | Provenance and source-independence checks show the intended orchestration-only boundary; no product/history drift was found. |
+| AC5 | **FAIL** | Database takeover evidence and mutation fencing are fixed, but transport child creation remains outside the owner-token CAS. A stale owner can start a late push after successor takeover. |
 | AC6 | PASS | Four disposable workflow-loop fixtures pass. |
-| AC7 | **FAIL overall** | Exact offline/native and dual-route execution reproduce, but the `source-plan` workload row false-greens an artifact rejected by its own schema, so the verifier is not fail-closed. |
-| AC8 | COMPLETE AS REJECTION | Independent exact-object review and immutable one-path child publication are performed; no installation/authority/maturity advance. |
+| AC7 | **FAIL** | Offline install, source independence, and route-byte equivalence reproduce, but the workload rewrites two tracked `.pyc` files and the verifier's final `diff-tree` row cannot detect working-tree dirtiness. |
+| AC8 | COMPLETE AS REJECTION | Exact-object independent review and immutable one-path rejection publication are performed; no installation, authority transfer, or maturity advance. |
 
 ## Reproduced bindings
 
 | Artifact | Blob OID | SHA-256 / result |
 |---|---|---|
 | `source-policy.v1.json` | `dd9d78abbbecf01d5de6ab7edbc8bace07e4f50a` | `44bef194b379b83185aab3f7055ce547c7a51a7b6df18764022a6f565cbde52a` |
-| `edge-record.v1.json` | `3a7bf876d352f7c3c4762afe97fdcb72c70c1661` | `5e49ae70c5f67739c7fd176a808a95629013985c684ac617aa3ec5e2cec9b495` |
-| `edge-record.v1.schema.json` | `2ad3c15fb478246fb753373d3638dc086e310f89` | `30d25c7fe55c27e2b79e06bbf38dbb410ab7e3ebbf3484c8ef8a408ef4429277` |
+| `edge-record.v1.json` | `02b50876b9f07c5fa4a004b68fe6816622c97fa4` | `2dbb5f13edabdac076ba4b961281f36aef3bae93d251c53fa001c439197b87c0` |
+| `edge-record.v1.schema.json` | `9ed57b7a338f12a6258a4ea4fdddab7f1da78813` | `70af1779c9a864073e3690b8eb93662292d4b5d5e4c4d47480fcd9210d775c09` |
 | `watcher-project.v1.json` | `af08720815120b4c40bc07ad1bf78977b1573f20` | `2efa5f264a76b3326a7e783bc7ec2cde6dab70c257f8a86a7f1f354b005bd302` |
 | `verification-workload.v1.json` | `f5b632170bcd0c8b639d119124a3c962aa80ff52` | `be2d600767d88c9f4e057dc2a539ba9f5032fa40dab25495ffd4462902972a33` |
 | `source-seed.v1.json` | `5278839736a53a82bfce884ea16eac0b254437ed` | `c6121b5092de071efebe1cd8a0c9f6cccbe3364f6edb3edd4548cf97618dd41a` |
 | `package.json` | `afaedd015a49f98bf7bb3d154281665879f2aa10` | `c1ec2d0e0e02a16ca24b4fbc45e249442b4cc136073f276df12748651c6616b7` |
 | `package-lock.json` | `b67ca3f905e5c87023198d47edaaf24f725edea2` | `74c56cce3e6703137a1b0ba4b97bd5c6fa087a192fb28c7af795ac89e0a195ea` |
-| Edge fixed point | 584 rows / 9 classes / 103 source blobs / 3 manifest blobs | `203f53420fb50ce82d0064ef238b568371a7095d8f7d2fff52256f7875a8dac8` |
-| Direct/npm inner result | 14/14 rows status 0, byte-identical | `b47d8c8d2bc0c99fbdd1550b4930a7199468360cb04f0f03c9332373840e3f9d` |
+| Edge fixed point | 604 rows / 9 classes / 104 source blobs / 3 manifest blobs | `b1745bfd39cd51d89b52d0e669b073643103ec597ee9c5f731d1bcb599b9cb5a` |
+| Direct/npm inner result | 14/14 rows status 0 in each route; byte-identical | `e21c1d0fb2f4afcbe88b27d4fd7988cb7f180c9b72a18936ca4ea98c7d81d0ef` |
 
-The direct/npm result reproduced the builder-bound hash under a distinct
-reviewer scratch `HOME`/`TMPDIR`, so the round-two environment-tokenization fix
-stands.
+The direct/npm inner result exactly matches the builder binding under this
+reviewer's distinct scratch clone and environment. Route records differ by
+design and bind the npm outer launcher/banner.
+
+## Prior-blocker closure
+
+### D1 — CLOSED — exact Draft-07 validation is now real and fail-closed
+
+The schema declares `policy_sha256`, `source_blobs`, `manifest_blobs`, and every
+row's `from_blob`, with closed enums and resolution-kind constraints. Direct
+`Draft7Validator.check_schema` plus validation of the exact HEAD value reports
+zero errors. `build-source-plan --check` validates both generated and committed
+values before fixed-point and byte comparison; two consecutive invocations are
+stable and non-writing. The rejecting-schema and structurally-invalid-schema
+regressions pass.
+
+### D2 — CLOSED — the six source-plan extraction/context residuals reject
+
+The lexical scanner now scans executable test bodies while treating fixture
+strings/comments as tokens, rejects `process.env`/member command expressions,
+recognizes `/src/...` as repository-capable, tracks function parameters and
+reassignment, and binds one source-specific tsconfig variant while rejecting
+equal-depth competitors. The exact source-plan suite passes 46/46, including
+all six former adversarial cases, and the exact committed closure has 604 rows.
+
+### C1 — CLOSED AS WRITTEN — takeover CAS carries prior identity and evidence
+
+`WatcherStore.takeover` validates prior-PGID evidence and writes
+`prior_owner_pgid` plus `takeover_evidence` in the same conditional SQL update
+which installs the successor. The crash-immediately-after-CAS reopen fixture
+observes both fields durably. There is no longer a second evidence write needed
+to make that takeover record complete.
+
+### C2 — CLOSED — every APPLYING database mutation is owner-token fenced
+
+Recovery, APPLIED, escalation, retry/failure accounting, PGID, and termination
+evidence updates all predicate on `state='APPLYING' AND owner_token=?`.
+Non-applying escalation is limited to PREPARED/APPROVED. The stale-owner fixture
+proves the old token cannot change state, counters, evidence, or terminal fields
+after takeover.
 
 ## Acceptance-blocking findings
 
-### D1 — HIGH — edge-record v1 is invalid under edge-record v1 schema
+### C3 — HIGH — owner fencing does not cover transport child creation
 
-Draft-07 validation of the exact committed record against the exact committed
-schema reports **585 errors**:
+The watcher checks ownership and then spawns separately:
 
-- the record root carries `policy_sha256`, `source_blobs`, and
-  `manifest_blobs`, while the schema has `additionalProperties:false` and does
-  not declare them (`provenance/edge-record.v1.schema.json:7-13`);
-- every one of the 584 rows carries `from_blob`, while row objects likewise
-  forbid and do not declare it (`provenance/edge-record.v1.schema.json:15-47`).
+- `src/watcher/apply.ts:202-220` reads the row/checks ownership, then starts the
+  pre-push probe;
+- `src/watcher/apply.ts:241-245` checks ownership, then starts the push;
+- `src/watcher/apply.ts:246-252` records the push child/checks ownership, then
+  starts the post-push probe.
 
-`tools/build-source-plan.mjs:91-101` checks fixed-point equality and byte
-equality only. It never validates the generated/committed value against the
-versioned schema, so `--check` exits 0 on an artifact its schema rejects. This
-violates AC2's versioned edge-record contract and makes AC7's source-plan row a
-false green.
+Meanwhile takeover reads `owner_pgid` or the PGID file at
+`src/watcher/apply.ts:125-150` and commits the successor at lines 151-165. The
+child shim does not write its PGID until after process creation
+(`src/watcher/reaper.ts:96-100`). Therefore this valid interleaving remains:
 
-### D2 — HIGH — executable-edge extraction remains fail-open and context-global
+1. the old owner passes an ownership check and is paused before spawn after its
+   lease has expired;
+2. the successor sees no old PGID/file, commits `no_prior_identity` evidence,
+   and takes ownership;
+3. the old owner resumes and starts the probe or exact-lease push. Its later
+   owner-guarded database write loses, but the external operation already ran,
+   and its late PGID was not part of the successor's evidence or reap.
 
-Six direct library fixtures against the accepted resolver expose residuals:
+The exact expected-old server lease protects against overwriting an unrelated
+OID, but it does not satisfy AC5's stronger guarantee that all old-owner
+probe/push groups are known and reaped before takeover or that one owner alone
+may initiate transport. The current crash and stale-mutation fixtures begin
+with either a known PGID or no later-resuming owner, so all 28 watcher tests
+pass without exercising this check/use window.
 
-1. A repository-capable `spawnSync('./tools/missing.sh')` in a test body yields
-   zero edges because `tools/lib/source-plan.mjs:155-156` skips every test body.
-2. `spawnSync(process.env.SCRIPT, [])` yields zero edges because the extractor
-   at lines 182-188 accepts only a string or bare identifier.
-3. `readFileSync('/src/missing.json')` yields zero rows rather than
-   `unknown_edge`; absolute repository-shaped paths fall through the
-   `isRepoCapable` gate at lines 71-78 and 355-359.
-4. A function parameter shadowing an outer literal command is reported as the
-   outer safe repository script, not rejected as computed.
-5. A variable initialized to a safe literal and then reassigned from
-   `process.env` is likewise reported as the stale safe literal.
-6. Two variant tsconfig contexts assigning the same alias to different targets
-   silently resolve every source to the last globally merged target rather
-   than detecting source-context ambiguity (`buildContexts`, lines 102-109).
+### V1 — HIGH — verification false-greens tracked bytecode mutation
 
-The global regex literal map at lines 149-150 has no scope or mutation model;
-the computed-edge rejection at lines 329-332 can only reject expressions the
-extractor first recognizes. Binding all source blobs makes mutations move the
-fixed point, but does not make omitted or misclassified edges map exactly once.
+The accepted tree tracks:
 
-### C1 — HIGH — takeover evidence is not atomic with the takeover CAS
+- `tools/review-queue/__pycache__/_lib.cpython-310.pyc`
+- `tools/review-queue/__pycache__/_reviewers.cpython-310.pyc`
 
-`WatcherStore.takeover` clears `owner_pgid` and `termination_evidence` while
-installing the new owner (`src/watcher/state.ts:169-182`). Only after that
-transaction commits does `applyCandidate` separately call
-`recordTermination` (`src/watcher/apply.ts:128-133`). A crash between those
-writes leaves an APPLYING owner with neither the prior PGID nor the evidence
-that supposedly gated takeover.
-
-A direct compiled-source state probe reproduced the window: the first takeover
-succeeded and left `owner_pgid:null` plus `termination_evidence:null`; after
-that new lease expired, a second takeover succeeded with no evidence. The live
-group fixtures exercise a non-crashing serial path and do not cover this
-between-transactions crash.
-
-### C2 — HIGH — a stale owner can terminally mutate the successor's APPLYING row
-
-`setOwnerPgid`, `recordTermination`, `recoverToApproved`, and `markApplied` use
-owner predicates, but `escalate` and `recordFailure` do not
-(`src/watcher/state.ts:209-226`). `attemptPush` calls those unguarded mutations
-after transport outcomes. A direct state probe took over from `old` to `new`,
-then an unconditional stale-owner escalation succeeded and moved the new
-owner's row to `ESCALATED`.
-
-This violates the AC5 requirement that conditional transitions serialize
-owners. The new PGID write guard prevents one stale write class, not stale
-terminal/failure mutation.
+In a fresh clean private clone, the exact command
+`vitest run tests/review-queue` passes 9/9 and rewrites both tracked files
+(4,750→4,766 bytes and 4,548→4,564 bytes). The full 153-test run and both
+14-row verification routes reproduce the same tracked dirty state. The final
+workload row runs `git diff-tree --no-commit-id --name-only -r HEAD`, which
+describes the HEAD commit and cannot detect working-tree changes. The route
+therefore reports `verdict=pass` even though its own workload mutated accepted
+tracked bytes. This undercuts the clean, source-independent verification
+contract and leaves path/interpreter-specific generated artifacts in the
+ordinary source repository.
 
 ## Design-choice judgments
 
-- **Stand:** sealed-policy-driven source planning, source/manifest blob binding,
-  canonical context hashes, and a non-writing `--check` are the right design;
-  schema validation and complete extraction are missing from the enforcement.
-- **Stand:** child-first PGID publication, group-directed TERM/KILL, and
-  exact-expected-old remote CAS are appropriate; termination evidence must be
-  committed in the same guarded transition and every stale-owner mutation must
-  be token-predicated.
-- **Stand:** normalized scratch roots, separate route envelopes, the 14-row
-  roster, and the named offline native rebuild reproduce correctly.
+- **Stand:** exact Draft-07 validation before comparison/write, the lexical
+  fail-closed scanner, source-specific tsconfig selection, and source/manifest
+  blob fixed-point binding are appropriate and now reproduce.
+- **Stand:** atomic takeover evidence and owner-token predicates on every state
+  mutation are the correct database design.
+- **Change:** process creation needs an owner-aware launch barrier, not merely a
+  check immediately before `spawnSync`. A child must publish identity before
+  transport and proceed only after its still-current owner is confirmed, while
+  takeover must either revoke that launch or observe and reap it.
+- **Change:** generated Python bytecode must not be tracked, and the verifier
+  must assert post-workload tracked cleanliness rather than using `diff-tree`
+  as a working-tree proxy.
 
 ## Drift and merge preview
 
-- No product/context/history or installation/authority drift was observed.
-- Source independence, 76 byte-identical ports, 13 skills, dependency closure,
-  and the ordinary target topology reproduce.
+- No product/context/history, installation, remote, authority, or maturity
+  drift was observed. The standalone loop remains an internal local `DEV`
+  asset and Project_echo remains authoritative.
 - Feature merge base against current main is
-  `84c15504a55d65c093a845b335748f2c58250dd1`. The feature adds only the
-  migration record and review record relative to that base. Current main
-  changes neither path; `merge-tree` reports no textual conflict.
-- This conflict preview is not merge approval.
+  `84c15504a55d65c093a845b335748f2c58250dd1`. Relative to that base, the feature
+  adds only the migration record and this review record. Current main changes
+  neither path; classic `merge-tree` reports no conflict markers or
+  changed-in-both path.
+- This clean textual preview is not merge approval. The acceptance blockers
+  require a new target and builder head before merge.
 
 ## Suggested fixups
 
-1. Extend `edge-record.v1.schema.json` to describe every emitted root/row field
-   and make `build-source-plan --check` validate both generated and committed
-   bytes against it before fixed-point comparison. Commit a regression that
-   validates the exact HEAD artifact.
-2. Replace or strengthen regex extraction so unsupported executable patterns
-   fail closed; do not skip executable test bodies; handle scope/reassignment;
-   recognize member-expression commands and absolute repository paths; bind
-   tsconfig contexts per source and reject ambiguity.
-3. Make prior PGID + termination evidence an input to, and durable output of,
-   the same takeover CAS. Owner-token-predicate every APPLYING mutation,
-   including escalation and failure accounting. Add crash-between-CAS/evidence
-   and stale-owner-after-takeover fixtures.
-4. Regenerate a new target HEAD/tree and immutable migration record, publish a
-   new builder head, and request another independent review. Do not install or
-   advance authority/maturity.
+1. Introduce a launch protocol which closes the owner-check-to-child-spawn
+   window for pre-probe, push, and post-probe. Add deterministic fixtures that
+   pause the old owner after each ownership check, perform an expired-lease
+   takeover, resume the old owner, and assert no old transport starts and the
+   remote remains successor-controlled.
+2. Remove tracked `__pycache__`/`*.pyc` artifacts, ignore them, and run Python
+   consumers with bytecode writes disabled or redirected. Add a final verifier
+   row which fails on tracked/staged/unmerged worktree changes after every
+   workload row has run.
+3. Regenerate the source inventory/closure and migration bindings at a new
+   target HEAD/tree, publish a new migration-record-only builder head on top of
+   this rejection child, and request a fresh independent review. Do not install
+   or advance authority/maturity.
 
 ## Test counts observed
 
-- Full target suite: **22/22 files; 143/143 tests passed**.
-- Source-plan focused suite: **38/38 passed**; independent schema validation:
-  **585 errors**.
-- Watcher suites: **38/38 passed** across containment 10, recovery 6, apply 5,
-  state 5, project 5, and probe 7; two direct residual state probes exposed the
-  C1/C2 failures above.
-- Coordination: **28/28 passed**; task-state: **16/16 passed**; review queue:
-  **9/9 passed**; workflow loop: **4/4 passed**.
-- Migration suites: source-plan 38, source-seed 5, dependency 3,
-  verification-result 1, source-independence 1 — **48/48 passed**.
-- Typecheck, lint, provenance, dependencies, skills, source-plan `--check`,
-  fsck, and recursive diff-tree rows: pass.
-- Offline lifecycle: private clone, deny-network probe, offline `npm ci`, named
-  `better-sqlite3` rebuild, and native load: pass.
-- Direct/npm routes: **14/14 rows status 0** in each route; inner bytes equal;
-  bound/environment-invariant SHA-256 reproduced.
+- Full target suite: **22/22 files; 153/153 tests passed** in 219.12s.
+- Source-plan focused suite: **46/46 passed**; independent exact Draft-07
+  validation: **0 errors**.
+- Watcher focused suites: **4/4 files; 28/28 passed** (containment 10, state 7,
+  recovery 6, apply 5).
+- Review queue focused rerun: **3/3 files; 9/9 passed**, while reproducing the
+  two tracked `.pyc` modifications.
+- Workflow loop: **4/4 passed**; source independence: **1/1 passed**.
+- Typecheck, lint (43 files), provenance (76/148 byte-identical ports),
+  dependencies (5 declared / 132 locked), skills (13), source-plan `--check`
+  twice, strict full fsck, and object/topology checks: pass.
+- Offline reviewer lifecycle: clean private clone, isolated offline
+  `npm ci --ignore-scripts`, named offline `better-sqlite3` rebuild, and native
+  in-memory SQLite smoke: pass.
+- Direct/npm routes: **14/14 rows status 0 in each route**; inner bytes equal;
+  SHA-256 `e21c1d0f…` reproduced. The green result is insufficient because its
+  workload leaves tracked files dirty and does not check that state.
 
 ## Final verdict
 
-**REJECT — redo before merge.** The executable evidence is green, but it is not
-acceptance-complete: the edge record fails its own schema, source-edge analysis
-still has fail-open/ambiguous cases, and watcher takeover state can lose the
-required evidence or be terminally changed by a stale owner. The target remains
-unaccepted, `authority:false`, `installed:false`, and `DEV`; Project_echo
-remains authoritative.
+**REJECT — redo before merge.** The fourth-review findings are genuinely
+closed, but AC5 still permits a late old-owner transport child after takeover,
+and AC7 false-greens tracked bytecode mutation. The target remains unaccepted,
+`authority:false`, `installed:false`, and `DEV`; Project_echo remains the
+active authority.
