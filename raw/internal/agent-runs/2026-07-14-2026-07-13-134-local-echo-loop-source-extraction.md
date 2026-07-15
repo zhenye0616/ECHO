@@ -742,3 +742,204 @@ No drift. Only pinned read-only source access, the existing local no-remote
 target, and the authorized Project_echo feature-branch publication were in
 scope. No sibling, wiki, holdout-131, install, release, or target-remote action
 occurred. No ECHO MCP call was made, so no dogfooding-journal entry was added.
+
+---
+
+## Run 10 (resumed at 2026-07-15T06:23:18Z — fifth-review residuals CLOSED)
+
+### Trigger and prior state
+
+The immutable fifth `codex-ops` judgment child
+`9bf1d8fbe503f1a0757ca450bc70bf32d8df8a69` reproduced Run 9 and REJECTed two
+remaining defects: C3, the check/use gap between watcher ownership validation
+and transport child creation; and V1, tracked Python bytecode mutations hidden
+by a final `git diff-tree HEAD` row which never inspected the worktree.
+Founder authorized only precise fifth-round remediation and a normal builder
+handoff.
+
+Kept: the clean rejection child, the clean no-remote target at reviewed HEAD
+`38989db78e221a7e15b2adbe859fa76244bf16e4`, all previously accepted
+D1/D2/C1/C2 and broader AC work, and the existing feature worktree. Discarded:
+no committed or uncommitted source state. Generated verifier outputs and
+`node_modules/` were removed only after their hashes/results were recorded.
+Seven linear target commits advance the reviewed target:
+
+- `08404d0` — watcher launch fencing and verifier cleanliness;
+- `1c3a6df` — pinned watcher-supervisor executable;
+- `6a06983` — extraction closure regeneration;
+- `59a2699` — takeover identity hardening;
+- `981874a` — watcher launch closure refresh;
+- `ba8bee2` — bounded cross-architecture validator transport;
+- `c8ed1b0` — final validator-transport closure.
+
+### Outcome
+
+**C3 and V1 are CLOSED on disposable fixtures; normal builder handoff to
+`pending_review`.** Fresh independent review is required and the builder
+makes no acceptance claim. The target remains UNACCEPTED, no remote, not
+installed, and local `DEV`; `authority:false`; `installed:false`.
+
+### Implemented fifth-review remediation
+
+- **C3 — CLOSED.** Added a durable launch tuple
+  `(generation, stage, nonce, pgid, status, result)` for pre-probe, push, and
+  post-probe. A pinned detached supervisor becomes group leader; the child owns
+  exact owner-token registration before Git and exact completion after Git.
+  The parent consumes only the completed fence. Takeover binds the exact old
+  owner plus full launch tuple/evidence and either consumes completion or
+  authenticates and reaps the active identity before the successor CAS.
+  Deterministic fixtures cover both CAS interleavings at all three launch
+  stages, parent/child crashes, wrong nonce, and post-Git crash.
+- **V1 — CLOSED.** Deleted the two tracked
+  `tools/review-queue/__pycache__/*.pyc` files; added `__pycache__/` and
+  `*.py[cod]` ignores; forced `PYTHONDONTWRITEBYTECODE=1` through test,
+  verifier, schema, offline-install, and sandbox children. Replaced the
+  non-observing `diff-tree` tail with exact final row
+  `["git","status","--porcelain=v1","--untracked-files=no"]`, expected
+  empty stdout. The verifier resolves HEAD/tree before executing the workload,
+  making `tracked-clean` the last executable child. New regressions prove the
+  prior false green and reject unstaged, staged, and unmerged tracked changes.
+
+### Self-audit repairs before final sealing
+
+A separate read-only adversarial re-audit found three defects in the initial C3
+repair; none was carried into the final green target:
+
+- A supervisor death while Git was live could leave a leaderless transport
+  group with insufficient identity evidence. A same-PGID inert sentinel now
+  carries the exact marker, and a real SIGKILL fixture against live
+  `git daemon` proves successor authentication and reap.
+- Group identity could change between inspection and TERM/KILL. Reaping now
+  STOPs, re-inspects the exact marker, and sends only CONT on mismatch—never
+  TERM/KILL or takeover CAS. A deterministic replacement fixture proves it.
+- A locally invalid binding after takeover could strand APPLYING. An exact
+  successor-owner/current-non-ACTIVE-launch CAS now escalates durably without
+  admitting stale-owner mutation.
+
+The source-plan check also rejected a computed supervisor executable; transport
+now pins `/usr/local/bin/node`. These repairs were re-audited with no remaining
+concrete blocker before the final suite.
+
+### Disclosed killed attempt versus final green run
+
+The first full-suite attempt was **not** counted as green. Under Rosetta x86_64
+Node spawning arm64 Python, Draft-07 validation hung in
+`json.load(sys.stdin)` for approximately six minutes. That exact test session
+was terminated; no pass result was claimed. The repair writes canonical JSON to
+a mode-0600 temporary file outside the repo, invokes Python with that pathname
+and stdin closed, applies a hard 30-second timeout, and removes the file in all
+outcomes. The validator then passed five consecutive probes. A completely new
+full-suite run at final HEAD `c8ed1b0` passed 24/24 files and 169/169 tests.
+
+### Files modified
+
+Target delta `38989db..c8ed1b0`: **25 paths, 2,114 insertions, 540
+deletions**:
+
+- watcher protocol: `src/watcher/{apply,reaper,state,transport}.ts`,
+  `tools/watcher-transport-{supervisor,sentinel}.mjs`;
+- watcher tests: `tests/watcher/{apply,containment,launch-barrier,recovery,state}.test.ts`;
+- verifier/schema: `tools/lib/{draft7-schema,verification-workload}.mjs`,
+  `tools/{run-verification,verify-offline-install}.mjs`,
+  `provenance/{edge-record.v1.json,verification-workload.v1.json}`;
+- verifier tests/config: `tests/helpers/py.ts`,
+  `tests/migration/{verification-cleanliness,verification-result}.test.ts`,
+  `vitest.config.ts`, `vitest.workload.config.ts`;
+- cleanliness: `.gitignore` plus deletion of the two tracked review-queue pyc
+  files.
+
+Project_echo feature commit
+`155c48c0f3b79fb4aad4fa2b1ad95d175f0b0601` changes only
+`raw/internal/migrations/2026-07-13-134-echo-loop.md`; its sole parent is
+`9bf1d8fbe503f1a0757ca450bc70bf32d8df8a69`. The record blob is
+`4855dd938da4a8db312d9e30d584fc9714e44d30` (12,381 bytes; SHA-256
+`ade0cae94b9cde965bcb9ec6eaa98e021779c5aa5e2b9bfa562746850f46aaca`).
+
+### Exact target, closure, and topology
+
+- HEAD `c8ed1b01435bf0cb9dbf1ff6eec4c42a5202082b`; tree
+  `b6faf29693ff050ee3160d0461a2ad4d075a394e`; branch
+  `migration/2026-07-13-134`; 41 linear commits, one root/branch, no merges.
+- Edge record blob `d8ee0bd667e95c288fefb063155f085f68595b14`,
+  SHA-256 `6d1129a7862303b4dd5d5d42c9defd56504d1f0dc1bd11ed63b465c8203b85ff`;
+  exact closure 644 rows / 9 classes / 110 source blobs / 3 manifest blobs;
+  fixed point
+  `b719002a8a1a2426ff55698e914ee0a66ede394ef00e1797336ac6c0d70bb20f`.
+- 472/472 reachable objects: 41 commits / 177 trees / 254 blobs; strict
+  `fsck --full --strict --no-reflogs --unreachable` exits 0 with zero garbage.
+- 177 tracked files exactly equal 177 non-`.git` filesystem files after
+  cleanup; status including ignored/untracked is empty. No remote, tags,
+  alternates, promisor/partial-clone, replace, graft, shallow, symlink, or
+  gitlink state.
+
+### Tests and checks — final accepted execution results
+
+Full suite, new run after the killed attempt:
+
+```text
+Test Files  24 passed (24)
+Tests       169 passed (169)
+Duration    331.94s
+```
+
+Focused suites:
+
+```text
+Watcher:             7 files / 53 tests passed
+Source plan:         1 file  / 46 tests passed
+Review+cleanliness:             12 tests passed
+```
+
+Dual-route workload, canonical direct→npm and reverse npm→direct:
+
+```text
+verify:extraction route=direct verdict=pass rows=14 out=.verify-direct
+verify:extraction route=npm verdict=pass rows=14 out=.verify-npm
+verify:extraction route=npm verdict=pass rows=14 out=.verify-reverse-npm
+verify:extraction route=direct verdict=pass rows=14 out=.verify-reverse-direct
+```
+
+All four `inner.json` files were byte-identical, SHA-256
+`ce265a7b646513945e9944a1f26e0b8ee86c748d57a30911463ca104a9c6a99f`.
+Each contains the exact 14-row roster, all status 0, ending in
+`tracked-clean`. Typecheck; lint (46 source files); provenance (76/148);
+dependencies (5 declared / 132 locked); skills (13); repeated source-plan
+`--check`; private-clone deny-network offline install/native SQLite
+rebuild+load; source independence; and strict fsck all passed.
+
+### Acceptance-criteria status and decisions
+
+- **AC1 PASS:** exact clean ordinary local repo/topology/object closure above.
+- **AC2 PASS:** final policy-bound 644-row fixed point and dependency/skill/
+  provenance closure pass.
+- **AC3 PASS:** coordination semantics and offline native SQLite proof remain
+  green.
+- **AC4 PASS:** protocol-template boundary remains product/history-free.
+- **AC5 PASS FOR BUILDER HANDOFF:** C3 launch barrier, crash recovery,
+  identity reinspection, and stale-owner exclusion are implemented and covered
+  by 53/53 watcher tests. Independent reviewer must still judge acceptance.
+- **AC6 PASS:** disposable claim/build/review/merge fixtures pass.
+- **AC7 PASS FOR BUILDER HANDOFF:** tracked-clean closes V1; all four route
+  results are identical and source-independence/offline checks pass.
+- **AC8 BUILDER LEG COMPLETE:** literal leased feature publication used
+  expected-old fifth judgment `9bf1d8f…`; strict literal remote readback is
+  exactly `155c48c0…`. The independent review child is deliberately not
+  created by this builder.
+
+No new design choice widens the spec. The target remains the acceptance object;
+no result is generalized into an install, release, remote, maturity advance, or
+authority transfer.
+
+### Open questions
+
+None for the builder. A fresh independent review may accept or reject exact
+feature head `155c48c0…`; this handoff does not inherit or pre-decide a
+reviewer verdict.
+
+### Drift and ECHO MCP
+
+No drift. Work stayed within the two fifth-review residuals plus repairs needed
+to make that exact mechanism fail closed. No sibling, wiki, holdout-131,
+target-remote, install, release, item-body, review-sidecar, or docs/BACKLOG
+change occurred. Zero ECHO MCP calls were made, so no MCP journal entry was
+added.

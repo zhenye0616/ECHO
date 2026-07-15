@@ -35,41 +35,44 @@ claimed_by: "fable-builder-134b"
 claimed_at: "2026-07-14T05:49:30Z"
 branch: "agent/134-echo-loop"
 worktree: "/Users/zhenye/Desktop/Project_echo--134-echo-loop"
-head_sha: "ed41a6685848a0dc6f04d558e00e3c426a9b3166"
+head_sha: "155c48c0f3b79fb4aad4fa2b1ad95d175f0b0601"
 pr_url: ""
 agent_notes: |
-  FOURTH-REVIEW REMEDIATION COMPLETE — normal builder handoff for a fresh,
-  independent AC8 review. The immutable fourth codex-ops judgment child
-  `fe26a78f89d130364af5b2207e7b07b41eecb78b` rejected D1, D2, C1, and C2;
-  all four residuals are closed on disposable fixtures only.
-  - D1 CLOSED: the full Draft-07 schema constrains every generated field and
-    generated + committed records are validated against the exact committed
-    schema before fixed-point/byte comparison or write.
-  - D2 CLOSED: the lexical JS scanner distinguishes executable test bodies from
-    fixture strings and covers member/computed env expressions, absolute repo
-    paths, scope shadowing, reassignment, and competing tsconfig contexts.
-  - C1 CLOSED: takeover's owner-token CAS atomically binds the prior PGID and
-    termination evidence with the successor owner; crash-after-CAS recovery is
-    proven from durable state.
-  - C2 CLOSED: every APPLYING mutation, including escalation/failure/recovery/
-    APPLIED, is owner-token-predicated; a stale owner cannot mutate a takeover.
+  FIFTH-REVIEW REMEDIATION COMPLETE — normal builder handoff for a fresh,
+  independent AC8 review. The immutable fifth codex-ops judgment child
+  `9bf1d8fbe503f1a0757ca450bc70bf32d8df8a69` accepted all prior repairs and
+  rejected C3 (owner check was not atomically coupled to transport launch) and
+  V1 (tracked Python bytecode plus a false-green final diff-tree row). Both are
+  closed on disposable fixtures only.
+  - C3 CLOSED: pre-probe, push, and post-probe use a child-owned durable
+    generation/stage/nonce/PGID launch fence. Exact registration/completion
+    CASes, sentinel-authenticated leaderless recovery, STOP/reinspection before
+    TERM/KILL, and successor-only pre-launch escalation prevent late stale-owner
+    transport and fail closed on identity replacement.
+  - V1 CLOSED: tracked pyc files are deleted and ignored, Python bytecode writes
+    are disabled, and the exact final workload row is tracked-clean
+    (`git status --porcelain=v1 --untracked-files=no`, expected empty stdout).
+    Regressions reject unstaged, staged, and unmerged tracked state.
   Target `/Users/zhenye/Desktop/echo-loop` is clean at HEAD
-  `38989db78e221a7e15b2adbe859fa76244bf16e4`, tree
-  `76a7bc47a9aaf0196d2a43497d01460b0df86847`: 34 linear commits; 22 files /
-  153 tests pass; focused source-plan 46/46 and watcher 28/28 pass; typecheck,
-  lint, provenance, dependencies, skills, closure check, source independence,
-  strict fsck, and the 14-row direct+npm workload pass. The closure is 604 rows
-  / 9 classes, 104 source blobs, 3 manifest blobs, fixed point
-  `b1745bfd39cd51d89b52d0e669b073643103ec597ee9c5f731d1bcb599b9cb5a`.
-  Direct+npm inner SHA-256 is
-  `e21c1d0fb2f4afcbe88b27d4fd7988cb7f180c9b72a18936ca4ea98c7d81d0ef`;
-  all 400 objects are reachable and 173 tracked files exactly equal the 173
-  non-`.git` filesystem files, with no remote or hidden repository state.
-  Feature head `ed41a6685848a0dc6f04d558e00e3c426a9b3166` is a migration-record-only
-  child of the rejected judgment and is published at
-  `refs/heads/agent/134-echo-loop`. Fresh independent review is required; this
-  builder makes no acceptance claim. Target remains UNACCEPTED, no remote, not
-  installed, local `DEV`; `authority:false`; `installed:false`.
+  `c8ed1b01435bf0cb9dbf1ff6eec4c42a5202082b`, tree
+  `b6faf29693ff050ee3160d0461a2ad4d075a394e`: 41 linear commits; full suite
+  169/169, watcher 53/53, source-plan 46/46, and review-cleanliness 12/12 pass;
+  typecheck, lint, provenance, dependencies, skills, source independence,
+  strict fsck, and source-plan fixed-point checks pass. Canonical direct→npm
+  and reverse npm→direct 14-row routes all pass; all four inner files are
+  byte-identical SHA-256
+  `ce265a7b646513945e9944a1f26e0b8ee86c748d57a30911463ca104a9c6a99f`.
+  The closure is 644 rows / 9 classes, 110 source blobs, 3 manifest blobs,
+  fixed point
+  `b719002a8a1a2426ff55698e914ee0a66ede394ef00e1797336ac6c0d70bb20f`.
+  All 472 objects are reachable; 177 tracked files exactly equal 177 non-`.git`
+  files; there is one root/branch, no merges, and no remote, tags, alternates,
+  promisor, replace, graft, shallow, symlink, gitlink, ignored, or untracked
+  state. Feature head `155c48c0f3b79fb4aad4fa2b1ad95d175f0b0601`
+  is the migration-record-only child of the fifth rejection and is published
+  at `refs/heads/agent/134-echo-loop`. Fresh independent review is required;
+  this builder makes no acceptance claim. Target remains UNACCEPTED, no remote,
+  not installed, local `DEV`; `authority:false`; `installed:false`.
 review_notes: ""
 ---
 
