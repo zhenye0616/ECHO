@@ -680,3 +680,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
 - **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
 - **Note:** Second consecutive reframe-gate firing on the 136 lane (r2-patch mechanisms this time); investigator repeated the platform-semantics risk — if GitHub artifact/approval/draft-release/API semantics can't support stable outer-tuple validation or cross-run orphan detection, the hosting-tier stop path applies, not more prose. Watch for a third firing at r4: if r4 findings target the r3 inner/outer split itself, that's the loop-not-converging signal the disposition discipline exists to catch. r4 spec_commit_sha pins 9997f073 directly (patch commit, not disposition commit — passed via --spec-sha).
+
+## 2026-07-15 16:23 PDT — 137 r1 no_responses escalation to founder (zero MCP calls — expected-response failure)
+
+- **Trigger:** Watcher tick combined 137 r1 → `combined_verdict: no_responses`, `escalated_to_founder: true`. Both requested reviewers (codex, claude) silent past the timeout — requested 2026-07-15 15:20 PDT, combined 16:22 PDT, zero response files. Queue path: `backlog/reviews/2026-07-15-137-echo-context-installable-shadow-runtime/r1/combined.md` @ a1c81c89.
+- **Query inputs:** none — the escalation branch makes no `coord_invoke`; this entry is the skill-mandated escalation record, and both reviewer lanes failing to produce any response is the surprising-failure case that stays journal-worthy despite zero MCP calls this tick.
+- **Returned:** n/a.
+- **Sources:** repo state only — r1 request.md frontmatter + combine.py output in the ephemeral watcher worktree; no ECHO retrieval.
+- **Verdict:** ❌ surprising failure — 136's four rounds got two-reviewer responses on the same cadence earlier today; 137 r1 got zero from both lanes in the same hour window.
+- **Note:** Observation only: the most recent main commit before this tick is `82e7b7e2 review: pin claude reviewer to fable`, i.e. the claude reviewer wrapper changed between 136's responsive rounds and 137's silent round; codex is silent too, so the launchd fallback cadence for both lanes in this window is also suspect. Founder decides wait / re-dispatch / accept-partial per §AC4.
