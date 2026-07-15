@@ -7,7 +7,10 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| - | - | - | _(empty)_ | - | - | - |
+| PROPOSED | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-contained CI, and source-artifact authority | 3d | 2026-07-13-135-local-echo-context-source-extraction |
+| PROPOSED | HIGH | 2026-07-15 | [2026-07-15-137-echo-context-installable-shadow-runtime](../backlog/proposed/2026-07-15-137-echo-context-installable-shadow-runtime.md) | Versioned per-user echo-context shadow runtime and exact-artifact founder-Mac proof | 5d | 2026-07-15-136-echo-context-canonical-repository-release-substrate |
+| PROPOSED | HIGH | 2026-07-15 | [2026-07-15-138-echo-context-cutover-substrate-rehearsal](../backlog/proposed/2026-07-15-138-echo-context-cutover-substrate-rehearsal.md) | Deterministic echo-context cutover substrate and full-cycle rehearsal | 6d | 2026-07-15-137-echo-context-installable-shadow-runtime |
+| PROPOSED | HIGH | 2026-07-15 | [2026-07-15-139-echo-context-founder-mac-authority-activation](../backlog/proposed/2026-07-15-139-echo-context-founder-mac-authority-activation.md) | Exact-artifact founder-Mac context authority activation and reversible acceptance | 2d operator work + 7 calendar-day acceptance | 2026-07-15-138-echo-context-cutover-substrate-rehearsal |
 
 ## Ready
 
@@ -25,9 +28,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| PENDING_REVIEW | HIGH | 2026-07-13 | [2026-07-13-133-local-echo-brain-source-extraction](../backlog/pending_review/2026-07-13-133-local-echo-brain-source-extraction.md) | Local standalone echo-brain source extraction and parity proof | 4d | 2026-07-13-132-product-graduation-foundation |
-| PENDING_REVIEW | HIGH | 2026-07-13 | [2026-07-13-134-local-echo-loop-source-extraction](../backlog/pending_review/2026-07-13-134-local-echo-loop-source-extraction.md) | Local standalone echo-loop source extraction and fixture proof | 5d | 2026-07-13-132-product-graduation-foundation |
-| PENDING_REVIEW | HIGH | 2026-07-13 | [2026-07-13-135-local-echo-context-source-extraction](../backlog/pending_review/2026-07-13-135-local-echo-context-source-extraction.md) | Local standalone echo-context source extraction and synthetic parity proof | 5d | 2026-07-13-132-product-graduation-foundation |
+| - | - | - | _(empty)_ | - | - | - |
 
 ## Complete
 
@@ -105,6 +106,9 @@ Do not edit by hand.
 | COMPLETE | HIGH | 2026-07-09 | [2026-07-09-130-decision-changeset-compiler-v0](../backlog/complete/2026-07-09-130-decision-changeset-compiler-v0.md) | Decision→Linear changeset compiler v0: meeting decision cards materialize as an editable batch changeset (creates + closes), human-confirmed in one gesture | 2.5d | - |
 | COMPLETE | HIGH | 2026-07-10 | [2026-07-10-131-post-meeting-brief-generator-v0](../backlog/complete/2026-07-10-131-post-meeting-brief-generator-v0.md) | Post-meeting brief generator v0: harden the meeting→brief fast path around six root causes; canonical tool-agnostic brief object + markdown render as a CLI command | 2d | - |
 | COMPLETE | HIGH | 2026-07-13 | [2026-07-13-132-product-graduation-foundation](../backlog/complete/2026-07-13-132-product-graduation-foundation.md) | Product graduation foundation: additive echo-brain composition boundary, product-only tests, and build-once qualification evidence | 5d | - |
+| COMPLETE | HIGH | 2026-07-13 | [2026-07-13-133-local-echo-brain-source-extraction](../backlog/complete/2026-07-13-133-local-echo-brain-source-extraction.md) | Local standalone echo-brain source extraction and parity proof | 4d | 2026-07-13-132-product-graduation-foundation |
+| COMPLETE | HIGH | 2026-07-13 | [2026-07-13-134-local-echo-loop-source-extraction](../backlog/complete/2026-07-13-134-local-echo-loop-source-extraction.md) | Local standalone echo-loop source extraction and fixture proof | 5d | 2026-07-13-132-product-graduation-foundation |
+| COMPLETE | HIGH | 2026-07-13 | [2026-07-13-135-local-echo-context-source-extraction](../backlog/complete/2026-07-13-135-local-echo-context-source-extraction.md) | Local standalone echo-context source extraction and synthetic parity proof | 5d | 2026-07-13-132-product-graduation-foundation |
 | COMPLETE | MED | 2026-05-14 | [2026-05-14-053-reviewer-completed-at-coercion](../backlog/complete/2026-05-14-053-reviewer-completed-at-coercion.md) | Reviewer schema accepts/coerces unquoted-YAML completed_at timestamps (two-prong — quoted-example prompts + defensive coercion) | 0.5-1d | - |
 | COMPLETE | MED | 2026-05-16 | [2026-05-16-058-strategist-disposition-discipline-prefer-removal](../backlog/complete/2026-05-16-058-strategist-disposition-discipline-prefer-removal.md) | Strategist disposition discipline — prefer removal over deeper patching when findings target a recent-round patch | 0.25d | - |
 | COMPLETE | MED | 2026-05-17 | [2026-05-17-059-coord-emit-surface-daemon-rejection](../backlog/complete/2026-05-17-059-coord-emit-surface-daemon-rejection.md) | coord-emit.sh distinguishes daemon-rejection from daemon-unreachable (silent-failure observability gap) | 0.25-0.5d | - |

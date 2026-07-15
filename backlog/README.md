@@ -354,6 +354,15 @@ head_sha: ""                      # sha of last commit on branch
 pr_url: ""                        # if PR opened
 agent_notes: ""                   # summary on completion or escalation
 review_notes: ""                  # founder fills during review
+# --- optional external-target fields; agent-managed only under a founder-authorized successor-repository decision ---
+target_repo: ""                    # absolute canonical target repository path
+target_remote: ""                  # canonical target remote URL
+target_branch: ""                  # target feature branch, never target main
+target_worktree: ""                # isolated sibling target worktree
+target_head_sha: ""                # reviewed full target feature-head SHA
+target_pr_url: ""                  # target-repository PR
+target_landed_sha: ""              # founder-merged canonical target-main SHA after readback
+project_landed_sha: ""             # founder-merged Project_echo main SHA after readback
 ---
 
 # [Title]
@@ -387,6 +396,14 @@ The strategist reads this section when promoting decisions to the wiki.]
 > byte-for-byte).
 
 ## Agent Operating Rules
+
+### Founder-authorized successor repository items
+
+The normal backlog item owns one Project_echo branch/worktree and may not write elsewhere. A narrow exception exists only when a locked raw/internal/decisions record names the item and exact external scope, the spec cites that record and lists the paths, and the founder approves the target-main and external-execute checkpoints.
+
+Such an item still has one Project_echo claim. External source work uses an isolated target feature worktree and the optional fields above. Builders fill target_repo, target_remote, target_branch, target_worktree, target_head_sha, and target_pr_url. A different agent reviews both exact repository heads; the founder merges the target repository first and fills target_landed_sha only after remote-main readback; the normal Project_echo review/merge then fills project_landed_sha after its own readback. Partial landings remain durable and the item stays incomplete; never force-rewrite history to simulate atomicity. Build-once artifacts consume canonical landed SHAs, never feature-worktree bytes. Live user-path mutation belongs only to the explicitly named, checkpointed scope in the founder decision; source/rehearsal items may not infer it.
+
+The current scoped protocol is raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md. It applies only to the named echo-context items and does not generalize to echo-brain, echo-loop, or future repositories.
 
 When an agent runs, it must:
 

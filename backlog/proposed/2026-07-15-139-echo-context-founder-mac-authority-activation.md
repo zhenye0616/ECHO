@@ -1,0 +1,173 @@
+---
+id: 2026-07-15-139-echo-context-founder-mac-authority-activation
+title: "Exact-artifact founder-Mac context authority activation and reversible acceptance"
+status: proposed
+priority: HIGH
+estimate: "2d operator work + 7 calendar-day acceptance"
+created: 2026-07-15
+blocked_by:
+  - 2026-07-15-138-echo-context-cutover-substrate-rehearsal
+task_state_ref: 2026-07-15-139-echo-context-founder-mac-authority-activation
+requested_reviewers: ["codex", "cursor"]
+files_to_modify:
+  - "/Users/zhenye/Library/Application Support/echo-context/**" # exact releases, config, secrets, controller journal, backups, quarantine, and evidence
+  - /Users/zhenye/.echo-context/** # final authoritative 0700 context home and state
+  - /Users/zhenye/.echo-context-shadow/** # retained isolated shadow state, never promoted in place
+  - /Users/zhenye/Library/LaunchAgents/com.echo.context.plist # authority-record-gated rebind of the exact 137 runtime
+  - "/Users/zhenye/Library/Application Support/echo-project-residual/**" # exact residual release/config/secrets/coord state
+  - /Users/zhenye/Library/LaunchAgents/com.echo.project-residual.plist # product/loop-only residual service
+  - /Users/zhenye/Library/Logs/echo-project-residual/** # residual bounded logs
+  - /Users/zhenye/Library/LaunchAgents/com.echo.daemon.plist # protected snapshot then retirement of mixed job
+  - "/Users/zhenye/Library/Application Support/ECHO/**" # source DB, authority projection, rollback retention, and old full state
+  - /Users/zhenye/.echo/state/capture-sources.json # source capture config translated into context ownership
+  - /Users/zhenye/.echo/state/granola-checkpoint.json # source capture checkpoint translated into context ownership
+  - /Users/zhenye/.echo/state/granola.json # retained 0600 rollback credential source; value never logged/bundled
+  - /Users/zhenye/.codex/config.toml # atomic echo/context and residual MCP wiring
+  - /Users/zhenye/.claude.json # atomic echo/context and residual MCP wiring
+  - /Users/zhenye/.cursor/mcp.json # atomic echo/context and residual MCP wiring
+  - /Users/zhenye/.codex/skills/ECHO:*/** # checksum-bound rendered split-endpoint Codex skills
+  - /Users/zhenye/.claude/commands/** # checksum-bound rendered split-endpoint Claude commands
+  - /Users/zhenye/.npm-global/lib/node_modules/echoctl/** # replace old unfenced package with exact residual/rollback-full package
+  - /Users/zhenye/.npm-global/bin/echoctl # stable shim to the authority-fenced package
+  - raw/internal/migrations/2026-07-15-139-echo-context-authority-activation.md # NEW redacted live execution/acceptance record
+  - raw/internal/agent-runs/** # workflow-owned failure/completion run log
+  - backlog/task-state/2026-07-15-139-echo-context-founder-mac-authority-activation/** # workflow continuity pointers
+  - backlog/proposed/2026-07-15-139-echo-context-founder-mac-authority-activation.md # proposal and review revisions
+  - backlog/ready/2026-07-15-139-echo-context-founder-mac-authority-activation.md # watcher-owned promotion target
+  - backlog/claimed/2026-07-15-139-echo-context-founder-mac-authority-activation.md # workflow claim target
+  - backlog/pending_review/2026-07-15-139-echo-context-founder-mac-authority-activation.md # workflow handoff target
+  - docs/BACKLOG.md # generated stage-derived index
+spec_refs:
+  - backlog/complete/2026-07-15-138-echo-context-cutover-substrate-rehearsal.md # landed controller/residual source and full-cycle rehearsal
+  - backlog/complete/2026-07-15-137-echo-context-installable-shadow-runtime.md # exact context runtime release/cache and shadow evidence
+  - backlog/complete/2026-07-15-136-echo-context-canonical-repository-release-substrate.md # canonical target source/release authority
+  - raw/internal/migrations/2026-07-15-138-echo-context-cutover-rehearsal.md # paired landed SHAs and go/no-go evidence
+  - raw/internal/migrations/2026-07-15-137-echo-context-shadow-runtime.md # installed runtime tuple
+  - raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md # sole authorized live external-write protocol
+  - raw/internal/decisions/2026-07-12-g2-terminal-dispositions-and-repository-topology.md # founder authority-transfer checkpoint
+  - raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md # context remains internal infrastructure
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
+pr_url: ""
+agent_notes: ""
+review_notes: ""
+---
+
+# Exact-artifact founder-Mac context authority activation and reversible acceptance
+
+## Why this spec exists
+
+Items 136-138 leave canonical, independently reviewed source plus a proven context runtime, cutover controller, Project_echo residual/full fence, and complete isolated rehearsal. Item 137 may leave only its capture-off, authority-false shadow installed; live state, clients, credentials, and authority remain unchanged. This item is the sole live authority execute gate: it builds the final controller/residual artifacts from completed canonical SHAs, migrates populated state, rewires machine clients, proves rollback and a fresh-generation recutover, then observes real daily use before freezing only Project_echo's context plane.
+
+The daily-use milestone is active generation G2 after the rollback/recutover drill. Completion follows seven continuous calendar days later. The Team decision product remains the commercial product; Project_echo remains its current product/loop runtime and rollback source until separate authority transfers. Neither this item nor the context install creates a parallel commercial roadmap.
+
+## Acceptance Criteria
+
+### AC1 — Build and approve exact execute artifacts from completed canonical SHAs
+
+Verify item 137's retained context runtime tgz/manifest/checksum/SBOM and installed shadow identity. Read the item-138 target_landed_sha and project_landed_sha from canonical remotes, require both complete/reviewed, and create fresh detached clones at those exact SHAs with no local sibling dependency. Build the operator controller and Project_echo residual/rollback-full artifacts exactly once; manifests bind both source SHAs/trees, locks/SBOMs, item-137 tuple, schemas, entrypoints, inventories, platform/architecture, and authority_active_at_release false.
+
+Publish/cache the exact bytes under owned protected paths and independently download/reread them to reproduce hashes. No patch, npm install/rebuild, feature SHA, dirty byte, source-checkout runtime dependency, or alternate artifact is allowed. A build/verification gap stops and creates a new proposed source item; live hotfix is forbidden.
+
+Before mutation, the controller emits a secret-free plan binding every artifact, source/final/shadow/residual/quarantine/backup path, actual source DB opened by the daemon, labels/ports, rosters, clients/installed adapters, capture workers/secret refs, source/coord cut lines, disk requirement, phases, and rollback/recutover policy. Founder approval binds the three exact artifact hashes and plan hash.
+
+### AC2 — Quarantine the known preexisting context home without merging it
+
+Inventory the existing /Users/zhenye/.echo-context path by path/type/mode/owner/size/hash without recording file content. The accepted known shape is the extraction-era scaffold: empty adapters, roles, skills, and workflows directories plus state/onboarding.json and state/projects.json, currently non-authoritative. Any database, unknown entry, nonempty support directory, symlink/hardlink, foreign owner, mount difference, invalid JSON shape, or post-plan hash change stops.
+
+At the execute checkpoint, atomically move the whole root to a generation-bound 0700 protected quarantine under Application Support. Never copy selected files, merge onboarding/projects into context state, overwrite, or delete it. The new final context root must be absent before promotion and mode 0700 after creation. Rollback restores the quarantine byte-for-byte to its original path; recutover inventories and quarantines it again under the new generation.
+
+### AC3 — Close credentials and authenticated clients before stopping authority
+
+Founder rotates/revokes the Slack bot token currently embedded in the mode-0644 com.echo.daemon.plist. The replacement lives only in Keychain or an owned 0600 secret reference usable by residual and rollback-full modes. No LaunchAgent, argv, environment, artifact, log, plan, status, client evidence, or Git file contains its value; readback records only type/reference and rotation confirmation.
+
+Reuse item 137's context bearer reference, generate a distinct residual bearer reference, and verify owner/type/mode plus missing/wrong/correct auth. Copy the existing 0600 Granola API key into a distinct owned 0600 context capture secret without logging it; retain the old file unchanged for rollback. Snapshot all three 0600 client configs and installed skill/command manifests into the encrypted/protected rollback area before edits. Unsupported protected header injection stops before service mutation.
+
+### AC4 — Quiesce and create a restored, encrypted source checkpoint
+
+Stop the mixed daemon and shadow, then prove no matching job/PID/listener or source DB/WAL/SHM/sidecar writer remains. PID checks bind executable and start time; lsof and an exclusive SQLite lock probe close stale races. Bind the source database from the running daemon's verified configuration/open-file evidence, not a path assumption; checkpoint WAL, close, and run quick_check.
+
+Use SQLite backup API to create an authenticated AES-256-GCM bundle with a random Keychain-held key. It contains the DB and explicit nonsecret context sidecars only; excludes granola.json, onboarding/project/loop/product state, logs/PIDs/health, and unknown files. Its manifest binds schema/user_version, modes/hashes, versioned length-prefixed event digest, row count/max rowid/per-source counts, coord counts/order, sidecar schemas/hashes, source/artifact versions, and restore command without content. Wrong key/tamper/partial/WAL drift fails. A full scratch restore/integrity/digest check is mandatory.
+
+### AC5 — Migrate populated context and coordination into separate authorities
+
+Restore into an absent same-filesystem staging root and run only the exact context runtime migrations against that copy. Translate capture-sources.json, granola-checkpoint.json, and the reviewed sidecar allowlist through versioned maps; unknown schema/key, secret/product/loop field, or lossy translation aborts. Prove exact event IDs/bytes/order, logical digest, row count/max rowid/per-source counts, integrity, and populated hashes for all eight context tools.
+
+Import the complete pre-cutover coord:* ledger into an absent residual coord.sqlite, preserving IDs/bytes/append order, replay watermark, idempotency state, open deadlines, and coord_status snapshot. Record context baseline rowid W and residual baseline sequence C. Historical coord rows remain context-searchable; residual is canonical for live coordination. Atomically promote only the verified staging roots; source state remains unchanged.
+
+### AC6 — Prepare the split under one durable authority commit point
+
+Create generation G1 in the single canonical transaction record defined by item 137/138 with state prepared; final/old projection files bind its hash but are not independent commit points. It binds exact artifacts, configs, homes/DBs, source cuts/digests/backup, labels/ports, capture workers/secrets, client before/after hashes, quarantine, operator/time, and rollback window.
+
+Use the item-137 prepare-final command to journal/rebind the unchanged context runtime from shadow to com.echo.context, final home, and 38478; never hand-edit installer-owned config/plist/state. Install the exact residual/rollback-full package as com.echo.project-residual on 38479 and replace/neutralize the old global echoctl package/start paths. Bootout and snapshot com.echo.daemon. Make only the retained source-side context DB/WAL/SHM and old capture sidecars non-writable.
+
+Start context in prepared retrieval-only/capture-off mode and residual in prepared product-workers-paused mode. Exact eight/seven rosters, populated hashes, coordination snapshot, auth, and product service conformance pass. Only context may hold the final context DB; residual holds coord.sqlite and uses authenticated HTTP; direct old full/global/plist starts fail before PID/path/DB/socket mutation.
+
+### AC7 — Rewire machine clients and installed adapters atomically
+
+Apply item 138's reviewed reversible transforms to ECHO-owned entries only. Retain client key echo for context at 38478; add echo-project-residual at 38479. Preserve unrelated config and protected exact before bytes. Replace ambiguous endpoint variables in installed Claude commands and Codex ECHO skills using checksum-bound rendered artifacts; do not hand-edit copies. Scan active installed configs/commands/skills/package callers for ECHO_MCP_URL, ECHO_DAEMON_PORT, old mixed URLs, missing auth, or wrong client classification.
+
+Direct initialize/tools-list calls prove exact rosters. Fresh Codex, Claude Code, and Cursor processes must authenticate and exercise each applicable endpoint; cached sessions do not count. Any parse/format/header/installed-copy drift restores exact before images and stops while authority remains prepared.
+
+### AC8 — Activate G1 and prove the live topology before rollback drill
+
+With external Slack delivery disabled, prove pending/task-state reads, coord emit/status persistence, an injected propose-decision fixture, product-context reads/appends, and prepared-mode restart. Founder then approves the atomic G1 commit-point transition to active; immutable configs reference it, context capture and residual product workers enable, and services restart on the same artifacts.
+
+Prove historical retrieval, one uniquely tagged context append searchable by MCP, one real configured local-source capture, product-derived append, coord outbox/mirror visibility through wait/search, residual deadline status, clean restart, exact artifact/config/generation, no repository-open handles, and one context DB writer. Every enabled adapter—fs, git, Granola, Claude Code, Codex, and Cursor—must produce one live continuity observation during the drill/window or carry an explicit founder-approved disabled/no-activity reason with healthy checkpoint evidence. At this point Project_echo context is retained and non-authoritative pending acceptance, not frozen.
+
+### AC9 — Perform lossless rollback and fresh-generation recutover
+
+Founder-approved rollback quiesces both services, backs up the current target, and exports context/product rows after W, residual coord rows after C, current capture checkpoints, client after state, and mirror watermark. Restore the pre-cutover source bundle into staging; replay context rows preserving IDs/bytes/rowids where free, then canonical coord rows preserving IDs/bytes/internal order with later old-DB rowids. Identical collisions are idempotent; differing collision/order/gap/digest failure aborts before the commit point.
+
+Restore old clients/global package/plist, credential refs, file modes, and the quarantined preexisting home exactly; mark G1 rolled_back; start only fenced full mode. Prove all pre-cutover and G1 events/status exactly once. While rolled back, create at least one context event and one coord event to prove the hard case.
+
+Recutover never reactivates G1. It creates generation G2 with a new quiescence, backup, cut lines W2/C2, freshly migrated context DB, freshly rebuilt residual coord DB, new client plan, quarantine, and prepared record. Carry all G1 and rollback-era writes/checkpoints forward, then pause for a separate founder approval bound to the G2 generation/plan/artifact hashes before activation. Activate G2 through the same checks and prove every event exactly once plus mirror convergence. Any rollback restarts the acceptance clock.
+
+### AC10 — Use G2 daily for seven continuous days, then freeze only the context plane
+
+Generation G2 begins the daily-use window. For seven continuous calendar days, record redacted doctor/auth/uptime/capture-lag/count/retrieval/client-endpoint evidence from real fresh-client use, at least one service restart, source-by-source continuity/adjudication for all six adapters, residual product/coord health, and zero competing context writer. Any authority rollback, artifact/config generation change, lost history, duplicate capture, auth bypass, or unresolved source failure resets the window.
+
+Only after the full window passes and the founder explicitly approves the evidence-bound freeze may the canonical record and Project_echo projection mark the Project_echo context plane frozen. Retain the source DB/code, old package/plist snapshot, quarantine, credentials needed for rollback, client snapshots, controller/residual/runtime artifacts, and both encrypted backups; delete nothing in this item.
+
+Definition of done: new Codex, Claude Code, and Cursor sessions use echo-context for populated and new machine-scope unified context; the exact service survives restart; Project_echo no longer serves or writes context; its product/loop residual remains healthy; and a proven lossless rollback/recutover path is retained.
+
+## Out of Scope (Don't Drift)
+
+- No source, test, schema, skill-source, package-lock, or build-workflow edit in Project_echo, echo-context, echo-brain, or echo-loop.
+- No artifact rebuild after AC1, live hotfix, feature-SHA artifact, public release, auto-update, or other OS/architecture.
+- No new MCP tool/semantic, context quality feature, storage redesign, embedding/backfill, product feature, or generic migration framework.
+- No echo-brain/echo-loop authority transfer, whole Project_echo deprecation, Team-product graduation, Fleet, cloud, or cross-machine sync.
+- No autonomous Slack send, unlisted external message, secret/content in evidence, or unreviewed client mutation.
+- No deletion of source/target/residual/quarantine/backup/code/artifact state.
+
+## Risks
+
+- Live filesystem/launchd behavior can differ from rehearsal. Every adapter rechecks its preconditions and the controller stops/replays rather than patching.
+- Existing home or credential content can be misclassified. Whole-root quarantine and secret-reference boundaries forbid merging or logging.
+- A legacy global binary can reclaim authority. The exact package replaces/neutralizes supported paths and fences full mode before any mutation.
+- Client config/installed skill drift can strand users. Protected before images, pure transforms, checksum-bound adapters, and fresh-client probes enable exact restore.
+- Capture or coord deltas can be lost across rollback. W/C cuts, stable IDs, binary digests, collision abort, G1 rollback writes, and fresh G2 prove the hard path.
+- The acceptance window can extend beyond the nominal sprint. It is deliberately elapsed-time truth, not builder effort; safety gates are not shortened.
+
+## Tests
+
+- /Users/zhenye/Desktop/echo-context/tests/cutover/phase-machine.test.ts, /Users/zhenye/Desktop/echo-context/tests/cutover/mutation-guard.test.ts, /Users/zhenye/Desktop/echo-context/tests/cutover/backup-migrate.test.ts, /Users/zhenye/Desktop/echo-context/tests/cutover/client-adapters.test.ts, /Users/zhenye/Desktop/echo-context/tests/cutover/rollback-recutover.test.ts, and /Users/zhenye/Desktop/echo-context/tests/cutover/crash-resume.test.ts rerun against the AC1 controller hash and assert replay, zero unauthorized mutation, restored backup parity, reversible clients, W/C deltas, G1 rollback, rollback-era writes, fresh G2, and exact-one authority.
+- tests/daemon/legacy-residual.test.ts, tests/daemon/authority-fence.test.ts, tests/mcp/legacy-residual-roster.test.ts, tests/storage/context-service.test.ts, tests/storage/coord-continuity-mirror.test.ts, tests/echo-home/adapters/split-mcp-config.test.ts, tests/echo-home/adapters/caller-classification.test.ts, and tests/integration/context-cutover-rehearsal.test.ts rerun against the AC1 residual hash and assert exact seven-tool composition, pre-open full fencing, sealed service conformance, canonical coordination/outbox mirroring, lossless caller transforms, and the full old→G1→old→G2 ceremony.
+- Verify the item-137 runtime and AC1 controller/residual manifests, checksums, SBOMs, canonical source SHAs, inventories, and owned cache/readback before execute.
+- Run the item-138 full test/rehearsal suite unchanged against the final artifact hashes; any mismatch blocks live execution.
+- Controller preflight/plan dry run proves paths, disk, DB, clients, installed adapters, credentials, jobs/ports, quarantine shape, and zero mutation.
+- Backup scratch-restore and logical-digest verification prove DB/WAL/sidecar integrity before migration.
+- Prepared and active doctor probes prove auth, exact eight/seven rosters, populated hashes, one writer, residual DB separation, full-start fence, and repository independence.
+- Fresh Codex/Claude/Cursor calls plus installed-copy scan prove split client/skill wiring and removal of ambiguous endpoint defaults.
+- G1 live smoke, lossless rollback, rollback-era writes, and G2 recutover prove context/product/coord/checkpoint preservation with exact-once IDs.
+- Seven-day acceptance evidence proves all six source continuities/adjudications, restart, fresh-client daily retrieval, residual health, auth, and zero dual writer.
+- git diff --check and secret/content scans cover only the redacted Project_echo evidence/backlog changes before commit.
+
+## After Completion (Strategist Notes)
+
+- Create or update wiki/architecture/machine-context-authority.md after shipment, naming echo-context as active machine-context authority and Project_echo as product/loop residual plus rollback source.
+- Retire the item-135 vocabulary/default-path/auth follow-up and mark only the context authority leg of the repository-topology follow-up complete.
+- Open a later retention/deletion decision only after separate brain/loop authority work; never infer whole Project_echo deprecation from this cutover.

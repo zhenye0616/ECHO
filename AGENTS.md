@@ -150,6 +150,8 @@ When acting as a builder agent, follow `docs/AGENT_INSTRUCTIONS.md` exactly:
 
 One item per run unless the user explicitly invokes the documented batch workflow. If uncertainty needs founder input, stop and move the item to review with the question. Do not silently expand scope.
 
+Items 136-139 have one narrow founder-authorized successor-repository exception recorded in raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md. For those items only, follow the two-repository and external-execute protocol in docs/AGENT_INSTRUCTIONS.md. Target fields are mandatory only for items 136-138, which modify echo-context source; item 139 consumes their canonical landed SHAs and has no target-source lane. Missing applicable fields, independent review, canonical-main readback, or exact-artifact founder approval is a hard stop. The default no-external-write rule remains unchanged for every other item.
+
 ## Drift Prevention
 
 The `CLAUDE.md` drift rules apply to Codex:

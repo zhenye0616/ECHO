@@ -110,6 +110,10 @@ The slash-command skills that drive ECHO's multi-agent workflow — `process-bac
 
 Why this matters internally: the Fleet coordination system must stay vendor-neutral so Claude and non-Claude tools can build the Team product as peers. This is an operating-system property, not ECHO's current commercial wedge. See `raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md` for the original reasoning.
 
+### Narrow successor-repository lane
+
+Items 136-139 alone follow the founder-authorized two-repository/live-execute protocol in raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md and docs/AGENT_INSTRUCTIONS.md. Project_echo remains the claim/record root; echo-context changes use an isolated target branch with independent review and founder target-main approval; artifacts build only from canonical landed SHAs; live user paths wait for the separately named exact-artifact execute scope. This does not relax the default external-write prohibition for any other item.
+
 ### Reviewer independence rule
 
 The reviewer-and-merger of any item must be **a different role/agent than the builder** that wrote the code. Acceptable reviewers, in preference order:

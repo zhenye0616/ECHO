@@ -252,7 +252,7 @@ These rules override anything you might infer from context. If any rule conflict
 
 5. **Tests are mandatory, not optional.** If acceptance says "tests pass," tests must exist and pass. If no test framework exists yet, escalate — don't invent one.
 
-6. **No spec changes.** You do not edit `wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`. The ready-stage integrity field `ready_content_sha` is watcher/founder-owned, NOT builder-writable; a builder cannot self-certify claimability. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
+6. **No spec changes.** You do not edit `wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`, plus `target_repo`, `target_remote`, `target_branch`, `target_worktree`, `target_head_sha`, and `target_pr_url` when the founder-authorized successor-repository protocol applies. `target_landed_sha` and `project_landed_sha` are independent-merger/founder-managed readback fields. The ready-stage integrity field `ready_content_sha` is watcher/founder-owned, NOT builder-writable; a builder cannot self-certify claimability. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
 
 7. **No merging your own branch.** You push `agent/<slug>`. Someone else merges — by preference the strategist, otherwise a second builder agent that did not build this item, otherwise the founder. **You never run `git merge` on `main` for an item you built.** If the user asks you to review and merge a *different* builder's pending item, you may operate in reviewer mode: read the diff, prep `review_notes` and any reconciliation diff, but the actual `git merge` and `git push origin main` still wait for founder green-light per the Reviewer Independence Rule in `claude.md` / `backlog/README.md`.
 
@@ -367,6 +367,21 @@ Founder will respond by either:
 
 The ready-stage integrity field `ready_content_sha` is NOT agent-managed. The watcher stamps it when promoting `proposed/` to `ready/`, and stale ready items are bounced back to `proposed/`. Builders only consume claimability through `tools/blocked.py`; they do not read readiness fields manually. New task-state anchors for unclaimed specs should point at `backlog/proposed/<id>.md` until promotion moves the item.
 
+### Founder-authorized successor-repository exception
+
+The default is still one Project_echo worktree and no external writes. A builder may cross that boundary only when a locked decision explicitly names the item, external repository/path, mutation class, review/merge order, and founder execute checkpoint; the item cites that decision in spec_refs and lists every external path in files_to_modify.
+
+For items covered by raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md:
+
+- Project_echo remains the claim, task-state, run-log, and backlog coordination root.
+- Echo-context source work uses a separate sibling feature worktree/branch; never edit its main checkout directly.
+- For source-changing items 136-138, track the external repository/remote/worktree/branch/full head SHA/PR in the item fields defined by backlog/README.md; only the independent merger/founder fills canonical landed SHAs after remote readback. Item 139 has no target-source lane and consumes the landed fields from completed item 138.
+- A different agent reviews both repository heads for source-changing items and the exact execute plan/artifacts for item 139. Founder approval precedes each target-main merge/push and the normal Project_echo main push.
+- Release artifacts build only from fresh detached clones of read-back canonical main SHAs.
+- Live user paths remain forbidden until the separately named item reaches its exact-artifact founder execute checkpoint.
+
+Any missing field, decision, clean-base proof, independent review, canonical readback, or checkpoint restores the default rule: stop and escalate.
+
 ## What You Must Not Write
 
 - Anything in `wiki/` (only the strategist edits, and only post-shipment)
@@ -375,7 +390,7 @@ The ready-stage integrity field `ready_content_sha` is NOT agent-managed. The wa
 - `docs/STATUS.md` (founder updates Friday)
 - `docs/NORTH_STAR.md` (founder owns this)
 - Anything in `backlog/complete/` (founder-only)
-- Anything outside the repo (no Slack messages, no GitHub issues, no external API calls beyond test fixtures)
+- Anything outside the repo, except the exact repositories/paths and checkpointed mutations permitted by a founder-authorized successor-repository decision as described above (still no unlisted Slack messages, GitHub issues, or external API calls)
 
 ---
 
