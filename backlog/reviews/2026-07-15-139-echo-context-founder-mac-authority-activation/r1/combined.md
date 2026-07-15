@@ -7,7 +7,7 @@ cursor_response: null
 codex-ops_response: null
 claude_response: null
 patch_commit_sha: null
-next_round: null
+next_round: 2
 combined_verdict: no_responses
 escalated_to_founder: true
 ---
@@ -29,5 +29,8 @@ escalated_to_founder: true
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+needs R2 — focus_hints: Founder-directed retry with two independent remote Codex reviewers; perform a fresh full-spec review only, drive the proposal to convergence, and do not claim, build, implement, install, or release anything.
 
+## Founder disposition
+
+On 2026-07-15 the founder directed a fresh retry with `codex` and `codex-ops`. R1 remains an immutable no-response audit record; it is not accepted as substantive review evidence.
