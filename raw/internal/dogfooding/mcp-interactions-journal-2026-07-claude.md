@@ -653,3 +653,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** none — empty result sets; no source_breakdown. (Absence itself is the signal: the sibling 133/134 runtime-inventory / install-proof artifacts are not in the live prod db at :38478 — either not yet captured/indexed, or they live only in the standalone target repos which ECHO does not watch.)
 - **Verdict:** 🟡 partial — queries executed cleanly but returned nothing actionable; literal-token search over exact filenames found no captured atom. Falling back to authoring from the item spec (AC2/AC7 prose) directly.
 - **Note:** The standalone extraction targets (/Users/zhenye/Desktop/echo-{brain,loop,context}) are outside ECHO's watched roots, so sibling-lane build artifacts won't surface via search_memories; the item spec + founder adjudication remain the only sources for these shapes.
+
+## 2026-07-15 15:33 PDT — 136 r2 verification-round dispatch (coord_invoke ×2)
+
+- **Trigger:** Watcher tick combined 136 r1 (codex + claude, both proceed_after_patches, 8 findings, not escalated); all findings accepted and patched at ad53c6c7; r2 dispatched at 76df42c3; 057b post-push hook fires the active trigger for the r2 roster.
+- **Query inputs:** `coord_invoke` ×2 — roles codex + claude on backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r2/request.md, correlation_id 73bd8f8a-21e4-40d8-aece-1935f50c316f; repo-relative request_path per the pin rule.
+- **Returned:** both ok — reviewer_invoked ids 17538597… (codex, run-codex-reviewer.sh) and 800c6dd7… (claude, run-claude-reviewer.sh); wrappers spawned fire-and-forget.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
+- **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
+- **Note:** First 136 round; reframe gate structurally n/a at r1. r2 spec_commit_sha pins a3d83d7d (disposition commit, contains the patched spec bytes from ad53c6c7).
