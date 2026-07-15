@@ -1,22 +1,20 @@
 ---
 item_id: 2026-07-13-134-local-echo-loop-source-extraction
-verdict: redo before merge
-reviewed_at: '2026-07-15T07:02:54Z'
+verdict: merge as-is
+reviewed_at: '2026-07-15T18:49:28Z'
 test_counts:
-  passed: 165
-  failed: 4
+  passed: 171
+  failed: 0
 producer: review-pending-orchestrator
 ---
 ## Verdict
-Redo before merge. Fresh independent sixth review at immutable child e9ae6519070144a7dd04f98b5016ebe20b66ef38 closes the fifth-review transport and tracked-clean findings but finds one blocking portability defect: exact Draft-07/source-plan validation depends on mutable founder user-site Python state. The required scratch-HOME/system-jsonschema envelope passes 165/169 overall and 43/46 source-plan, so AC2 and AC7 remain open. Authority remains false, installed false, maturity DEV.
+Fresh independent seventh review APPROVED exact builder head `e2ccdf9a22eb272bdb608bf0a86a5a7d119cc915` and immutable review child `566499fc29ad41ca9f9b2de132db6465b1c7894f` for merge as-is. The sixth-review scratch-HOME/Draft-07 portability defect is closed under the accepted system toolchain; AC1–AC8 pass, with `authority:false`, `installed:false`, and maturity `DEV`. Neutral execution passed 24/24 files and 171/171 tests plus the focused source-plan, watcher, review/cleanliness, coord, workflow, provenance, offline-install, source-independence, topology, and strict-fsck gates.
 
 ## Pre-merge fixups
-- [ ] Replace the relative edge-record schema $id with a standards-correct absolute base; isolate the validator from user-site/PYTHONPATH state; implement version-stable Draft-07 meta-validation with regex format checking.
-- [ ] Add scratch-HOME and poisoned-user-site regressions, prove direct-to-npm and npm-to-direct four-route equivalence, and preserve malformed-regex invalid-schema behavior on the accepted system toolchain.
-- [ ] Regenerate source closure and migration/verifier bindings at a new target HEAD/tree, publish a migration-record-only builder child of e9ae6519..., and obtain fresh independent approval without advancing authority or maturity.
+- None. Merge the exact reviewed remote feature tip `566499fc29ad41ca9f9b2de132db6465b1c7894f`.
 
 ## Expected merge conflicts
-- None observed against current main 8bdf76beca0b8406087e46595c381f13258c41ae. Exact classic merge-tree is clean; the feature adds only the 134 migration and immutable review records. This textual preview is not approval while AC2/AC7 remain open.
+- None observed. Classic merge-tree against current main `a50f6f0a16acba9333db32612b4b74cfb92b7b80` produced no conflict markers or changed-in-both signals. The feature contributes the 134 migration record and its accepted independent review record; revalidate if main advances before merge.
 
 ## Follow-up items (defer, do not block merge)
-- None. The portability finding is a pre-merge acceptance gate and must not be deferred.
+- Refresh or explicitly historicize the target repository's tracked `EXTRACTION-STATUS.md` only in a future target version whose new HEAD/tree and provenance are deliberately rebound. Its conservative authority/install posture is correct and it is not an acceptance or runtime artifact, so this does not block the reviewed DEV repository merge.
