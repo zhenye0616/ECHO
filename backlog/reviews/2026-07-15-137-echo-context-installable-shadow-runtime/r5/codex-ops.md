@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-15-137-echo-context-installable-shadow-runtime"
+round: 5
+reviewer: "codex-ops"
+artifact_sha: "7a79d6d479d872062bbb177c2cd8eb43e88f7cde"
+completed_at: '2026-07-16T06:03:15Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC4 — release FSM process containment and tests/install/release-fsm.test.ts"
+    finding: "The flock serializes coordinator processes but does not contain spawned build, upload, smoke, bootstrap-install, or record subprocesses. If the coordinator is SIGKILLed, a child can keep mutating after the lock is released while resume verifies or adopts state; inheriting the lock can instead wedge recovery. Require write-ahead PID/start/executable/process-group identity, bounded parent-death containment, and recovery that proves the prior executor quiescent before any verification or side effect, with coordinator-kill tests during every child operation."
+  - severity: "high"
+    where: "AC4 — release FSM lock namespace and private publication"
+    finding: "Coordination is keyed by landed SHA plus version, while the private tag, fixed asset names, and real installation are effectively keyed by repository plus version. Two different landed SHAs using 0.1.0-dev.137.1 can acquire different locks and interleave publication or installation. Add a durable repository/destination/version reservation, bind it into the journal and approval tuple, refuse a second SHA for that destination, and test cross-SHA same-version races."
+  - severity: "high"
+    where: "AC4/AC5 — release-set checkpoint and repo-free trust anchor"
+    finding: "The stage checkpoint list omits the release-set manifest bytes and digest, and the runner is required to verify and protect only the bootstrap and release-set manifest before invoking the bootstrap; the tgz, runtime manifest, checksum, and SBOM remain pathname inputs vulnerable to substitution or verify/use swaps. Generate and checkpoint the release-set manifest before smoke, bind the smoked and approved transitions to it, verify every asset against it, and consume the entire protected set. Also authenticate expected modes because acceptance currently compares modes that the release-set records do not contain."
+  - severity: "high"
+    where: "AC5 — install crash transaction and tests/integration/shadow-install.test.ts"
+    finding: "The install intent cannot precede the first mutation when it lives inside a freshly created support-root transaction directory, and bootstrap extraction occurs before the CLI intent and provisional ownership checkpoint. SIGKILL can therefore leave directories or bytes that rerun recovery and manifest-driven cleanup cannot discover. Establish durable cleanup authority in a pre-existing owner-checked anchor before the first mkdir or extraction, checkpoint every staging path before population, and inject kills from initial directory creation through extraction and final commits."
+  - severity: "medium"
+    where: "AC5 — lifecycle mutation serialization"
+    finding: "There is no per-layout mutation lock across install, recovery, uninstall, prepare-final, start, stop, and disable. Concurrent commands can independently pass stopped-state or ownership checks and interleave atomic file commits with launchctl actions. Add one owner-checked nonblocking lifecycle lock, distinct from the runtime writer lock, held from before recovery/state reads through filesystem and launchd convergence, with barrier tests for conflicting command pairs."
+  - severity: "high"
+    where: "AC5 — supervisor restart and logging failure behavior"
+    finding: "The supervisor has no fixed child-restart budget, backoff window, or circuit breaker, and sink failure is not required to keep draining child pipes. A crashing child can cause an unbounded spawn/fsync loop inside one supervisor despite launchd ThrottleInterval, while a failed sink can fill a pipe and hang the runtime. Require bounded persisted restart exhaustion, fail-open draining/discard after sink failure, operator-visible degraded evidence, and real-launchd tests proving bounded activity and termination under both conditions."
+  - severity: "high"
+    where: "AC7 — crash-durable candidate cleanup and failure evidence"
+    finding: "An in-process finally block cannot cover SIGKILL, wrapper death, or host crash, so a run-unique KeepAlive LaunchAgent, listener, and disposable tree can survive without a durable locator; evidence is written only after failure and its fsync failure behavior is undefined. Persist an owner-checked run intent outside the disposable root before bootstrap that binds root, label, port, and process identity, make subsequent invocations recover or refuse outstanding runs, preflight the evidence destination, and retain the located root after safe process cleanup when evidence cannot be committed."
+---
