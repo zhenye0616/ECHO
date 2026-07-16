@@ -689,3 +689,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** repo state only — r1 request.md frontmatter + combine.py output in the ephemeral watcher worktree; no ECHO retrieval.
 - **Verdict:** ❌ surprising failure — 136's four rounds got two-reviewer responses on the same cadence earlier today; 137 r1 got zero from both lanes in the same hour window.
 - **Note:** Observation only: the most recent main commit before this tick is `82e7b7e2 review: pin claude reviewer to fable`, i.e. the claude reviewer wrapper changed between 136's responsive rounds and 137's silent round; codex is silent too, so the launchd fallback cadence for both lanes in this window is also suspect. Founder decides wait / re-dispatch / accept-partial per §AC4.
+
+## 2026-07-15 20:03 PDT — 137 r3 verification-round dispatch (coord_invoke ×2)
+
+- **Trigger:** Watcher tick combined 137 r2 (codex 3 MEDIUM + codex-ops 2 MEDIUM, both proceed_after_patches; not escalated — the dual-codex rebind after r1's silent round produced full responses). Reframe gate NOT triggered: r1 was an immutable no-response timeout with no patch commit, so all five findings target original spec text. All five accepted as completion patches at 8e73045f (config-derived secret root, two-phase artifact ownership, arch/Rosetta preflight, bounded installer-owned logs, lease owner-identity/stale-reclaim semantics); r3 dispatched at 4977c260; 057b post-push hook fires the active trigger for the r3 roster.
+- **Query inputs:** `coord_invoke` ×2 — roles codex + codex-ops on backlog/reviews/2026-07-15-137-echo-context-installable-shadow-runtime/r3/request.md, correlation_id from r3 request frontmatter; repo-relative request_path per the pin rule.
+- **Returned:** both ok — reviewer_invoked ids c6a3120a… (codex, run-codex-reviewer.sh) and a1682a7a… (codex-ops, run-codex-ops-reviewer.sh); wrappers spawned fire-and-forget.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
+- **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
+- **Note:** First responsive round on the 137 lane confirms the r1 silence was roster-binding-related (codex+claude then, codex+codex-ops now), consistent with the r1 escalation note's suspicion about the claude-reviewer wrapper change. r3 spec_commit_sha pins e9033277 (disposition commit; contains patched bytes from 8e73045f).
