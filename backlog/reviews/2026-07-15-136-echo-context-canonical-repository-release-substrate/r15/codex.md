@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-15-136-echo-context-canonical-repository-release-substrate"
+round: 15
+reviewer: "codex"
+artifact_sha: "47909a315bb4ba83fa4f6bd86bae805e42d4c722"
+completed_at: '2026-07-16T10:15:44Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC4 — exact-SHA check-run evidence"
+    finding: "The gate authenticates check runs at H but never requires those jobs to checkout and assert H and H^{tree}. A pull_request job may test GitHub's synthetic merge ref, allowing M^{tree}=H^{tree} to land bytes the checks did not execute. Require an event-specific checkout of full H, in-job HEAD/tree assertions, gate binding to the exact run and job identities, and a merge-ref-substitution rejection fixture."
+  - severity: "high"
+    where: "AC6 — annotated-tag construction and authorization"
+    finding: "The approval fields bind the tag name but omit the exact TAG_OBJECT_OID, and no deterministic tagger identity, timestamp, timezone, complete object-byte contract, or publisher materialization step exists. Define canonical annotated-tag bytes, bind their OID and peeled source through the approval, Project_echo record, publication plan, and dispatch, then reconstruct and verify that object in the fresh publisher clone before pushing it."
+  - severity: "medium"
+    where: "AC6 — release-asset mutation responses"
+    finding: "GitHub Release Asset upload and metadata responses do not carry a release_id field, so the required response-body authentication of exact release binding is not executable as written. Bind each upload through the captured release-scoped request endpoint, require its returned asset ID in a fully paginated GET /releases/{release_id}/assets result, and retain exact-ID metadata and byte readback."
+  - severity: "medium"
+    where: "AC6 — publish preflight and public Project_echo read"
+    finding: "The committed authorization verifier cannot perform the required checks before checkout because its bytes are unavailable until checkout, and the credential-free public read lacks an explicit transport contract. Limit pre-checkout work to immutable context guards, checkout exact M with persist-credentials disabled, run the committed verifier before artifact download or mutation, and require an unauthenticated host-pinned Project_echo adapter with no authorization, cookie, or cross-host redirect."
+  - severity: "medium"
+    where: "AC6 — build-run approval and readback"
+    finding: "The durable approval binds a run ID, attempt, and artifact metadata but not the build run's workflow ID/path, workflow_dispatch event, head SHA M, main ref, overall success, or successful build-artifact job. Bind and revalidate those run and job fields in the approval, Project_echo authorization, and publish preflight so a valid artifact left by a failed or different workflow cannot satisfy the build/publish separation claim."
+  - severity: "medium"
+    where: "AC4/AC6 — independent-review enforcement"
+    finding: "The landing gate binds a review artifact, hash, heads, and verdict but does not schema-bind both builder and reviewer actor/run identities or enforce their inequality. Add canonical builder and reviewer identities to the review and authorization records, reject missing or equal identities, and add negative fixtures for self-review and identity substitution."
+  - severity: "medium"
+    where: "AC4/AC6 — execution-plan hashes"
+    finding: "Both authorizations depend on a SHA-256 of an exact execution or publication plan, but no canonical plan bytes, schema, path, or recomputation contract is defined. Define canonical JSON plan artifacts containing every ordered command, request, identity, retry policy, and immutable input; embed or commit their exact bytes and require both gates to recompute the recorded hashes."
+  - severity: "medium"
+    where: "files_to_modify versus AC4/AC6 committed artifacts"
+    finding: "AC6 creates root source-release-approval.v1.json in the authorization commit, but that path is absent from files_to_modify; AC4 also requires a committed implementation-review artifact without naming its path or owner. Add the exact paths and ownership comments to files_to_modify, or explicitly define and validate the narrow reviewer/coordinator-generated off-main exception."
+---
