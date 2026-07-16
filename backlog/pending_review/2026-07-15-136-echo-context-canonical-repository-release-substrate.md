@@ -60,27 +60,26 @@ claimed_by: "codex-136-cycle3-builder-mendel-222cc09b"
 claimed_at: "2026-07-16T18:42:07Z"
 branch: "agent/echo-context-canonical-repository-release-substrate"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate"
-head_sha: "2fdce9c64b8077de1e73fffe5232bc471a973ac3"
+head_sha: "7f156ba44b3ff17095a55198a7463ede713f81f7"
 pr_url: ""
 agent_notes: |
-  REOPENED after formal independent review of exact target head
-  02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7 (tree
-  bc8b700fe5db3435d54a930a71d0c5455b85541b) found zero HIGH and exactly three
-  MEDIUM AC3 blockers. Fresh repair builder codex-136-cycle3-builder-mendel-222cc09b,
-  run ID cycle3-mendel-222cc09b-20260716T184207Z, must repair only: (1) timestamp
-  complete terminal proof rather than direct exit/error when deciding whether a
-  deadline may be rescued; (2) use a monotonic production clock instead of Date.now();
-  and (3) apply immediate before/after monotonic checks to every verifier-local
-  synchronous filesystem call, with no later operation after a late return and
-  immediate T recording after mkdtempSync. Reviewer reproducers have SHA-256
-  636dfb61badab446d49e7cdc6d89ad89b3abfa21c605aef6aa6388ca303120e0,
-  799dc1796a359cc7b8ffb6a478ddac8d9bd4ad38d501d0f7e0caf339ea4f2120, and
-  67a4e3ea325456c802272352ad972fc5ebd1d13282fdf53386ac8cda8a9c7b85.
-  Every other formal gate passed, including focused/full tests, typecheck, lint,
-  inventory, authority, operator replay, four-ref scan, canonical fresh-clone
-  acceptance, dual deterministic artifact verification, fsck, scope audit, and
-  merge preview. No implementation-review record was written. The existing Project
-  and target feature histories remain intact; no target-main or Project-main
+  COMPLETED the bounded formal-review AC3 repair as fresh builder
+  codex-136-cycle3-builder-mendel-222cc09b, run
+  cycle3-mendel-222cc09b-20260716T184207Z. Rejected target
+  02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7 was preserved; final target
+  ad370ae0a666f366e1ff93c9ec5b920763e9cbb8 (tree
+  3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec) adds exactly two commits repairing
+  full-terminal deadline rescue, monotonic production time, and immediate per-call
+  synchronous-filesystem deadline checks, plus the regenerated v2 inventory. All
+  three pinned reviewer reproducers, AC3 focus 49/49, typecheck, lint, inventory,
+  authority, full CI 1,086 passed/17 skipped, four-ref full-history scan, pinned
+  operator 2/2, isolated no-local/no-hardlinks acceptance, canonical HTTPS
+  acceptance, fsck, and exact-head oracle passed. Target feature and PR 1 refs read
+  back exact final target head; target main remains the frozen baseline. Project
+  evidence feature head 7f156ba44b3ff17095a55198a7463ede713f81f7 (tree
+  6b23ee3310c3714c1292d9dbcfa80a1c1b03e119) is pushed and read back. No
+  implementation-review record was written; a different fresh reviewer must review
+  both exact heads and independently rerun AC3. No target-main merge, Project-main
   implementation merge, release, install, live mutation, or authority transfer occurred.
 review_notes: |
   Implementation cycle 1 rejected — redo before merge.
@@ -111,7 +110,7 @@ target_repo: "/Users/zhenye/Desktop/echo-context"
 target_remote: "https://github.com/zhenye0616/echo-context.git"
 target_branch: "agent/echo-context-canonical-repository-release-substrate"
 target_worktree: "/Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate"
-target_head_sha: "02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7"
+target_head_sha: "ad370ae0a666f366e1ff93c9ec5b920763e9cbb8"
 target_pr_url: "https://github.com/zhenye0616/echo-context/pull/1"
 target_landed_sha: ""
 project_landed_sha: ""

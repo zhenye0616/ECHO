@@ -21,13 +21,13 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| CLAIMED | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/claimed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-testing clean clone, and tuple-sealed source artifact | 1d | 2026-07-13-135-local-echo-context-source-extraction |
+| - | - | - | _(empty)_ | - | - | - |
 
 ## Pending Review
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| - | - | - | _(empty)_ | - | - | - |
+| PENDING_REVIEW | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/pending_review/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-testing clean clone, and tuple-sealed source artifact | 1d | 2026-07-13-135-local-echo-context-source-extraction |
 
 ## Complete
 
