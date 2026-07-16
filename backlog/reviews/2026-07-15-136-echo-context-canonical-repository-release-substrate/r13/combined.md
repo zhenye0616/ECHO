@@ -6,8 +6,8 @@ codex_response: codex.md
 cursor_response: null
 codex-ops_response: codex-ops.md
 claude_response: null
-patch_commit_sha: null
-next_round: null
+patch_commit_sha: f130ba6fd89bd598a06e7603b700fb0f66c6dd54
+next_round: 14
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 ---
@@ -25,9 +25,9 @@ Reframe gate: FIRED. All three R13 findings target the R12 fresh-clone-verifier 
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | HIGH | codex | AC3 — HEAD equality and three cleanliness probes | accepted — propagation completion. The verifier retains the validated full source SHA as immutable `S`; each pre-install, post-`npm ci`, and final boundary now contains an exact `git rev-parse HEAD` equality-to-`S` assertion paired with the exact exit-zero/empty-stdout status probe, and a persistent clean retarget between boundaries must fail. The contract explicitly excludes adversarial transient retarget-and-restore claims. | _stamped at dispatch: see patch commit below_ |
-| 2 | MEDIUM | codex | AC3 exact per-mode allowlist; Tests scripted fresh-clone acceptance bullet | accepted — propagation completion. Replace shorthand common-template/once-only language with the complete ordered source and release traces, explicit ordinal executable+argv entries and per-command counts: HEAD/status each 3; source build/derived verify 1/1; release build/caller verify 0/1; cleanup and final assertions placed explicitly. Matching tests assert the entire trace, order, counts, and mode exclusions. | _stamped at dispatch: see patch commit below_ |
-| 3 | MEDIUM | codex | AC3 verifier-owned temporary cleanup; Tests cleanliness fixtures | accepted — propagation completion. Source-mode cleanup remains a Node-internal operation over only the exact recorded owned directory and is followed by an explicit Node filesystem ENOENT assertion; cleanup error or continued existence fails independently of git status. Fixtures inject cleanup failure and a surviving gitignored owned temp while proving a non-owned sentinel is never removed. Release mode creates no unnecessary owned temp directory. | _stamped at dispatch: see patch commit below_ |
+| 1 | HIGH | codex | AC3 — HEAD equality and three cleanliness probes | accepted — propagation completion. The verifier retains the validated full source SHA as immutable `S`; each pre-install, post-`npm ci`, and final boundary now contains an exact `git rev-parse HEAD` equality-to-`S` assertion paired with the exact exit-zero/empty-stdout status probe, and a persistent clean retarget between boundaries must fail. The contract explicitly excludes adversarial transient retarget-and-restore claims. | f130ba6fd89bd598a06e7603b700fb0f66c6dd54 — spec-r13-patches |
+| 2 | MEDIUM | codex | AC3 exact per-mode allowlist; Tests scripted fresh-clone acceptance bullet | accepted — propagation completion. Replace shorthand common-template/once-only language with the complete ordered source and release traces, explicit ordinal executable+argv entries and per-command counts: HEAD/status each 3; source build/derived verify 1/1; release build/caller verify 0/1; cleanup and final assertions placed explicitly. Matching tests assert the entire trace, order, counts, and mode exclusions. | f130ba6fd89bd598a06e7603b700fb0f66c6dd54 — spec-r13-patches |
+| 3 | MEDIUM | codex | AC3 verifier-owned temporary cleanup; Tests cleanliness fixtures | accepted — propagation completion. Source-mode cleanup remains a Node-internal operation over only the exact recorded owned directory and is followed by an explicit Node filesystem ENOENT assertion; cleanup error or continued existence fails independently of git status. Fixtures inject cleanup failure and a surviving gitignored owned temp while proving a non-owned sentinel is never removed. Release mode creates no unnecessary owned temp directory. | f130ba6fd89bd598a06e7603b700fb0f66c6dd54 — spec-r13-patches |
 
 ## Convergence call
 
