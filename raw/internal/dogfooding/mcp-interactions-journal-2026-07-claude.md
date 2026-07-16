@@ -690,6 +690,15 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ❌ surprising failure — 136's four rounds got two-reviewer responses on the same cadence earlier today; 137 r1 got zero from both lanes in the same hour window.
 - **Note:** Observation only: the most recent main commit before this tick is `82e7b7e2 review: pin claude reviewer to fable`, i.e. the claude reviewer wrapper changed between 136's responsive rounds and 137's silent round; codex is silent too, so the launchd fallback cadence for both lanes in this window is also suspect. Founder decides wait / re-dispatch / accept-partial per §AC4.
 
+## 2026-07-15 20:00 PDT — 138 r3 verification-round dispatch (coord_invoke ×2)
+
+- **Trigger:** Watcher tick combined 138 r2 (codex proceed_after_patches ×2 MEDIUM, codex-ops proceed_after_patches ×3 MEDIUM; not escalated). Reframe gate evaluated, NOT triggered — r1 was a no-response timeout with zero patch commits, so all five findings target original spec text. All five accepted; spec patched at 9c37bd8c (AC1 command split + durable failure evidence + permanent root-scoping, lifecycle.ts into files_to_modify, AC5 preflight/landing gate recorded in AC8), r3 dispatched; 057b post-push hook fires the active trigger for the r3 roster.
+- **Query inputs:** `coord_invoke` ×2 — roles codex + codex-ops on backlog/reviews/2026-07-15-138-echo-context-cutover-substrate-rehearsal/r3/request.md, correlation_id 4a2c36a0-f1d0-4c7a-8836-6ae6f8cfbde5 from r3 request frontmatter; repo-relative request_path per the pin rule.
+- **Returned:** both ok — daemon accepted both roles; wrappers spawned fire-and-forget.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
+- **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
+- **Note:** Finding 2 verified against code before disposition: src/daemon/lifecycle.ts:81 (mkdirSync dataDir) and :91 (PID write) own the pre-open side effects AC2's fence must precede, so the fence is NOT reachable solely through the previously listed files — moved lifecycle.ts from spec_refs to files_to_modify rather than adding an unchanged-lifecycle note. Two concurrent-push rebases this tick (sibling 137 spec-patch + one more); spec-patch SHA stable at 9c37bd8c, r3 spec_commit_sha pins it in full.
+
 ## 2026-07-15 20:03 PDT — 137 r3 verification-round dispatch (coord_invoke ×2)
 
 - **Trigger:** Watcher tick combined 137 r2 (codex 3 MEDIUM + codex-ops 2 MEDIUM, both proceed_after_patches; not escalated — the dual-codex rebind after r1's silent round produced full responses). Reframe gate NOT triggered: r1 was an immutable no-response timeout with no patch commit, so all five findings target original spec text. All five accepted as completion patches at 8e73045f (config-derived secret root, two-phase artifact ownership, arch/Rosetta preflight, bounded installer-owned logs, lease owner-identity/stale-reclaim semantics); r3 dispatched at 4977c260; 057b post-push hook fires the active trigger for the r3 roster.
