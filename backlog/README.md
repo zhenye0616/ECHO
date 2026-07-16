@@ -8,7 +8,7 @@ Kanban-style work coordination across strategic conversations, one or more auton
 
 1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/proposed/` items. Does **not** write to `wiki/` until an item is shipped. **May also review and prep merges** for items in `pending_review/` — see the Reviewer Independence Rule below.
 2. **Builder agent (autonomous, parallelizable)** — claims items from `backlog/ready/`, works in an isolated git worktree, moves items through the pipeline. Multiple agents may run in parallel. **Never reviews or merges its own work** (and never merges any work — see `docs/AGENT_INSTRUCTIONS.md`).
-3. **Founder** — gives final approval at the two irreversible repository-merge moments: (a) substantive conflict-resolution sign-off, (b) `git push origin main`. A Team-product artifact release has a separate checksum-bound approval under `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`; main-push approval never counts as release approval. The founder also handles end-to-end review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
+3. **Founder** — by default, gives final approval at the two irreversible repository-merge moments: (a) substantive conflict-resolution sign-off, (b) `git push origin main`. A Team-product artifact release has a separate checksum-bound approval under `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`; main-push approval never counts as release approval. The founder also handles end-to-end review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment. A locked program-specific decision may substitute a named approval holder without weakening any gate.
 
 ### Reviewer Independence Rule
 
@@ -18,7 +18,11 @@ The reviewer-and-merger of any item must be **a different role/agent than the bu
 2. **A second builder agent** (not the builder of this item) — independent eyes, no design conflict-of-interest.
 3. **Founder** — fallback, or whenever founder wants direct review.
 
-Whoever reviews handles the cognitive work end-to-end (read diff against acceptance, prep `review_notes`, draft any reconciliation diff for conflicts), but **never skips the two founder checkpoints**: substantive conflict resolution and the actual `git push origin main`. Self-review is structurally weaker than independent review — the agent that drifted into wrong scope can't see its own drift.
+Whoever reviews handles the cognitive work end-to-end (read diff against acceptance, prep `review_notes`, draft any reconciliation diff for conflicts), but **never skips the two authority checkpoints**: substantive conflict resolution and the actual `git push origin main`. The founder supplies them by default; a locked scoped delegation may supply a canonical authorization instead. Self-review is structurally weaker than independent review — the agent that drifted into wrong scope can't see its own drift.
+
+### Echo-context persistent-coordinator delegation
+
+Only the program named in `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md` may substitute the persistent Codex coordinator for a new human-founder response. It covers items 136-138 and exactly two successors replacing 139, keeps one covered item active, requires a fresh implementation builder and a different reviewer for each item, and requires committed/read-back exact-operation authorization before irreversible action. Builders still stop and hand off after one item or any uncertainty. Failed evidence is repaired and rerun, never waived. Every ordinary item retains the default founder checkpoints.
 
 ## Wiki Update Discipline
 
@@ -53,8 +57,8 @@ backlog/
 ├── proposed/            # spec draft in spec-review; reviewable, never claimable
 ├── ready/               # claimable; sealed by ready_content_sha
 ├── claimed/             # agent has atomically claimed; in-progress
-├── pending_review/      # agent done; awaits founder review + merge
-├── complete/            # founder approved + merged; wiki update pending
+├── pending_review/      # agent done; awaits independent review + authorized merge
+├── complete/            # independently reviewed + authorized + merged; wiki update pending
 ├── inbox/               # PARKED, non-kanban (see "Non-Kanban State" below)
 ├── reviews/             # cross-vendor review-queue rounds (non-kanban)
 ├── task-state/          # role-typed working-memory pointers (non-kanban)
@@ -83,9 +87,9 @@ ready/       ← claimable only; agents poll this folder
 claimed/     ← agent owns it; works in its own worktree on agent/<slug> branch
      │
      ▼
-pending_review/  ← agent done; founder reviews diff/tests/notes; merges PR
+pending_review/  ← agent done; independent reviewer checks diff/tests/notes
      │
-     ├── approved → complete/  ← strategist promotes decisions to wiki/ in next conversation
+     ├── authorized merge → complete/  ← strategist promotes decisions to wiki/ next
      └── rejected → proposed/ if the spec needs review again, or ready/ only with a fresh ready_content_sha
 ```
 
@@ -300,7 +304,7 @@ git push origin main
 
 A `tools/check-stale-claims.sh` and a `/release-stuck` slash command will land once we've actually run the loop a few times and seen what real failures look like. Lease/heartbeat auto-recovery is V1.5+.
 
-**Cleanup (founder, after merge):**
+**Cleanup (founder or named delegated coordinator, after merge):**
 
 ```bash
 cd ~/Desktop/Project_echo
@@ -333,7 +337,7 @@ task_state_ref: ""                # optional (046+). When set, names the task-st
                                   # snapshot strategist/builder/watcher/dispatcher actors read on cold
                                   # start. Reviewer ticks MUST NOT read this; see skills/role-typed-task-state.md.
 requested_reviewers: []           # optional reviewer roster for spec-review rounds
-ready_content_sha: <sha256>       # watcher/founder-owned seal required in ready/; proves the
+ready_content_sha: <sha256>       # watcher/authorized-coordinator seal required in ready/; proves the
                                   # file still matches the content promoted into claimable state.
                                   # Omit in proposed/; watcher stamps it during promotion.
 acceptance:                       # specific, testable criteria
@@ -353,7 +357,7 @@ worktree: ""                      # ~/Desktop/Project_echo--<slug>
 head_sha: ""                      # sha of last commit on branch
 pr_url: ""                        # if PR opened
 agent_notes: ""                   # summary on completion or escalation
-review_notes: ""                  # founder fills during review
+review_notes: ""                  # independent reviewer/authorized merger fills
 # --- optional external-target fields; agent-managed only under a founder-authorized successor-repository decision ---
 target_repo: ""                    # absolute canonical target repository path
 target_remote: ""                  # canonical target remote URL
@@ -361,8 +365,8 @@ target_branch: ""                  # target feature branch, never target main
 target_worktree: ""                # isolated sibling target worktree
 target_head_sha: ""                # reviewed full target feature-head SHA
 target_pr_url: ""                  # target-repository PR
-target_landed_sha: ""              # founder-merged canonical target-main SHA after readback
-project_landed_sha: ""             # founder-merged Project_echo main SHA after readback
+target_landed_sha: ""              # authorized merger records canonical target-main SHA after readback
+project_landed_sha: ""             # authorized merger records Project_echo main SHA after readback
 ---
 
 # [Title]
@@ -397,13 +401,13 @@ The strategist reads this section when promoting decisions to the wiki.]
 
 ## Agent Operating Rules
 
-### Founder-authorized successor repository items
+### Founder-authorized or scoped-delegated successor repository items
 
-The normal backlog item owns one Project_echo branch/worktree and may not write elsewhere. A narrow exception exists only when a locked raw/internal/decisions record names the item and exact external scope, the spec cites that record and lists the paths, and the founder approves the target-main and external-execute checkpoints.
+The normal backlog item owns one Project_echo branch/worktree and may not write elsewhere. A narrow exception exists only when a locked `raw/internal/decisions` record names the item and exact external scope, the spec cites that record and lists the paths, and each target-main or external-execute checkpoint receives founder approval or a valid program-specific delegated authorization.
 
-Such an item still has one Project_echo claim. External source work uses an isolated target feature worktree and the optional fields above. Builders fill target_repo, target_remote, target_branch, target_worktree, target_head_sha, and target_pr_url. A different agent reviews both exact repository heads; the founder merges the target repository first and fills target_landed_sha only after remote-main readback; the normal Project_echo review/merge then fills project_landed_sha after its own readback. Partial landings remain durable and the item stays incomplete; never force-rewrite history to simulate atomicity. Build-once artifacts consume canonical landed SHAs, never feature-worktree bytes. Live user-path mutation belongs only to the explicitly named, checkpointed scope in the founder decision; source/rehearsal items may not infer it.
+Such an item still has one Project_echo claim. External source work uses an isolated target feature worktree and the optional fields above. Builders fill `target_repo`, `target_remote`, `target_branch`, `target_worktree`, `target_head_sha`, and `target_pr_url`. A different agent reviews both exact repository heads; the founder or named delegated coordinator merges the target repository first and fills `target_landed_sha` only after remote-main readback; the normal Project_echo review/merge then fills `project_landed_sha` after its own readback. Partial landings remain durable and the item stays incomplete; never force-rewrite history to simulate atomicity. Build-once artifacts consume canonical landed SHAs, never feature-worktree bytes. Live user-path mutation belongs only to explicitly named, checkpointed scope; source/rehearsal items may not infer it.
 
-The current scoped protocol is raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md. It applies only to the named echo-context items and does not generalize to echo-brain, echo-loop, or future repositories.
+The current scoped protocol is `raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md`. Its persistent-coordinator authority is defined by `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md` for items 136-138 and exactly two successor items replacing 139. It does not generalize to echo-brain, echo-loop, unrelated future repositories, or any other backlog item.
 
 When an agent runs, it must:
 
@@ -425,7 +429,7 @@ When an agent runs, it must:
 5. **Read all `spec_refs`** in the item before writing any code
 6. **Implement to acceptance criteria only** — no scope expansion (per drift rules)
 7. **Log work** in `raw/internal/agent-runs/<date>-<item-id>.md` (append on resume, do not overwrite)
-8. **If uncertainty arises** that requires founder input — STOP, move item to `pending_review/` with the question in `agent_notes`. Do not guess.
+8. **If uncertainty arises** that requires an authority decision — STOP, move item to `pending_review/` with the question in `agent_notes`. Do not guess. The founder resolves ordinary items; the persistent coordinator resolves covered echo-context items.
 9. **When acceptance criteria pass** — push branch, `ensure_stage` to `pending_review/`, fill `agent_notes` with summary
 10. **One item per run** when invoked via `/process-backlog`. The `/process-backlog-batch` command wraps the same workflow in a controlled loop and ships multiple items sequentially within one session, halting on max-items, time budget, escalation, no-candidates, or git error. Parallelism across agents is achieved by running multiple sessions with distinct `ECHO_AGENT_ID` — the atomic-claim mechanic prevents collisions.
 
@@ -441,9 +445,9 @@ For each item in `pending_review/`:
    - **Approve** → fill `review_notes`, merge `agent/<slug>` to `main`, move item to `complete/`, remove worktree, delete branch.
    - **Rework** → fill `review_notes` with what's wrong, move back to `proposed/` if spec-review must run again, or to `ready/` only if it remains immediately claimable with a fresh `ready_content_sha` (worktree + branch can stay or be torn down).
    - **Cancel** → move to `complete/` with `review_notes: "cancelled — <reason>"`.
-4. **Founder checkpoints (never skipped, regardless of reviewer):**
-   - Any **substantive conflict** in step 3's merge must be surfaced to the founder before resolution. Mechanical conflicts (e.g., two items adding adjacent fields to the same interface) the reviewer prepares as a composed diff for founder rubber-stamp.
-   - The actual **`git push origin main`** is gated on founder green-light per push.
+4. **Authority checkpoints (never skipped, regardless of reviewer):**
+   - Any **substantive conflict** in step 3's merge must be surfaced for founder resolution, or resolved by the persistent coordinator under the named echo-context delegation and independently reviewed if the resolution changes implementation bytes.
+   - The actual **`git push origin main`** is gated on founder green-light per push, or on the covered program's canonical delegated authorization.
 5. After items land in `complete/`, **request a wiki update** from the next strategist conversation. The strategist reads each item's "After Completion (Strategist Notes)" section and promotes the now-shipped decisions to `wiki/`.
 
 Time budget: ~30 minutes/morning if 2–3 items came through overnight, less when the strategist or a second agent has already prepped review notes and reconciliation diffs.
@@ -500,7 +504,7 @@ When the spec depends on the layout of an external app's data files (Cursor's SQ
 
 `backlog/_followups.md` is a flat-file queue populated by `/merge-and-cleanup`'s C10 step. It accumulates two kinds of entries:
 
-- **Pre-merge fixups deferred during merge** — when the founder reviews a fixup and chooses `defer-as-followup` rather than applying it inline. The fixup's description goes here so it's not forgotten.
+- **Pre-merge fixups deferred during merge** — when the authorized merger reviews a fixup and chooses `defer-as-followup` rather than applying it inline. The fixup's description goes here so it's not forgotten.
 - **Non-blocking follow-up items from the review sidecar** — things the code-reviewer subagent flagged but didn't consider merge-blocking (e.g., "consider adding a comment explaining the chokidar polling fallback rationale").
 
 The queue is consumed during the next strategist conversation: each entry is either turned into a proper `backlog/proposed/` item (with full spec, blocked_by, etc.), rolled into an existing item's scope, or dropped with a one-line rationale.

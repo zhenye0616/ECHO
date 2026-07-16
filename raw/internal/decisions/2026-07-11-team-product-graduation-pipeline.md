@@ -14,6 +14,15 @@ The founder's phrase **CI/CD affinity matrix** is implemented here as the **rele
 
 This pipeline is the only route by which the Team-product wedge becomes client-facing. Machine context and Fleet orchestration stay in the lab unless a Team capability explicitly requires a narrow dependency that also passes this pipeline.
 
+**Scoped authority note (2026-07-16):** the founder-authority cell may be
+filled by the persistent Codex program coordinator only for the echo-context
+sequential program named in
+`raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md`.
+The coordinator must commit the exact-operation authorization required there.
+Every matrix, independent-review, staging, artifact-identity, backup, rollback,
+and acceptance cell remains unchanged. This does not delegate any Team-product
+release or client operation outside that named program.
+
 ## The four stages
 
 | Stage | Runtime and artifact | Required evidence | What it may be called |

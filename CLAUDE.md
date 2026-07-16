@@ -98,7 +98,7 @@ This repo coordinates three roles. **Multiple builder agents may run in parallel
 
 1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/proposed/<id>.md` items; does **not** write to `wiki/` until items ship; **may also review and prep merges** for items in `pending_review/` (see "Reviewer independence rule" below)
 2. **Builder agents (autonomous, parallelizable)** — claim items from `backlog/ready/`, work in isolated worktrees, move items through the pipeline; **never review or merge their own work**
-3. **Founder** — gives final approval at the two irreversible repository-merge moments: (a) signing off on substantive conflict resolutions surfaced by reviewer, (b) `git push origin main`. A Team-product artifact release has a separate third approval bound to `source SHA + version + artifact SHA-256`; main-push approval never counts as release approval. The founder also handles review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
+3. **Founder** — by default, gives final approval at the two irreversible repository-merge moments: (a) signing off on substantive conflict resolutions surfaced by reviewer, (b) `git push origin main`. A Team-product artifact release has a separate third approval bound to `source SHA + version + artifact SHA-256`; main-push approval never counts as release approval. The founder also handles review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment. A locked, program-specific delegation may substitute a named approval holder without weakening any gate; the only current delegation is the echo-context sequential program below.
 
 ### Cross-tool protocol lives in `skills/` (not `.claude/commands/`)
 
@@ -112,7 +112,11 @@ Why this matters internally: the Fleet coordination system must stay vendor-neut
 
 ### Narrow successor-repository lane
 
-Items 136-139 alone follow the founder-authorized two-repository/live-execute protocol in raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md and docs/AGENT_INSTRUCTIONS.md. Project_echo remains the claim/record root; echo-context changes use an isolated target branch with independent review and founder target-main approval; artifacts build only from canonical landed SHAs; live user paths wait for the separately named exact-artifact execute scope. This does not relax the default external-write prohibition for any other item.
+Items 136-138 and exactly two later successor items replacing 139 follow the two-repository/live-execute protocol in `raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md` plus the persistent Codex delegation in `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md`. Project_echo remains the claim/record root; echo-context changes use isolated target branches and independent review; artifacts build only from canonical landed SHAs; and exact-artifact operations require a committed, pushed, read-back delegated-operation authorization. Item 139 and its reviews remain historical risk evidence until the two successors are created after 138 completes. This does not relax the default external-write prohibition or founder gates for any other item.
+
+### Scoped persistent-coordinator rule
+
+For that named program only, the persistent Codex coordinator may satisfy later references in this file to founder approval, founder-only merge/cleanup, human conflict/fixup decisions, exact-artifact execution, installation, and live mutation. It must follow the locked delegation record, keep one covered item active, assign a fresh implementation builder for each item, obtain review from a different agent, record exact operation authority before irreversible action, repair and rerun failed gates, and never review its own implementation bytes. Builders still stop and hand off uncertainty; the coordinator resolves it and continues the program. Any instruction below that says to pause for a new founder response is superseded only within this scope.
 
 ### Reviewer independence rule
 
@@ -122,13 +126,13 @@ The reviewer-and-merger of any item must be **a different role/agent than the bu
 2. **A second builder agent** (not the one that built the item) — independent eyes, no spec-author conflict-of-interest
 3. **Founder** — fallback when neither of the above is available, or whenever founder wants to review directly
 
-Self-review is the bad version. The agent that drifted into wrong scope can't see its own drift. Independence is the structural check that makes the pipeline trustworthy. Whoever reviews must (a) read the diff against acceptance criteria, (b) prep `review_notes` and any reconciliation diff for conflicts, (c) pause for founder green-light at substantive-conflict and `push-to-main` checkpoints. The reviewer never skips those two checkpoints; everything else they handle end-to-end.
+Self-review is the bad version. The agent that drifted into wrong scope can't see its own drift. Independence is the structural check that makes the pipeline trustworthy. Whoever reviews must (a) read the diff against acceptance criteria, (b) prep `review_notes` and any reconciliation diff for conflicts, (c) obtain founder green-light at substantive-conflict and `push-to-main` checkpoints, or the canonical delegated authorization when the scoped persistent-coordinator rule applies. The reviewer never skips those two checkpoints; everything else they handle end-to-end.
 
 ### Pipeline
 
 ```
 backlog/proposed/  →  backlog/ready/  →  backlog/claimed/  →  backlog/pending_review/  →  backlog/complete/
-   spec review          claimable          builder owns          founder reviews              │
+   spec review          claimable          builder owns          independent review           │
                                                                                               ▼
                                                                                  strategist updates wiki/
 ```
@@ -153,7 +157,7 @@ G2 is lifted, so a builder may run these steps for a product item only after its
 3. **Read all `spec_refs`** in the item before writing code.
 4. **Implement to acceptance criteria only.** No scope expansion (per `drift-prevention` rules).
 5. **Log work** in `raw/internal/agent-runs/<date>-<item-id>.md`.
-6. **If uncertainty arises that requires founder input** — STOP, move item to `pending_review/` with the question in `agent_notes`. Do not guess.
+6. **If uncertainty arises that requires an authority decision** — STOP, move item to `pending_review/` with the question in `agent_notes`. Do not guess. The founder resolves ordinary items; the persistent coordinator resolves covered echo-context program items and obtains fresh review when required.
 7. **When acceptance criteria pass** — push the feature branch, then in the main repo on `main` move the item to `pending_review/` with `agent_notes` summary, `head_sha`, and (if applicable) `pr_url`.
 8. **One item per run.** Do not pick up a second.
 

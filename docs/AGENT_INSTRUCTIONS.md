@@ -26,6 +26,10 @@ The **entire `wiki/` folder is your global context** — read-only, but readable
 
 **Current product gate:** G2 is lifted. Do not enter the claim/build loop for a product item until its `backlog/proposed/` spec has passed review and been promoted to `backlog/ready/` with a fresh `ready_content_sha`. A claim or merge does not advance the product beyond DEV or authorize an artifact release.
 
+### Persistent coordinator exception (not builder authority)
+
+The founder-locked decision at `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md` governs items 136-138 and exactly two successor items replacing 139. It authorizes the persistent Codex program coordinator—not a builder—to resolve decisions and satisfy founder checkpoints through canonical delegated-operation records. A covered builder still performs one item only, never reviews or merges its own bytes, and stops at completion, uncertainty, or a failed gate. The coordinator assigns a fresh builder for the next item, obtains review from a different agent, repairs and reruns failures, and continues the sequential program. Later instructions to pause for the human founder are read as handoffs to that coordinator only within the named scope; ordinary items retain the normal founder path.
+
 ## Your Single Loop
 
 ```
@@ -97,7 +101,7 @@ The **entire `wiki/` folder is your global context** — read-only, but readable
        Either way: STOP via path 13 or 14
 ```
 
-**Do not pick up a second item in the same run** when invoked via `/process-backlog`. One item per execution; founder reviews before the next.
+**Do not pick up a second item in the same run** when invoked via `/process-backlog`. One item per builder execution; the founder or scoped coordinator completes review/merge before assigning the next fresh builder.
 
 **Exception: `/process-backlog-batch`** wraps the same workflow in a controlled loop. In batch mode you DO repeat the loop until a hard stop fires (max items, time budget, escalation, no-candidates, or git error). Per-iteration discipline is identical to single-item mode — same atomic claim, same idempotent worktree, same `ensure_stage`, same drift rules. The only difference is "after handoff, return to step 2 and try for another candidate" instead of stopping. Mandatory context (the seven files) is read once at session start, not per iteration. Per-item `spec_refs` are loaded fresh inside each iteration.
 
@@ -252,9 +256,9 @@ These rules override anything you might infer from context. If any rule conflict
 
 5. **Tests are mandatory, not optional.** If acceptance says "tests pass," tests must exist and pass. If no test framework exists yet, escalate — don't invent one.
 
-6. **No spec changes.** You do not edit `wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`, plus `target_repo`, `target_remote`, `target_branch`, `target_worktree`, `target_head_sha`, and `target_pr_url` when the founder-authorized successor-repository protocol applies. `target_landed_sha` and `project_landed_sha` are independent-merger/founder-managed readback fields. The ready-stage integrity field `ready_content_sha` is watcher/founder-owned, NOT builder-writable; a builder cannot self-certify claimability. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
+6. **No spec changes.** You do not edit `wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`, plus `target_repo`, `target_remote`, `target_branch`, `target_worktree`, `target_head_sha`, and `target_pr_url` when the founder-authorized successor-repository protocol applies. `target_landed_sha` and `project_landed_sha` are independent-authorized-merger readback fields. The ready-stage integrity field `ready_content_sha` is watcher/authorized-coordinator owned, NOT builder-writable; a builder cannot self-certify claimability. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
 
-7. **No merging your own branch.** You push `agent/<slug>`. Someone else merges — by preference the strategist, otherwise a second builder agent that did not build this item, otherwise the founder. **You never run `git merge` on `main` for an item you built.** If the user asks you to review and merge a *different* builder's pending item, you may operate in reviewer mode: read the diff, prep `review_notes` and any reconciliation diff, but the actual `git merge` and `git push origin main` still wait for founder green-light per the Reviewer Independence Rule in `claude.md` / `backlog/README.md`.
+7. **No merging your own branch.** You push `agent/<slug>`. Someone else merges — by preference the strategist, otherwise a second builder agent that did not build this item, otherwise the founder. **You never run `git merge` on `main` for an item you built.** If the user asks you to review and merge a *different* builder's pending item, you may operate in reviewer mode: read the diff, prep `review_notes` and any reconciliation diff, but the actual `git merge` and `git push origin main` still wait for founder green-light or, only for the named echo-context program, a canonical delegated authorization from the persistent coordinator.
 
 8. **Stop signals override progress signals.** If you encounter:
    - An ambiguity not resolved by spec
@@ -286,7 +290,7 @@ The standing test: *"Is this in the acceptance criteria?"* If no, don't do it. L
 | `backlog/proposed/` | `backlog/ready/` | Watcher promotes after spec-review convergence; never builder-owned | main repo, on `main` |
 | `backlog/ready/` | `backlog/claimed/` | Atomic claim at run start | main repo, on `main` |
 | `backlog/claimed/` | `backlog/pending_review/` | Done OR stuck | main repo, on `main` |
-| (anywhere) | `backlog/complete/` | **Founder only** — never you |  |
+| (anywhere) | `backlog/complete/` | **Founder or named delegated coordinator only** — never the builder |  |
 
 Use `git mv` always. One item at a time. The move + frontmatter edit + commit must be a single commit, pushed immediately.
 
@@ -341,7 +345,7 @@ When you can't proceed without founder input:
 5. Write your full run log to `raw/internal/agent-runs/`
 6. STOP. Do not pick up another item.
 
-Founder will respond by either:
+The founder—or the persistent coordinator for a covered echo-context item—will respond by either:
 - Updating the item with clarification → moving back to `proposed/` if it needs spec-review again, or `ready/` only if it is immediately claimable with a fresh `ready_content_sha`
 - Marking it cancelled → moving to `complete/` with note
 - Splitting into smaller items → adjusting backlog
@@ -369,18 +373,18 @@ The ready-stage integrity field `ready_content_sha` is NOT agent-managed. The wa
 
 ### Founder-authorized successor-repository exception
 
-The default is still one Project_echo worktree and no external writes. A builder may cross that boundary only when a locked decision explicitly names the item, external repository/path, mutation class, review/merge order, and founder execute checkpoint; the item cites that decision in spec_refs and lists every external path in files_to_modify.
+The default is still one Project_echo worktree and no external writes. A builder may cross that boundary only when a locked decision explicitly names the item, external repository/path, mutation class, review/merge order, and authority checkpoint; the item cites that decision in `spec_refs` and lists every external path in `files_to_modify`.
 
-For items covered by raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md:
+For items covered by `raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md` and `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md`:
 
 - Project_echo remains the claim, task-state, run-log, and backlog coordination root.
 - Echo-context source work uses a separate sibling feature worktree/branch; never edit its main checkout directly.
-- For source-changing items 136-138, track the external repository/remote/worktree/branch/full head SHA/PR in the item fields defined by backlog/README.md; only the independent merger/founder fills canonical landed SHAs after remote readback. Item 139 has no target-source lane and consumes the landed fields from completed item 138.
-- A different agent reviews both repository heads for source-changing items and the exact execute plan/artifacts for item 139. Founder approval precedes each target-main merge/push and the normal Project_echo main push.
+- For source-changing items 136-138, track the external repository/remote/worktree/branch/full head SHA/PR in the item fields defined by `backlog/README.md`; only the independent merger or persistent coordinator fills canonical landed SHAs after remote readback. The two authorized successors consume the completed landed fields; item 139 remains historical risk evidence.
+- A different agent reviews both repository heads for source-changing items and the exact execute plan/artifacts for later live stages. Each target-main merge/push, Project_echo main push, release, install, or live mutation requires the applicable founder approval or the scoped coordinator authorization committed and read back under the delegation decision.
 - Release artifacts build only from fresh detached clones of read-back canonical main SHAs.
-- Live user paths remain forbidden until the separately named item reaches its exact-artifact founder execute checkpoint.
+- Live user paths remain forbidden until the separately named item reaches its exact-artifact founder or scoped delegated execute checkpoint.
 
-Any missing field, decision, clean-base proof, independent review, canonical readback, or checkpoint restores the default rule: stop and escalate.
+Any missing field, decision, clean-base proof, independent review, canonical readback, backup, rollback proof, or checkpoint restores the default rule: the builder stops and escalates. For covered items the coordinator repairs the cause, reruns the gate, records fresh authorization when identities changed, and resumes; it never waives the failure.
 
 ## What You Must Not Write
 
@@ -389,7 +393,7 @@ Any missing field, decision, clean-base proof, independent review, canonical rea
 - `docs/BACKLOG.md` (generated by `tools/backlog_index.py`; strategist/post-merge only)
 - `docs/STATUS.md` (founder updates Friday)
 - `docs/NORTH_STAR.md` (founder owns this)
-- Anything in `backlog/complete/` (founder-only)
+- Anything in `backlog/complete/` (founder or named delegated coordinator only; never builder-owned)
 - Anything outside the repo, except the exact repositories/paths and checkpointed mutations permitted by a founder-authorized successor-repository decision as described above (still no unlisted Slack messages, GitHub issues, or external API calls)
 
 ---

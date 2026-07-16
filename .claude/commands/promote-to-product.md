@@ -6,6 +6,8 @@ description: Four-stage qualification and release gate for Team-product code —
 
 Canonical decision: `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`.
 
+**Scoped authority:** only for the echo-context sequential program named in `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md`, the persistent Codex coordinator may fill a founder approval/execute cell through the required committed exact-operation authorization. This substitutes the approval actor, not the qualification matrix, independent review, exact-artifact staging, backup, rollback, acceptance, or client-safety evidence. Ordinary Team-product promotion remains founder-gated.
+
 This skill governs the only path from ECHO's lab into the client-facing Team product:
 
 > **DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE**

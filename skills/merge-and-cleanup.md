@@ -6,6 +6,12 @@ You are executing the founder's morning merge after `/review-pending` has produc
 
 This command is destructive in the sense that it pushes to origin and deletes branches. Match the scope of what was approved — do not merge items the human did not name.
 
+### Scoped persistent-coordinator override
+
+For items 136-138 and exactly two successor items replacing 139, the locked decision at `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md` has higher precedence than later human-founder pause language in this skill. The persistent Codex coordinator may make the conflict, fixup, commit, push, cleanup, and live-bringup decisions without requesting another founder response, but it must record the applicable canonical delegated authorization, preserve every verification and readback gate, and obtain independent review for any implementation or merge-resolution bytes it authors. The implementation builder never invokes this override or merges its own work. A failed gate is repaired and rerun; it is not waived. This override does not apply to any other item.
+
+Under that override, each later `read` or "reply" pause becomes a coordinator decision point recorded in `review_notes` and, when the operation is exact-artifact or otherwise irreversible, in the committed delegated-operation authorization. "Do not auto-resolve" still means no unexamined mechanical resolution: the coordinator must inspect and justify the resolution, then obtain the required independent review.
+
 ## Inputs
 
 - One or more positional arguments: item ids in **merge order**, e.g., `/merge-and-cleanup 012 013`. Order matters: items whose branches were claimed earlier should generally merge first, because later branches typically forked from earlier claim points and will conflict with them.
@@ -411,9 +417,9 @@ After the loop completes, output:
 
 After wiki promotion of an item lands in `wiki/`, convert its `backlog/complete/<id>.md` file to the stub schema and move the full original body to `backlog/archive/shipped/<YYYY-MM>/<id>.md`. The stub schema is documented in `backlog/archive/README.md`.
 
-### Live checkout bringup (founder-in-the-loop, replaces C11b auto-kickstart)
+### Live checkout bringup (authority-in-the-loop, replaces C11b auto-kickstart)
 
-After Step D's summary, surface this exact prompt and wait for founder `continue`:
+After Step D's summary, ordinary runs surface this exact prompt and wait for founder `continue`. In the scoped echo-context program, the persistent coordinator performs the same commands, records their results, and advances only after the identical health check passes:
 
 > **Live checkout bringup needed.** The merge(s) have landed on origin/main. The live checkout still runs the pre-merge code + dependencies. To make the daemon serve the new code:
 >
@@ -430,7 +436,7 @@ After Step D's summary, surface this exact prompt and wait for founder `continue
 >
 > Reply `continue` when `coord-status.sh uptime` returns a number.
 
-The founder's `continue` is the final gate. The skill does not exit past this pause without it. If `coord-status.sh uptime` fails, surface the failure — do not auto-retry. Daemon-boot failures after merge typically indicate a real defect (module-loader interop, lockfile drift, missing dependency) that needs investigation, not automated recovery.
+The founder's `continue`, or the scoped coordinator's recorded successful result, is the final gate. The skill does not exit past this gate without it. If `coord-status.sh uptime` fails, surface or record the failure and repair the underlying cause before rerunning. Daemon-boot failures after merge typically indicate a real defect (module-loader interop, lockfile drift, missing dependency) that needs investigation, not blind retry.
 
 If the daemon isn't launchd-managed in this environment (e.g., during a manual `npm run daemon` session), the `launchctl kickstart` line won't apply — founder restarts by hand. The verification check via `coord-status.sh uptime` is the same.
 

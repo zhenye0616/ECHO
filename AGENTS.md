@@ -65,9 +65,13 @@ ECHO uses three roles:
 
 - **Strategist:** talks with the founder, makes decisions, writes backlog specs, does not edit `wiki/` until shipped items move to `complete/`. **May also review and prep merges** for `pending_review/` items per the Reviewer Independence Rule.
 - **Builder agent:** claims one backlog item, works in an isolated worktree, implements only acceptance criteria, logs the run, moves the item to review. **Never reviews or merges its own work; never runs `git merge` on `main` at all.**
-- **Founder:** gives final approval at the two irreversible repository-merge moments — (a) substantive conflict resolution, (b) `git push origin main`. A Team-product artifact release has a separate third approval bound to `source SHA + version + artifact SHA-256`; main-push approval never counts as release approval. Handles end-to-end review when no strategist or independent reviewer is available. Asks the strategist to promote shipped decisions to the wiki.
+- **Founder:** by default, gives final approval at the two irreversible repository-merge moments — (a) substantive conflict resolution, (b) `git push origin main`. A Team-product artifact release has a separate third approval bound to `source SHA + version + artifact SHA-256`; main-push approval never counts as release approval. Handles end-to-end review when no strategist or independent reviewer is available. Asks the strategist to promote shipped decisions to the wiki. A locked program-specific delegation may substitute a named approval holder without weakening any gate.
 
-**Reviewer Independence Rule:** the reviewer-and-merger of any item must be a different role/agent than the builder. Preference order: strategist → second builder agent (not the one that built this item) → founder. Self-review is structurally weaker than independent review and is not allowed. Codex acting as a builder must never review its own diff into `main`; it may be asked to review a *different* builder's pending item, in which case it operates in reviewer mode (read-only on the feature branch, write-allowed on `review_notes` and merge-prep, never running `git merge`/`git push` without founder green-light).
+**Reviewer Independence Rule:** the reviewer-and-merger of any item must be a different role/agent than the builder. Preference order: strategist → second builder agent (not the one that built this item) → founder. Self-review is structurally weaker than independent review and is not allowed. Codex acting as a builder must never review its own diff into `main`; it may be asked to review a *different* builder's pending item, in which case it operates in reviewer mode (read-only on the feature branch, write-allowed on `review_notes` and merge-prep, never running `git merge`/`git push` without founder green-light or a valid scoped delegated authorization).
+
+### Echo-context sequential-program delegation
+
+`raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md` delegates the human founder's decision, merge, push, release, install, and live-execute checkpoints only for items 136-138 and exactly two successor items replacing 139. The persistent Codex coordinator must keep one covered item active, use a fresh implementation builder and a different reviewer for each item, commit and read back exact-operation authorizations, and repair/rerun every failed gate. Builders do not inherit this authority: they stop at handoff or uncertainty, and the coordinator resolves and resumes. Any later founder-only or pause-for-founder wording in this file is superseded only within that named scope; ordinary gates remain unchanged elsewhere.
 
 Codex must identify which role the current user request implies. Product specification and boundary work remains strategist work until a proposal is reviewed and promoted to `ready/`. Normal coding tasks against a ready item use builder mode unless the user is brainstorming strategy, asking for explanation only, or asking for review of another agent's work.
 
@@ -77,7 +81,7 @@ Codex must identify which role the current user request implies. Product specifi
 
 1. **The spec file.** Frontmatter MUST include:
    - `id`, `title`, `status: proposed`, `priority`, `estimate`, `created`, `blocked_by`.
-   - Omit `ready_content_sha`; the watcher/founder stamps it only when review convergence promotes the item to `ready/`.
+   - Omit `ready_content_sha`; the watcher or authorized coordinator stamps it only when review convergence promotes the item to `ready/`.
    - `task_state_ref: <id>` — **self-reference** to the task-state pointer dir. Required for the cold-start primer to find the pointer. (047's pattern: `task_state_ref: 2026-05-13-047-codex-as-builder-binding-adapter`.)
    - `requested_reviewers: ["codex", "cursor"]` — cross-vendor pair is the post-047 default.
    - `files_to_modify:` — bulleted list, one-line `# why` comment per entry.
@@ -148,9 +152,9 @@ When acting as a builder agent, follow `docs/AGENT_INSTRUCTIONS.md` exactly:
 11. Append `raw/internal/agent-runs/<date>-<item-id>.md`.
 12. Move the item to `pending_review/` with `agent_notes`.
 
-One item per run unless the user explicitly invokes the documented batch workflow. If uncertainty needs founder input, stop and move the item to review with the question. Do not silently expand scope.
+One item per builder run unless the user explicitly invokes the documented batch workflow. Covered echo-context stages never reuse one builder as a program batch: the persistent coordinator assigns a fresh builder for each sequential item. If uncertainty needs an authority decision, stop and move the item to review with the question. The founder resolves ordinary items; the coordinator resolves covered program items. Do not silently expand scope.
 
-Items 136-139 have one narrow founder-authorized successor-repository exception recorded in raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md. For those items only, follow the two-repository and external-execute protocol in docs/AGENT_INSTRUCTIONS.md. Target fields are mandatory only for items 136-138, which modify echo-context source; item 139 consumes their canonical landed SHAs and has no target-source lane. Missing applicable fields, independent review, canonical-main readback, or exact-artifact founder approval is a hard stop. The default no-external-write rule remains unchanged for every other item.
+Items 136-138 and the two authorized successors replacing 139 have one narrow successor-repository exception recorded in `raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md` and its 2026-07-16 delegation. For those items only, follow the two-repository and external-execute protocol in `docs/AGENT_INSTRUCTIONS.md`. Target fields are mandatory for source-changing items; later successors consume completed canonical landed SHAs. Missing fields, independent review, canonical-main readback, exact identities, backup, rollback, or a committed exact-operation authorization blocks execution until the coordinator repairs the cause and reruns the gate. The default no-external-write rule remains unchanged for every other item.
 
 ## Drift Prevention
 
