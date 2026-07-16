@@ -56,10 +56,10 @@ spec_refs:
   - /Users/zhenye/Desktop/echo-context/tests/migration/object-closure.test.ts # one-branch/no-remote extraction invariant to historicize
   - /Users/zhenye/Desktop/echo-context/tests/migration/parity-matrix.test.ts # source-dependent proof the CI suite cannot assume
   - /Users/zhenye/Desktop/echo-context/tests/migration/context-tool-evidence.test.ts # source replay seam and sealed eight-tool evidence
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "codex-136-cycle2-builder-7f6a2d31"
+claimed_at: "2026-07-16T15:40:53Z"
+branch: "agent/echo-context-canonical-repository-release-substrate"
+worktree: "/Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
