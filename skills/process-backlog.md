@@ -6,6 +6,12 @@ You are an ECHO builder agent. Pick up the next ready backlog item — or resume
 
 Backlog lifecycle is `proposed/ → ready/ → claimed/ → pending_review/ → complete/`. Builders only claim from `ready/`: that folder means the spec is claimable and carries a fresh `ready_content_sha` seal. `proposed/` is spec-draft/review state and is reviewable by the review queue, but it is never a builder candidate. New specs are authored into `backlog/proposed/`; the watcher promotes them to `ready/` after spec-review convergence.
 
+### Scoped echo-context external-target lane
+
+Items 136-138 and exactly two successor items replacing 139 use the narrow two-repository/live-execute protocol in `raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md` and `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md`. For a covered claimed item, the builder may write only the external repository/worktree/feature-branch paths explicitly named by that item's `files_to_modify`; when the reviewed item changes echo-context source, it must populate the applicable target fields defined in `backlog/README.md`. Project_echo remains the claim/run-log/task-state root, and its normal record-only atomic-claim and final-handoff commits still push to Project_echo `main` through this skill's existing protocol. This exception does not authorize a builder to merge or push implementation bytes to either main branch, push target `main`, publish/release, install, mutate live paths, fill canonical landed SHAs, or invoke the coordinator's delegated authority. A fresh builder still hands the item to a different implementation reviewer and stops.
+
+The persistent coordinator, not the builder, resolves covered-item uncertainty and performs separately authorized merge, publication, installation, and live-execute operations. Generic founder-only or no-external-write language later in this skill is read with this narrow exception; ordinary items remain unchanged.
+
 ## Mandatory First Steps
 
 Before doing anything, read these four files in order — they are your global context for every run:
@@ -400,7 +406,7 @@ or the caller-side finish-path block (post-commit-pre-push state).
 
 ### E3. STOP
 
-Do not pick up another item. The founder reviews next.
+Do not pick up another item. The founder reviews ordinary work; the persistent coordinator assigns a different reviewer for the covered echo-context program.
 
 ## Stopping Conditions (Use Generously)
 
@@ -442,7 +448,7 @@ If during implementation you catch yourself thinking any of:
 - Merge `agent/<slug>` into `main` (founder-only)
 - Remove worktrees (founder-only, after merge)
 - Pick up a second item in the same run
-- Take any action that affects systems outside this repo
+- Take any action that affects systems outside this repo, except the exact external target feature-worktree paths explicitly permitted by a covered echo-context item's reviewed specification and the two locked decisions above
 
 ## What "Success" Looks Like
 
@@ -452,7 +458,7 @@ By the end of the run:
 - One run log file is in `raw/internal/agent-runs/` (committed + pushed on main; appended-to if resumed)
 - One feature branch `agent/<slug>` exists at `origin` with your work
 - Your worktree at `~/Desktop/Project_echo--<slug>/` still exists (founder cleans it up after merge)
-- Founder has everything they need to review in <30 minutes
+- Founder, or the persistent coordinator for a covered echo-context item, has everything needed for independent review
 
 Now begin. Read `docs/AGENT_INSTRUCTIONS.md` first.
 
@@ -495,7 +501,7 @@ Codex CLI sessions have implicit upper bounds. If a long-running builder exhaust
 2. Move the item to `pending_review/` with `agent_notes:` framed as the BLOCKED escalation (per the "Stopping Conditions" section above).
 3. Exit non-zero. The lockfile trap removes `.git/echo-builder-in-progress.d/` automatically.
 
-The next founder action is to read the run log and decide: re-invoke the wrapper (whose atomic-claim reconciliation path resumes the same item via `claimed_by` match), or escalate to a different builder binding via direct skill loading.
+The next authority action is to read the run log and decide: re-invoke the wrapper (whose atomic-claim reconciliation path resumes the same item via `claimed_by` match), or escalate to a different builder binding via direct skill loading. The founder owns ordinary items; the persistent coordinator owns this decision for the covered echo-context program.
 
 ### `backlog/task-state/<task-id>/builder.md` writer contract (047 AC3)
 
