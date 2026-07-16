@@ -4,7 +4,7 @@ role: builder
 binding: codex
 claimed_by: codex-builder-136-20260716
 claimed_at: 2026-07-16T08:33:45Z
-last_updated: 2026-07-16T09:36:40Z
+last_updated: 2026-07-16T10:03:40Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
@@ -16,10 +16,10 @@ handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-
 
 ## current_thesis
 
-Implemented the reviewed standalone repository, self-contained CI, deterministic non-installable source artifact, and fail-closed first-release controls as the fresh independent Codex builder. Exact hosted-green echo-context review candidate: `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e` / PR `https://github.com/zhenye0616/echo-context/pull/1`.
+Implementation cycle one is rejected after independent review and is historical evidence only. Frozen cycle-one heads are Project_echo `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e` / PR `https://github.com/zhenye0616/echo-context/pull/1`. Neither branch may resume, merge, or release until the AC4/AC6 reframe converges and a fresh builder claim is issued.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at 25b833332bb22ec79700fcdf31b9c9f20eea79f5.
+- Lifecycle: ESCALATED/REJECTED — cycle-one review evidence is sealed at Project_echo commit 77c5e0c3f7f64c0bda1d99439d8d35eca54551ee; specification reopened for R15.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -34,8 +34,8 @@ Implemented the reviewed standalone repository, self-contained CI, deterministic
 
 ## open_questions
 
-- Independent implementation review is required before either feature branch may merge.
-- The current private-repository/account tier cannot enforce the exact protected-main plus required-environment-reviewer contract, and the sole current repository identity cannot supply an independent required PR approval. The persistent coordinator must disposition and repair this external hosting gate before target-main or release execution.
+- R15+ exact-SHA specification convergence and a fresh claim are required before any cycle-two implementation edit.
+- Cycle-one accepted findings are immutable in `backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.review.md`; all high/medium findings remain blocking.
 
 ## dont_touch
 
@@ -46,5 +46,5 @@ Implemented the reviewed standalone repository, self-contained CI, deterministic
 
 ## canonical_anchors
 
-- spec: backlog/pending_review/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
+- spec: backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/
