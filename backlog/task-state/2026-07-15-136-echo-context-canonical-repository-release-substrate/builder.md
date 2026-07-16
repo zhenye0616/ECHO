@@ -4,22 +4,24 @@ role: builder
 binding: codex
 claimed_by: codex-136-cycle2-final-builder-oracle-42c8
 claimed_at: 2026-07-16T17:45:27Z
-last_updated: 2026-07-16T17:45:27Z
+last_updated: 2026-07-16T18:23:23Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
 target_worktree: /Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate
 handoff_branch: agent/echo-context-canonical-repository-release-substrate
-handoff_head_sha:
+handoff_head_sha: 2fdce9c64b8077de1e73fffe5232bc471a973ac3
 handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
+target_head_sha: 02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7
+target_tree_sha: bc8b700fe5db3435d54a930a71d0c5455b85541b
 ---
 
 ## current_thesis
 
-R24 converged at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0` with ready seal `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`. Builder `codex-136-cycle2-final-builder-oracle-42c8` preserves both feature histories and starts from local target commit `249e60dfd8b6615b55dadcd60737a9052da48364`, which contains the deadline and repeated-signal fixes but is not yet remote authority. It must implement the converged pre-spawn/spawned-child terminal shapes, rerun every exact-head gate, and stop at independent-review handoff.
+R24 converged at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0` with ready seal `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`. Final builder `codex-136-cycle2-final-builder-oracle-42c8` preserved both feature histories and repaired only the converged deadline, signal, pre-spawn, positive-PID terminality, inherited-group, and ceremony-completion paths. The immutable Project evidence head is `2fdce9c64b8077de1e73fffe5232bc471a973ac3` (tree `11fbc67d4efd9be05942ad0b8ed7a18fb75b1950`); the immutable target candidate is `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7` (tree `bc8b700fe5db3435d54a930a71d0c5455b85541b`). Both are pushed and read back, every exact-head gate passed, and the builder stops at independent-review handoff.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: CLAIMED — builder `codex-136-cycle2-final-builder-oracle-42c8` owns the final R24 implementation repair; the prior assigned session made no byte change, and no final target or Project handoff SHA exists yet.
+- Lifecycle: COMPLETE — ready for review at 2fdce9c64b8077de1e73fffe5232bc471a973ac3.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -30,12 +32,12 @@ R24 converged at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0` wi
 - AC4: delete every workflow and hosted/release surface; a different fresh reviewer must rerun AC3 at exact target head before the coordinator constructs and authorizes literal merge object `M`.
 - AC5: build the deterministic `0.1.0-dev.136.1` source archive/checksum/manifest triple from committed Git objects with `installable:false`, `runtime_authority:false`, and `state_authority:false`.
 - AC6: dual-build sealing and the final bootstrap migration record occur only after coordinator landing at canonical `M`; the builder must remove the premature cycle-one Project_echo bootstrap record and stop at pending review.
-- Prior evidence at `1a91750e5b9ce9db49e9c893f9974b318f12f38a` is historical only. Every focused/full/inventory/authority/secret-scan/operator/isolated-clone/canonical-HTTPS acceptance gate must rerun at the final target head.
+- Prior evidence at `1a91750e5b9ce9db49e9c893f9974b318f12f38a` is historical only. At final head `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7`, the 42-test AC3 focus set, typecheck, lint, inventory (340 packages / 23 sources), authority, all 78 CI files (1,079 passed / 17 skipped), four-ref exhaustive secret scan, two-test operator replay, isolated no-local acceptance, canonical HTTPS acceptance, and independent oracle all passed.
 - No target main push, Project main implementation merge, tag, hosted release, artifact publication, install, live mutation, retry/adoption controller, attempt ledger, credential helper, or authority transfer belongs to this builder.
 
 ## open_questions
 
-- None at claim. Any mismatch between the two converged terminal shapes and the production adapter returns to the persistent coordinator rather than changing the spec.
+- None. Independent review of both exact feature heads and all coordinator-owned landing/seal operations remain intentionally pending.
 
 ## dont_touch
 
@@ -47,7 +49,5 @@ R24 converged at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0` wi
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
-- converged_spec_commit: f80003a7fbd08755dbff669951ed07bf43b390d0
-- ready_seal: a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca
+- spec: backlog/pending_review/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r24/
