@@ -27,5 +27,4 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
-
+claim-ready after R21 — exact reviewed specification SHA `1c8814406d0667e98cff99784e59df5bb613f8f2`; codex=`proceed`, codex-ops=`proceed`; both findings lists empty; no specification edit after the converged responses. The ready seal applies only to the founder-directed scope cut: source-only local acceptance, exact independently reviewed landing, deterministic dual-build tuple, and no hosted/release/controller machinery.

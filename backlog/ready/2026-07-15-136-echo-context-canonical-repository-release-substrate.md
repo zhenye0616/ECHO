@@ -9,6 +9,7 @@ blocked_by:
   - 2026-07-13-135-local-echo-context-source-extraction
 task_state_ref: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 3a684ae49153c79c60a457c387249ae66f0d6e36499966ea8f80a6591d921793
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/.github/workflows/** # DELETE cycle-one hosted workflows; hosted CI is deferred to item 140 and no workflow file may remain
   - /Users/zhenye/Desktop/echo-context/package.json # prerelease identity and self-contained operator scripts
