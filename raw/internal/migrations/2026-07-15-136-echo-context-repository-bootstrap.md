@@ -3,7 +3,7 @@
 Date: 2026-07-16 PDT
 Item: `2026-07-15-136-echo-context-canonical-repository-release-substrate`
 Builder: `codex-builder-136-20260716`
-Status: builder evidence in progress; no repository creation, target-main push, release, installation, or authority transfer is claimed by this record
+Status: builder implementation complete and handed off for independent review; the coordinator-created private repository and exact-baseline main push are read back below; no successor merge to target main, release, installation, or authority transfer is claimed
 
 ## Reviewed contract binding
 
@@ -62,18 +62,50 @@ Authenticated GitHub API readback named `gitleaks/gitleaks` release ID `29966276
 
 This evidence permits only the separately authorized create-only empty-repository bootstrap of the exact extraction baseline. It does not authorize a successor-byte push, target-main merge, release, installation, or runtime/state mutation.
 
+## Coordinator-operated repository bootstrap readback
+
+- Repository-create authorization record: `raw/internal/migrations/2026-07-15-136-echo-context-canonical-repository-release-substrate-repository-create-6a2e8326-delegated-approval.md`
+- Baseline-main-push authorization record: `raw/internal/migrations/2026-07-15-136-echo-context-canonical-repository-release-substrate-baseline-main-push-472e7bf5-delegated-approval.md`
+- Captured GitHub repository ID: `1302541575`
+- Captured GitHub repository node ID: `R_kgDOTaM1Bw`
+- Canonical URL: `https://github.com/zhenye0616/echo-context`
+- Visibility/owner/default branch readback: private / `zhenye0616` / `main`
+- Create-only push porcelain result: newly created; no pre-existing ref was adopted
+- Remote `refs/heads/main` readback: `0cf7b006eba665c0bf55e82ff04da70f19f01ebb`
+- Baseline tree readback: `70c5cf8352652b3c4c1dce68cd1a5e40d44e4b05`
+- No tag, release, package, or other external namespace was created by the builder.
+
 ## Builder implementation identities
 
 - Project_echo feature branch: `agent/echo-context-canonical-repository-release-substrate`
-- Project_echo feature HEAD: pending
+- Project_echo feature HEAD: recorded by the backlog handoff after this evidence commit (the record cannot self-bind its containing commit)
 - Echo-context feature branch: `agent/echo-context-canonical-repository-release-substrate`
-- Echo-context feature HEAD/tree: pending
+- Echo-context feature HEAD: `4241ca989814c1b99a300d5cf861e7e040f4983b`
+- Echo-context feature tree: `61c670ce9dce494b685ff08448edc85e8f9addf2`
+- Echo-context pull request: `https://github.com/zhenye0616/echo-context/pull/1`
+- Remote feature-branch readback: `4241ca989814c1b99a300d5cf861e7e040f4983b`
 - Canonical echo-context landed main HEAD/tree: pending independent review and delegated authorization
 - Canonical Project_echo landed main HEAD/tree: pending independent review and delegated authorization
 
+### Builder verification at the exact target feature head
+
+- `npm ci`: passed; 291 packages, zero audit vulnerabilities
+- `npm run typecheck`: passed
+- `npm run lint`: passed
+- `npm run test:ci`: passed; 77 files, 1,024 passed, 17 skipped, zero failed
+- `npm run test:operator` with explicit source Git dir and SHA `2971310441b69735cbe759293abd8c4d044bf347`: passed; 2/2, including 217-path extraction replay and eight-tool parity aggregate
+- `npm run verify:inventory`: passed; runtime-inventory.v2 closes 340 packages and 25 successor executable/config sources
+- `npm run verify:authority`: passed; the accepted extraction baseline is an ancestor and authority remains false
+- `npm run scan:secrets`: passed against every advertised remote ref with the official digest-pinned Gitleaks 8.30.1 binary; zero findings
+- Detached sibling-free, temporary-HOME source acceptance: passed all 16 exact child steps with no Project_echo checkout or ECHO state
+- Workflow YAML parse: passed; exact jobs are `quality-macos`, `quality-ubuntu`, `secret-scan`, `build-artifact`, `publish-release`, and `rerun-sentinel`
+- Target worktree: clean at the exact feature head
+
+The first detached-clone run exposed a PATH-only scanner-resolution defect at step 14. The builder fixed the resolver, refreshed runtime-inventory.v2, reran focused scanner/type/lint checks, and reran the complete 16-step detached trace to success. No failed gate was waived.
+
 ## Source artifact and release identities
 
-- Version: `0.1.0-dev.136.1` (reviewed target; pending landed-byte readback)
+- Version: `0.1.0-dev.136.1` (exact target feature bytes; canonical release identity remains pending landed-main readback)
 - Source SHA/tree: pending canonical target-main landing
 - Lock hash: pending canonical target-main landing
 - Source-archive SHA-256: pending build-once release gate
@@ -85,7 +117,11 @@ This evidence permits only the separately authorized create-only empty-repositor
 - Release ID: pending platform allocation
 - Asset IDs: pending platform allocation
 
-No artifact is built or released by this builder record. Exact-artifact fields are populated only from the later fresh detached clone and protected build-once workflow after canonical landing.
+Ephemeral verification builds from the exact feature head were created only under temporary directories and removed. Their repeatable test tuple was source-archive SHA-256 `17954cff1c95f6cd4b85b18112817e71468d5d94d712ff06368f9e6aa6a24b12`, lock hash `13ead528470d91adfc4456d349ae628f03f768ba51d78aee8d0b2c42dc12784b`, and manifest hash `348f6e8c42ba57a92a977a9f49502dcbc16bd3de5b7d065b60fc65d206b4f7c3`. These values are verification evidence only: they are not the authoritative AC6 build-once tuple, do not authorize publication, and must not be fed to item 137. Exact release fields are populated only from the later fresh detached clone of reviewed and read-back canonical main.
+
+## Unresolved external hosting gate
+
+Authenticated hosting preflight found that the current private repository/account tier cannot enforce the exact reviewed combination of administrator-bound main protection and required protected-environment reviewers. The only current repository identity is also insufficient to supply an independent PR approval. The builder did not configure weaker controls, did not claim AC4/AC6 hosting completion, and did not execute the source-release workflow. Independent implementation review may proceed against both feature heads; target-main merge and release remain blocked until the persistent coordinator records and executes a spec-compatible hosting disposition.
 
 ## Authority boundary
 
