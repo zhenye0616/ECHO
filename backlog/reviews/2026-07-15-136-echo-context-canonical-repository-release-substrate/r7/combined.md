@@ -6,7 +6,7 @@ codex_response: codex.md
 cursor_response: null
 codex-ops_response: codex-ops.md
 claude_response: null
-patch_commit_sha: null
+patch_commit_sha: 92a03132f1a7ee7e438d8144ba67aeb8a572194f
 next_round: null
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
@@ -14,26 +14,26 @@ escalated_to_founder: false
 
 # Combined findings
 
+Reframe gate: TRIGGERED — all 8 rows target mechanisms introduced or reshaped by prior `spec-r*-patches` commits (r6's d309cdeb rerun-guard/manifest-hash/environment-readback/download/identity/scan completion patches; r5's 3d74d33b dispatch-input and release-identity shape), the second consecutive round targeting the previous round's completion patch, so the mandatory fresh-context investigator ran (`codex exec --sandbox read-only`). Verdict: `propagation_completion` — 8 rows, 7 distinct defects (the two manifest-hash rows are one chain); each finding exposes a missing carrier, observable, or negative fixture on a retained load-bearing first-release control, and cutting any of them would reopen exact-artifact, founder-approval, governance, or fail-closed invariants; the only true structural cut (dropping AC6 publication) would delete the item's outcome and the 137 handoff. Diagnostic check applied (producer→durable carrier→consumer→observable→negative fixture on the actual tier): the flawed *prerequisite* rerun-guard is replaced by a *dependent* terminal sentinel (needs every job + always()) because GitHub's failed-jobs rerun re-selects dependents but not previously-successful prerequisites — the inverted dependency is what makes the observable reachable in every rerun mode; the approved manifest hash gains a durable carrier (migration-record tuple) and an explicit consumer input (`--expected-manifest-hash`) instead of a recompute-only tautology; hosting controls gain a named committed verifier (tools/verify-hosting-controls.mjs) covering both the environment fields and `enforce_admins`; the artifact download is narrowed to the exact-ID raw-archive endpoint; release identity and secret-scan contracts gain the missing fixtures plus a committed scan-contract file both scan paths bind to. Investigator risk accepted and carried forward: if GitHub does not schedule the sentinel in some rerun mode or does not expose/enforce a required environment/admin field on this tier, propagation is falsified — the spec already stops for founder disposition rather than absorbing another prose patch. Grouped dispositions: divergent 1+6 (one manifest-hash patch), divergent 2+7 (one hosting-controls verifier). Patch commit: 92a03132f1a7ee7e438d8144ba67aeb8a572194f (`spec-r7-patches`).
 
 ## Convergent findings
 
 | # | Severity | Source | Where (primary) | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | HIGH | both (convergent on `AC6 — layered rerun rejection`) | AC6 — layered rerun rejection | _strategist fills_ | _strategist fills_ |
-
+| 1 | HIGH | both (convergent on `AC6 — layered rerun rejection`) | AC6 — layered rerun rejection | accepted — patched | 92a03132: the first-job rerun-guard (a prerequisite, which failed-jobs reruns are not guaranteed to re-select once it succeeded on attempt 1) is replaced by a terminal rerun-sentinel job — empty permissions, no environment, no checkout/build/upload/publication step — that lists every other executable job in `needs`, runs under `if: always()`, succeeds only when `run_attempt == 1`, and fails otherwise; as a dependent of every job it is scheduled by full-workflow, failed-jobs, and single-job reruns alike, per-job `run_attempt == 1` conditions are retained, and rerun fixtures now assert scheduler selection (sentinel in `needs`-of-all + always()), not only static conditions |
 ## Divergent findings (single-reviewer or non-overlapping primary `where`)
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | HIGH | codex | AC3 and AC6 — approved manifest-hash verification | _strategist fills_ | _strategist fills_ |
-| 2 | MEDIUM | codex | AC6 and Tests — protected-environment verification | _strategist fills_ | _strategist fills_ |
-| 3 | MEDIUM | codex | AC6 and Tests — workflow-artifact download | _strategist fills_ | _strategist fills_ |
-| 4 | MEDIUM | codex | AC6 and Tests — release identity readback | _strategist fills_ | _strategist fills_ |
-| 5 | MEDIUM | codex | AC1, AC4, and Tests — secret-scan contract | _strategist fills_ | _strategist fills_ |
-| 6 | HIGH | codex-ops | AC3 and AC6 — fresh-clone release verification | _strategist fills_ | _strategist fills_ |
-| 7 | MEDIUM | codex-ops | AC4 — main branch protection | _strategist fills_ | _strategist fills_ |
+| 1 | HIGH | codex | AC3 and AC6 — approved manifest-hash verification | accepted — patched (grouped with #6) | 92a03132: `verify:artifact` now requires `--expected-manifest-hash <hex>` and fails unless the recomputed canonical-JSON SHA-256 equals it; fresh-clone `--mode=release` takes the value as an explicit argument transcribed from the founder-approved tuple persisted in the migration record (durable carrier), never recomputed from the downloaded manifest; `--mode=source` self-derives from the just-built manifest (recompute-path binding, not approval); valid-artifact/wrong-approved-hash negative fixture added |
+| 2 | MEDIUM | codex | AC6 and Tests — protected-environment verification | accepted — patched (grouped with #7) | 92a03132: the readback is now owned by a committed verifier, tools/verify-hosting-controls.mjs, run by the dispatching founder/operator before any approval with output in the migration record; hosting-controls fixtures cover each required field (reviewer set exactly zhenye0616, prevent-self-review disabled, no admin bypass, main-only policy) and fail-closed on any missing/unexposed/unreadable/unenforceable field |
+| 3 | MEDIUM | codex | AC6 and Tests — workflow-artifact download | accepted — patched | 92a03132: download narrowed to the Actions artifact API's exact-artifact-ID endpoint writing the raw un-extracted archive to a file; a pinned action is acceptable only if it demonstrably preserves the raw archive; internal-extraction actions and name/latest-based retrieval are forbidden; fixtures add wrong-name and name/latest-retrieval rejection before raw-digest verification |
+| 4 | MEDIUM | codex | AC6 and Tests — release identity readback | accepted — patched | 92a03132: release-identity fixtures add a tag ref implicitly created at draft creation and a missing or incorrect annotated-tag message (both were already normative in AC6 prose; fixtures were the gap) |
+| 5 | MEDIUM | codex | AC1, AC4, and Tests — secret-scan contract | accepted — patched | 92a03132: scanner/version/digest-map/config/invocation committed as tools/secret-scan-contract.json in the target repo; the bootstrap record binds to it by SHA-256 and tools/secret-scan.sh reads and enforces it (equivalence proven through a shared committed artifact, not cross-repo prose); leak-exit and pipeline-masking fixtures prove leak findings and scanner failures stay nonzero through the redaction/reporting path |
+| 6 | HIGH | codex-ops | AC3 and AC6 — fresh-clone release verification | accepted — same patch as #1 (divergent) | 92a03132: required expected-manifest-hash input sourced from the approved tuple's durable migration record, passed through fresh-clone release mode into `verify:artifact`, mismatch fixture added |
+| 7 | MEDIUM | codex-ops | AC4 — main branch protection | accepted — same patch as #2 (divergent) | 92a03132: AC4 now requires administrator enforcement explicitly enabled (classic `enforce_admins: true` or the exact ruleset equivalent binding the personal-account owner); tools/verify-hosting-controls.mjs fails closed when it is absent, false, unsupported, or unreadable |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+needs R8 — focus_hints: verify the r7 propagation-completion patches: terminal rerun-sentinel (empty permissions, no environment, `needs` every other executable job, `always()`, succeeds only at `run_attempt == 1` — a dependent, not a prerequisite, so full/failed-jobs/single-job reruns all schedule it; per-job `run_attempt == 1` conditions retained; scheduler-selection fixtures); `--expected-manifest-hash` required by `verify:artifact` and fresh-clone release mode with the approved tuple's migration record as durable carrier (source mode self-derives; wrong-hash fixture); tools/verify-hosting-controls.mjs fail-closed verifier over environment fields (exactly zhenye0616, prevent-self-review disabled, no admin bypass, main-only) AND branch-protection administrator enforcement (`enforce_admins` or ruleset equivalent); exact-artifact-ID raw-archive download to file with no internal extraction and no name/latest retrieval; implicit-tag-at-draft and annotation-message fixtures; committed tools/secret-scan-contract.json bound by both scan paths with leak-exit and pipeline-masking fixtures; Tests bullet alignment for all of the above.
 
