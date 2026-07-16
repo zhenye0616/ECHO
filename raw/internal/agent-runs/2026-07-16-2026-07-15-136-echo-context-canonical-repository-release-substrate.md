@@ -293,3 +293,39 @@ implementation merge/push, release, install, live-state access, or authority
 transfer occurred. No drift event occurred.
 
 Zero ECHO MCP calls were made, so no dogfooding journal entry is owed.
+
+---
+
+## Run 3 claim — consolidated formal-review repair
+
+- Claimed at: `2026-07-16T18:42:07Z`.
+- Builder actor ID: `codex-136-cycle3-builder-mendel-222cc09b`.
+- Builder run ID: `cycle3-mendel-222cc09b-20260716T184207Z`.
+- Formal reviewer actor ID: `codex-136-final-reviewer-b9e01c42`.
+- Formal reviewer run ID: `codex-136-final-review-20260716T182509Z`.
+- Rejected target head/tree: `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7` / `bc8b700fe5db3435d54a930a71d0c5455b85541b`.
+- Exact spec/seal: `f80003a7fbd08755dbff669951ed07bf43b390d0` / `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`.
+- Verdict: FAIL — zero HIGH, exactly three MEDIUM; no review record published.
+
+The coordinator assigned one bounded repair after the independent reviewer
+completed every long gate. The builder must preserve history and change only:
+
+1. Record deadline-rescue time when the complete terminal predicate and any
+   required ceremony finish, never at direct exit/error. Reproducer SHA-256:
+   `636dfb61badab446d49e7cdc6d89ad89b3abfa21c605aef6aa6388ca303120e0`.
+2. Replace production `Date.now()` deadline accounting with one monotonic clock
+   used consistently. Reproducer SHA-256:
+   `799dc1796a359cc7b8ffb6a478ddac8d9bd4ad38d501d0f7e0caf339ea4f2120`.
+3. Check the monotonic deadline immediately before and after every verifier-local
+   synchronous filesystem call; a late return forbids every later operation.
+   If `mkdtempSync` returns late, record `T` immediately before rejection so the
+   existing cleanup transition owns it. Reproducer SHA-256:
+   `67a4e3ea325456c802272352ad972fc5ebd1d13282fdf53386ac8cda8a9c7b85`.
+
+All other formal gates passed at the rejected head: sequential canonical
+fresh-clone acceptance, focused AC3 42/42, full CI 1,079 passed/17 skipped,
+typecheck, lint, inventory, authority, operator 2/2, four-ref secret scan, dual
+deterministic artifact verification, fsck, scope audit, and target merge preview.
+Every gate must be rerun at the new exact head. No target-main or Project-main
+implementation merge, release, install, live mutation, or authority transfer is
+authorized. No ECHO MCP calls were made, so no dogfooding journal entry is owed.

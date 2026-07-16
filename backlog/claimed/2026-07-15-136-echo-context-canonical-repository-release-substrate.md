@@ -56,29 +56,32 @@ spec_refs:
   - /Users/zhenye/Desktop/echo-context/tests/migration/object-closure.test.ts # one-branch/no-remote extraction invariant to historicize
   - /Users/zhenye/Desktop/echo-context/tests/migration/parity-matrix.test.ts # source-dependent proof the CI suite cannot assume
   - /Users/zhenye/Desktop/echo-context/tests/migration/context-tool-evidence.test.ts # source replay seam and sealed eight-tool evidence
-claimed_by: "codex-136-cycle2-final-builder-oracle-42c8"
-claimed_at: "2026-07-16T17:45:27Z"
+claimed_by: "codex-136-cycle3-builder-mendel-222cc09b"
+claimed_at: "2026-07-16T18:42:07Z"
 branch: "agent/echo-context-canonical-repository-release-substrate"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate"
 head_sha: "2fdce9c64b8077de1e73fffe5232bc471a973ac3"
 pr_url: ""
 agent_notes: |
-  COMPLETE builder handoff for R24 spec f80003a7fbd08755dbff669951ed07bf43b390d0
-  and fresh ready seal a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca.
-  Builder codex-136-cycle2-final-builder-oracle-42c8 preserved both feature histories.
-  Project evidence head 2fdce9c64b8077de1e73fffe5232bc471a973ac3 has tree
-  11fbc67d4efd9be05942ad0b8ed7a18fb75b1950 and is pushed/read back. Target head
-  02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7 has tree
-  bc8b700fe5db3435d54a930a71d0c5455b85541b and is pushed/read back from the
-  canonical HTTPS remote. Exact-head evidence passed: AC3 focus 42/42; typecheck;
-  lint; inventory 340 packages/23 sources; authority; full CI 78/78 files,
-  1,079 passed/17 skipped; exhaustive four-ref secret scan; operator replay 2/2;
-  isolated no-local/no-hardlinks acceptance; canonical HTTPS acceptance with four
-  advertised refs; and a fresh read-only oracle with no remaining HIGH/MEDIUM finding.
-  One unrelated EPERM cleanup race and one over-strict harness assertion were each
-  isolated and rerun green; neither changed target bytes. No target-main or Project-main
-  implementation merge/push, approval, release, install, live mutation, or authority
-  transfer occurred. Independent review of both exact heads is next.
+  REOPENED after formal independent review of exact target head
+  02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7 (tree
+  bc8b700fe5db3435d54a930a71d0c5455b85541b) found zero HIGH and exactly three
+  MEDIUM AC3 blockers. Fresh repair builder codex-136-cycle3-builder-mendel-222cc09b,
+  run ID cycle3-mendel-222cc09b-20260716T184207Z, must repair only: (1) timestamp
+  complete terminal proof rather than direct exit/error when deciding whether a
+  deadline may be rescued; (2) use a monotonic production clock instead of Date.now();
+  and (3) apply immediate before/after monotonic checks to every verifier-local
+  synchronous filesystem call, with no later operation after a late return and
+  immediate T recording after mkdtempSync. Reviewer reproducers have SHA-256
+  636dfb61badab446d49e7cdc6d89ad89b3abfa21c605aef6aa6388ca303120e0,
+  799dc1796a359cc7b8ffb6a478ddac8d9bd4ad38d501d0f7e0caf339ea4f2120, and
+  67a4e3ea325456c802272352ad972fc5ebd1d13282fdf53386ac8cda8a9c7b85.
+  Every other formal gate passed, including focused/full tests, typecheck, lint,
+  inventory, authority, operator replay, four-ref scan, canonical fresh-clone
+  acceptance, dual deterministic artifact verification, fsck, scope audit, and
+  merge preview. No implementation-review record was written. The existing Project
+  and target feature histories remain intact; no target-main or Project-main
+  implementation merge, release, install, live mutation, or authority transfer occurred.
 review_notes: |
   Implementation cycle 1 rejected — redo before merge.
   Reviewed Project_echo head: 25b833332bb22ec79700fcdf31b9c9f20eea79f5.
@@ -98,6 +101,12 @@ review_notes: |
   unimplementable hard-return promise for non-returning synchronous filesystem calls.
   The persistent coordinator returned the item to proposed for the smallest truthful
   scope correction and exact-SHA cross-vendor review; no failed evidence is waived.
+  The later formal R24 implementation review rejected target head
+  02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7 with zero HIGH and three MEDIUM
+  AC3 findings: late terminal-proof acceptance, non-monotonic production deadline
+  math, and grouped rather than per-call synchronous-filesystem deadline checks.
+  All other formal gates passed. No merge-ready implementation-review record exists;
+  a new exact target head and full independent re-review are mandatory.
 target_repo: "/Users/zhenye/Desktop/echo-context"
 target_remote: "https://github.com/zhenye0616/echo-context.git"
 target_branch: "agent/echo-context-canonical-repository-release-substrate"
