@@ -60,9 +60,17 @@ claimed_by: "codex-136-cycle2-builder-7f6a2d31"
 claimed_at: "2026-07-16T15:40:53Z"
 branch: "agent/echo-context-canonical-repository-release-substrate"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate"
-head_sha: ""
+head_sha: "59db3c608ecbb3af0e7723e960bd80748d9e1326"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Cycle-two R21 source-only repair completed by codex-136-cycle2-builder-7f6a2d31.
+  Echo-context feature head 358fb4da774287b6c55d287a46d53b5aff033e87 deletes
+  every hosted workflow/release/controller surface, adds the injected frozen bootstrap
+  gate plus exact source-only fresh-clone state machine, and preserves AC2/AC5.
+  Inventory, authority, typecheck, lint, 1,041 CI tests, pinned full-ref secret scan,
+  sibling-free fresh-clone acceptance, and operator replay all pass. Project feature
+  head 59db3c608ecbb3af0e7723e960bd80748d9e1326 removes the premature AC6 migration
+  record. No main push, approval, release, seal, install, or authority transfer occurred.
 review_notes: |
   Implementation cycle 1 rejected — redo before merge.
   Reviewed Project_echo head: 25b833332bb22ec79700fcdf31b9c9f20eea79f5.
@@ -71,12 +79,12 @@ review_notes: |
   review-artifact blob 1cd16c1f31dab5c40ad76b70716846a09c98d845.
   The 2026-07-16 founder decision then deferred all hosted gates/release to item 140;
   cycle two implements this slimmed spec against the frozen cycle-one branch.
-target_repo: ""
-target_remote: ""
-target_branch: ""
-target_worktree: ""
-target_head_sha: ""
-target_pr_url: ""
+target_repo: "/Users/zhenye/Desktop/echo-context"
+target_remote: "https://github.com/zhenye0616/echo-context.git"
+target_branch: "agent/echo-context-canonical-repository-release-substrate"
+target_worktree: "/Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate"
+target_head_sha: "358fb4da774287b6c55d287a46d53b5aff033e87"
+target_pr_url: "https://github.com/zhenye0616/echo-context/pull/1"
 target_landed_sha: ""
 project_landed_sha: ""
 ---

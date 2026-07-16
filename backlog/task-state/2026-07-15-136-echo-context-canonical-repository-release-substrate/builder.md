@@ -4,16 +4,23 @@ role: builder
 binding: codex
 claimed_by: codex-136-cycle2-builder-7f6a2d31
 claimed_at: 2026-07-16T15:40:53Z
-last_updated: 2026-07-16T15:44:00Z
+last_updated: 2026-07-16T16:08:28Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
 target_worktree: /Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate
+handoff_branch: agent/echo-context-canonical-repository-release-substrate
+handoff_head_sha: 59db3c608ecbb3af0e7723e960bd80748d9e1326
+handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 ---
 
 ## current_thesis
 
 Cycle two repairs the frozen cycle-one Project_echo head `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context head `145868a67a85dbb651faed457ee4001370c0fad0` without rebasing or rewriting either history. The reviewed R21 cut keeps the local source substrate and deterministic artifact, deletes all hosted/release/controller machinery, and hands exact feature heads to an independent reviewer. This builder never lands target main, authors an approval, seals at canonical `M`, releases, installs, or changes runtime/state authority.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 59db3c608ecbb3af0e7723e960bd80748d9e1326.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -39,5 +46,5 @@ Cycle two repairs the frozen cycle-one Project_echo head `25b833332bb22ec79700fc
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
+- spec: backlog/pending_review/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r21/

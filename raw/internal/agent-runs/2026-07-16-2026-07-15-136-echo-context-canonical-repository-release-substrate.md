@@ -63,3 +63,95 @@ The current private GitHub repository/account tier cannot enforce the exact revi
 ## ECHO MCP
 
 Zero ECHO MCP calls were made. Per the repository rule, no dogfooding journal entry is owed.
+
+---
+
+## Run 1 (resumed at 2026-07-16T15:40:53Z)
+
+### What I Implemented
+
+Cycle two continued the frozen Project_echo and echo-context feature histories
+without rebase or rewrite and implemented the founder-directed R21 scope cut.
+It preserved the source substrate and deterministic non-installable artifact,
+added the injected frozen repository-bootstrap gate, replaced the old
+source/release verifier with the sole source-mode bounded state machine and
+cleanup child, added real top-level secret-scan failures plus no-hosted-surface
+governance, and deleted every hosted workflow, release/publication controller,
+and operation-host surface.
+
+### Prior State Kept vs. Discarded
+
+- Kept: item-135 immutable provenance, repository/source authority records,
+  source behavior and parity bytes, the deterministic source artifact builder
+  and verifier, the exact Gitleaks contract/installer, and the evolving v2
+  runtime inventory.
+- Discarded: all three `.github/workflows/**` files, workflow policy tests,
+  hosted-control and workflow-artifact verifiers, release-bundle/tuple tools,
+  the publication controller, release mode in fresh-clone acceptance, and the
+  premature builder-authored Project_echo bootstrap migration record.
+
+### Files and Branches
+
+- Project_echo branch `agent/echo-context-canonical-repository-release-substrate`
+  at `59db3c608ecbb3af0e7723e960bd80748d9e1326` updates cycle-two pointer/run
+  evidence and removes the premature migration record.
+- Echo-context branch `agent/echo-context-canonical-repository-release-substrate`
+  at `358fb4da774287b6c55d287a46d53b5aff033e87`, tree
+  `70c18b4c2e3f6e24b46c6cd8da56acc0eb13e76d`, contains the complete source-only
+  implementation. Remote feature-head readback matched exactly.
+
+### Decisions Made During Implementation
+
+- Bound the scrubbed acceptance scanner to the reviewed release binary at
+  `<sandbox HOME>/bin/gitleaks`; the host Homebrew binary has the same version
+  but different bytes and correctly fails the committed digest contract.
+- Made the clean-clone scan consume an exhaustively fetched local
+  `refs/echo-scan/**` snapshot so the credential-free acceptance process makes
+  no private-remote request while Gitleaks still scans every reachable ref.
+- Kept dual-build tuple sealing, target-main landing authorization, and the
+  final bootstrap record coordinator-only after independent review.
+
+### Acceptance Criteria Status
+
+- [x] AC1 — frozen bootstrap gate model and exact full-ref secret scanner,
+  including live top-level negative fixtures; no bootstrap write repeated.
+- [x] AC2 — frozen v1 evidence preserved; v2 regenerated for 340 packages and
+  22 executable/config sources; source/runtime authority split unchanged.
+- [x] AC3 — exact source-only wrapper/verifier/cleanup trace passed in a fresh
+  no-local sibling-free clone under a scrubbed temporary HOME; operator replay
+  independently passed 2/2.
+- [x] AC4 — implementation is independently reviewable at exact feature heads;
+  no target-main push was attempted and no hosted surface remains.
+- [x] AC5 — deterministic Git-object-only source artifact builder/verifier and
+  mutation tests passed; install/runtime/state flags remain false.
+- [ ] AC6 — intentionally coordinator-owned after review and canonical landing;
+  no tuple seal, final migration record, tag, release, or artifact publication
+  was performed by this builder.
+
+### Tests Run (verbatim terminal summaries)
+
+```text
+runtime-inventory.v2 OK: 340 packages, 22 sources
+repository-authority OK: baseline ancestor of 358fb4da774287b6c55d287a46d53b5aff033e87
+
+Test Files  78 passed (78)
+Tests  1041 passed | 17 skipped (1058)
+
+secret-scan OK: 4 snapshotted source ref(s), full reachable history
+fresh-clone acceptance OK
+
+Test Files  1 passed (1)
+Tests  2 passed (2)
+```
+
+`npm run typecheck`, `npm run lint`, `git diff --check`, target feature push,
+and both remote feature-head readbacks also exited zero.
+
+### Open Questions
+
+None for the builder. Independent implementation review and the exact
+coordinator-owned landing/seal sequence remain mandatory next steps.
+
+### Drift Events
+
+None. No ECHO MCP calls were made, so no dogfooding journal entry is owed.
