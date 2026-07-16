@@ -4,13 +4,13 @@ role: builder
 binding: codex
 claimed_by: codex-builder-136-20260716
 claimed_at: 2026-07-16T08:33:45Z
-last_updated: 2026-07-16T09:20:16Z
+last_updated: 2026-07-16T09:35:29Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
 target_worktree: /Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate
 handoff_branch: agent/echo-context-canonical-repository-release-substrate
-handoff_head_sha: b5c94304f78043b1a0508899a2188065c29157da
+handoff_head_sha: 61d993fe1022dfd903395b13d34c50ec9079774a
 handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 ---
 
@@ -19,7 +19,7 @@ handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-
 Implemented the reviewed standalone repository, self-contained CI, deterministic non-installable source artifact, and fail-closed first-release controls as the fresh independent Codex builder. Exact hosted-green echo-context review candidate: `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e` / PR `https://github.com/zhenye0616/echo-context/pull/1`.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at b5c94304f78043b1a0508899a2188065c29157da.
+- Lifecycle: COMPLETE — ready for review at 61d993fe1022dfd903395b13d34c50ec9079774a.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -48,6 +48,3 @@ Implemented the reviewed standalone repository, self-contained CI, deterministic
 
 - spec: backlog/claimed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/
-- target review: https://github.com/zhenye0616/echo-context/pull/1 at 145868a67a85dbb651faed457ee4001370c0fad0
-- evidence: raw/internal/migrations/2026-07-15-136-echo-context-repository-bootstrap.md
-- run log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
