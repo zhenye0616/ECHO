@@ -6,7 +6,7 @@ codex_response: codex.md
 cursor_response: null
 codex-ops_response: codex-ops.md
 claude_response: null
-patch_commit_sha: null
+patch_commit_sha: 1c7e894c14541db6b46be7d38cc5a42174d0bb11
 next_round: null
 combined_verdict: pushback
 escalated_to_founder: false
@@ -25,9 +25,9 @@ Reframe gate: assessed. Rows 1 and 3 are semantically convergent (same AC6 write
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | HIGH | codex | AC6 — write-ahead attempt-marker durability | escalated to founder — formal decision boundary held; no patch this tick | none — see FOUNDER DECISION REQUIRED below; same boundary as row 3 |
-| 2 | MEDIUM | codex | AC1 prepared main push and AC6 annotated-tag push | accepted — patch deferred; both create-only push contracts must gain `--porcelain` (and fixtures must reject its absence), but no spec mutation is permitted this tick | none — fold into the single R11 patch set once the founder selects substrate (A) or (B); do not patch piecemeal ahead of that decision |
-| 3 | HIGH | codex-ops | backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md: AC6 write-ahead attempt-marker contract | escalated to founder — formal decision boundary held; no patch this tick | none — see FOUNDER DECISION REQUIRED below; same boundary as row 1 |
+| 1 | HIGH | codex | AC6 — write-ahead attempt-marker durability | accepted — FOUNDER DECISION RECORDED: option (B); marker contract rewritten as best-effort diagnostics with destination namespace/readback as sole durable mutation authority, response+readback gating at every mutation boundary, read-only reconciliation + nonzero stop on ambiguity, manual founder-dispositioned fresh dispatch behind full empty-namespace preflight; impossible durable-log tests replaced | 1c7e894c14541db6b46be7d38cc5a42174d0bb11 — same patch resolves row 3 |
+| 2 | MEDIUM | codex | AC1 prepared main push and AC6 annotated-tag push | accepted — patched: `--porcelain` made explicit and mandatory in both create-only push commands; CAS fixtures reject invocations lacking it; tag push additionally rebased onto immutable `TAG_OBJECT_OID` refspec source with local-ref-retarget race fixture (founder rider folded into same patch set) | 1c7e894c14541db6b46be7d38cc5a42174d0bb11 |
+| 3 | HIGH | codex-ops | backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md: AC6 write-ahead attempt-marker contract | accepted — FOUNDER DECISION RECORDED: option (B), the reviewer's second offered contract (readback-as-durable-authority with run-log markers downgraded to best-effort evidence); tests rewritten for the selected contract per the founder's required option-B test list | 1c7e894c14541db6b46be7d38cc5a42174d0bb11 — same patch resolves row 1 |
 
 ## FOUNDER DECISION REQUIRED — AC6 write-ahead durability substrate
 
@@ -38,7 +38,9 @@ Both reviewers independently returned HIGH pushback on the same boundary: a GitH
 
 Until the founder records this choice, the item stays in `backlog/proposed/` — no R11 dispatch, no promotion, no build/claim, no external mutation.
 
+**FOUNDER DECISION RECORDED (2026-07-15): option (B) approved.** Destination namespace/readback is the sole durable mutation authority; Actions run-log intent markers are best-effort diagnostics only. Patched at `1c7e894c14541db6b46be7d38cc5a42174d0bb11` together with the founder's rider corrections (explicit `--porcelain` on both create-only pushes with reject-if-missing fixtures; pre-verified immutable `TAG_OBJECT_OID` as the tag-push refspec source with a local-ref-retarget race fixture; per-asset marker → write → authenticated readback trace over the three named assets in fixed order, any per-asset readback failure stopping every later asset/publish write). First-release-only empty-namespace, no-retry/no-adoption/no-auto-cleanup architecture and no-build scope preserved. Recorded in `backlog/task-state/.../strategist.md` locked_decisions.
+
 ## Convergence call
 
-HELD FOR FOUNDER DECISION after R10 — not claim-ready; R11 dispatch deliberately withheld. R11 (verification round over the substrate patch + the row-2 `--porcelain` patch) fires only after the founder selects (A) or (B) above.
+NOT CONVERGED after R10 — verification round required over the option-B substrate rewrite + rider patches. R11 dispatched to codex + codex-ops at the patched spec SHA. No promotion, build, claim, or external mutation until R11 verifies.
 
