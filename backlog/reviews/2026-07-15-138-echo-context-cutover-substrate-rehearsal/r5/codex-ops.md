@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-15-138-echo-context-cutover-substrate-rehearsal"
+round: 5
+reviewer: "codex-ops"
+artifact_sha: "677c585a8ca839233d9c1c79596345ab2e427515"
+completed_at: '2026-07-16T04:04:43Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC1 — initialization/resume grammar and authority-record commit"
+    finding: "Creating the never-deleted authority.lock before the first canonical transaction record leaves a crash window in which the root is nonempty but has no resumable record; the stated grammar then permanently rejects it. Admit one exact validated lock-only bootstrap state, acquire and recheck that lock before initialization, make every record commit temp-write/fsync/rename/parent-fsync durable while the lock remains held, and test kills at every bootstrap boundary."
+  - severity: "high"
+    where: "AC2 — shared authority-root binding"
+    finding: "The spec asserts that every full-start path uses the same lock object but defines no immutable package-bound locator for the canonical authority root. A stale configuration or alternate root can acquire a different authority.lock, observe an absent generation, and start full mode after activation. Bind the authority-root identity into the package manifest, reject missing, mismatched, aliased, or override-supplied roots before PID/data/SQLite/socket mutation, and add cross-process alternate-root tests."
+  - severity: "high"
+    where: "AC5 — cross-repository identity handoff"
+    finding: "The first echo-context build must embed the complete four-identity tuple, yet only the later Project_echo build receives a counterpart manifest, and neither build is given the counterpart checkout/object database needed to verify that repository's objects. Define an explicit immutable identity input for the first build and explicit counterpart repository/object inputs for both builds, reconcile the generated manifest with the committed-input rule, and test unrelated detached-worktree locations plus a counterpart HEAD change between builds."
+  - severity: "medium"
+    where: "AC5 — candidate output and verification lifecycle"
+    finding: "A logical build/output boundary does not prevent an ignored stale or symlinked output directory from redirecting writes, a failed build from leaving a selectable partial candidate, or concurrent build/verify scratch trees from colliding. Require descriptor-validated no-follow per-run staging, atomic publication of an explicitly selected manifest/archive pair, deterministic cleanup or quarantine after failure, and interrupted, stale, symlinked, repeated, and concurrent invocation tests."
+  - severity: "medium"
+    where: "AC1 — advertised npm rehearsal command"
+    finding: "The zero-write pre-trust promise is not enforceable solely inside the controller because npm can create cache/debug-log state and inherited Node/npm loader options can execute before the guard. Pin and sanitize the launcher runtime, PATH, loader variables, cache, log, HOME, and temporary-directory behavior, and run the sentinel matrix around the advertised npm run rehearse invocation itself; otherwise narrow the promise to controller-owned writes."
+  - severity: "medium"
+    where: "AC1/AC2 — bounded authority and quiescence operations"
+    finding: "No deadline or abort semantics are defined for authority-lock acquisition, launchd neutralization, process termination, or zero-writer verification. A stuck process can leave the controller waiting indefinitely with no nonzero exit or durable stop record while blocking all recovery starts. Require bounded waits and escalation, forbid phase commit on timeout, release the lock safely, persist the failure, and test stuck-lock, failing-launchd, and unkillable-process cases."
+  - severity: "medium"
+    where: "AC2 — preprovisioned fence-evidence sink"
+    finding: "The fence-evidence contract does not define behavior when the preprovisioned sink is missing, unwritable, full, or concurrently damaged. Such a failure must still forbid every startup mutation and must not become a silent KeepAlive rejection loop. Specify a fail-closed operator-visible fallback or mandatory preflight and cover each sink failure with fresh-process relaunch tests."
+---
