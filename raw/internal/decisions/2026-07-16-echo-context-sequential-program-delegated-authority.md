@@ -62,7 +62,7 @@ The record must contain:
 - manifest identity and SHA-256;
 - every artifact as a typed name/path plus SHA-256, never one ambiguous aggregate hash;
 - the exact intended operation, mode, destination repositories/refs/IDs/paths, and authority boundary;
-- repository stable ID, immutable tag-object OID, and deterministic release/tag/asset names; any platform-assigned release or asset ID already in existence and addressed by the operation must also be bound;
+- deterministic repository owner/name, immutable tag-object OID, and deterministic release/tag/asset names; any platform-assigned repository, release, or asset ID already in existence and addressed by the operation must also be bound;
 - independent builder and reviewer identities, reviewed heads, verdict, and gate-evidence references;
 - preflight and execution-plan identity/hash;
 - backup identity/hash and restore-proof identity;
@@ -74,7 +74,7 @@ For an operation that is not artifact-bound, artifact-only fields may be explici
 
 An authorization becomes stale if any bound identity, reviewed byte, gate result, destination, plan, backup, rollback object, or authority boundary changes. The coordinator must stop that operation, create fresh reviewed evidence as required, and issue a new single-use authorization rather than editing or reusing the old record.
 
-For create-only publication, a platform-assigned release or asset ID that does not exist before the authorized write is explicitly marked `pending allocation by this operation`; it is never guessed. The separate post-operation authenticated readback evidence must bind every returned release/asset ID to the pre-authorized deterministic name, bytes, digest, and destination. Any later mutation of an existing release or asset must bind its already-known ID in a fresh pre-operation authorization.
+For create-only repository creation or publication, a platform-assigned repository, release, or asset ID that does not exist before the authorized write is explicitly marked `pending allocation by this operation`; it is never guessed. The separate post-operation authenticated readback evidence must bind every returned repository/release/asset ID to the pre-authorized deterministic owner/name, bytes, digest, visibility, and destination as applicable. Any later mutation of an existing repository, release, or asset must bind its already-known ID in a fresh pre-operation authorization.
 
 ## Sequential execution and terminal state
 
