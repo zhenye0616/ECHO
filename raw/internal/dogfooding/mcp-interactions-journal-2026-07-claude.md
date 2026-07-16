@@ -707,3 +707,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
 - **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
 - **Note:** First responsive round on the 137 lane confirms the r1 silence was roster-binding-related (codex+claude then, codex+codex-ops now), consistent with the r1 escalation note's suspicion about the claude-reviewer wrapper change. r3 spec_commit_sha pins e9033277 (disposition commit; contains patched bytes from 8e73045f).
+
+## 2026-07-15 20:09 PDT — 139 r3 verification-round dispatch (coord_invoke ×2)
+
+- **Trigger:** Watcher tick combined 139 r2 (codex 4 MEDIUM proceed_after_patches; codex-ops proceed with zero findings; not escalated). Reframe gate NOT triggered: r1 was an immutable no-response timeout with no patch commits, so all four findings target original spec text. All four accepted as clarity patches at bb16485a (AC1 exact landed-SHA read path with 138 frontmatter + migration-record cross-check and canonical-remote reachability; AC1 build-once vs post-approval verification-clone boundary; AC7 staged-transaction atomic client rewire with before-image restore; AC8/AC10 secret-free adapter evidence tuple + forbidden content classes); r3 dispatched at 7b8f7492; 057b post-push hook fires the active trigger for the r3 roster.
+- **Query inputs:** `coord_invoke` ×2 — roles codex + codex-ops on backlog/reviews/2026-07-15-139-echo-context-founder-mac-authority-activation/r3/request.md, correlation_id c57c28b2… from r3 request frontmatter; repo-relative request_path per the pin rule.
+- **Returned:** both ok — active trigger accepted codex and codex-ops; wrappers spawned fire-and-forget.
+- **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
+- **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
+- **Note:** One concurrent-push rebase this tick (sibling 137 r3 reviewer responses + journals landed between combine and spec-patch push); spec-patch SHA stable at bb16485a post-rebase, r3 spec_commit_sha pins cadd1a8b (disposition commit; contains patched bytes from bb16485a). Prior tick's 138-dispatch journal push hit a push race (queue-errors PUSH-RACE-FALLBACK at 2026-07-16T03:01Z) but landed as da250ae5 — no action needed.
