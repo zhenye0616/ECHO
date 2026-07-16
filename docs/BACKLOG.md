@@ -7,7 +7,6 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| PROPOSED | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-testing clean clone, and tuple-sealed source artifact | 1d | 2026-07-13-135-local-echo-context-source-extraction |
 | PROPOSED | HIGH | 2026-07-15 | [2026-07-15-137-echo-context-installable-shadow-runtime](../backlog/proposed/2026-07-15-137-echo-context-installable-shadow-runtime.md) | Versioned per-user echo-context shadow runtime and exact-artifact founder-Mac proof | 5d | 2026-07-15-136-echo-context-canonical-repository-release-substrate |
 | PROPOSED | HIGH | 2026-07-15 | [2026-07-15-138-echo-context-cutover-substrate-rehearsal](../backlog/proposed/2026-07-15-138-echo-context-cutover-substrate-rehearsal.md) | Deterministic echo-context cutover substrate and full-cycle rehearsal | 6d | 2026-07-15-137-echo-context-installable-shadow-runtime |
 | PROPOSED | HIGH | 2026-07-15 | [2026-07-15-139-echo-context-founder-mac-authority-activation](../backlog/proposed/2026-07-15-139-echo-context-founder-mac-authority-activation.md) | Exact-artifact founder-Mac context authority activation and reversible acceptance | 2d operator work + 7 calendar-day acceptance | 2026-07-15-138-echo-context-cutover-substrate-rehearsal |
@@ -16,7 +15,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| - | - | - | _(empty)_ | - | - | - |
+| READY | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/ready/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-testing clean clone, and tuple-sealed source artifact | 1d | 2026-07-13-135-local-echo-context-source-extraction |
 
 ## Claimed
 

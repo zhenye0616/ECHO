@@ -2,12 +2,12 @@
 task_id: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 role: strategist
 binding: codex
-last_updated: 2026-07-16T17:31:50Z
+last_updated: 2026-07-16T17:34:07Z
 ---
 
 ## current_thesis
 
-Item 136 is back in proposed after the second independent cycle-two implementation review rejected exact Project head `5b99d896e9103e0047c31d19fc574d7eea92abc5` and target head `1a91750e5b9ce9db49e9c893f9974b318f12f38a`. R23 reviewers agreed that the R22 universal terminality wording incorrectly required an exit event and PGID absence when spawn failed before either could exist. The R23 patch closes that propagation edge with two exhaustive immutable terminal shapes—pre-spawn without PID, and spawned child with PID—while retaining the same no-report/no-advance rule. R24 is the terminal verification target; another finding against this patch-added mechanism requires removal or executable reduction rather than more prose.
+R24 converged with Codex and Codex-Ops both returning `proceed` and zero findings at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0`. Item 136 is ready for a fresh seal and claim. The repair builder must incorporate the already-local deadline/signal fixes plus the converged managed-child terminal shapes, rerun all exact acceptance evidence, and hand off new target and Project feature heads for independent review.
 
 ## locked_decisions
 
@@ -24,8 +24,8 @@ Item 136 is back in proposed after the second independent cycle-two implementati
 
 ## open_questions
 
-- R24 reviewers must verify only that the pre-spawn/spawned-child split is exhaustive, implementable, and closes the converged R23 finding without reintroducing removed architecture.
-- After R24 promotion, the repair builder must implement the exact terminal-shape fixtures and report any adapter-shape change. Any such byte remains independently reviewable.
+- No specification question remains after R24. Any implementation mismatch returns to the coordinator and may not silently change the converged bytes.
+- The repair builder must implement the exact terminal-shape fixtures and report any adapter-shape change. Any such byte remains independently reviewable.
 
 ## dont_touch
 
@@ -36,9 +36,10 @@ Item 136 is back in proposed after the second independent cycle-two implementati
 
 ## canonical_anchors
 
-- spec: backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
+- spec: backlog/ready/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - review_lineage: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/
 - prior_spec_commit: 1c8814406d0667e98cff99784e59df5bb613f8f2
+- converged_spec_commit: f80003a7fbd08755dbff669951ed07bf43b390d0
 - rejected_project_head: 5b99d896e9103e0047c31d19fc574d7eea92abc5
 - rejected_target_head: 1a91750e5b9ce9db49e9c893f9974b318f12f38a
 - delegation: raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md
