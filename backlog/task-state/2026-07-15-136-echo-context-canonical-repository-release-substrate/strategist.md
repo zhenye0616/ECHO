@@ -13,7 +13,7 @@ Turn the reviewed local echo-context extraction into the canonical private sourc
 - Clean hosted CI is sibling-free and state-free; raw Project_echo object replay is an explicit operator/release-review suite.
 - Main requires enforceable no-force/no-delete, PR, quality, and secret-scan controls; inability to enforce stops the release gate.
 - Version 0.1.0-dev.136.1 produces a deterministic source archive classified installable:false, runtime_authority:false, and state_authority:false.
-- The private source prerelease is built once and founder-approved by source SHA + version + artifact SHA-256; publish may not rebuild.
+- The private source prerelease is built once and founder-approved over the presented nine-field tuple (source SHA, source tree, version, source-archive SHA-256, lock hash, manifest hash, run ID, workflow artifact ID, workflow-artifact digest); publish may not rebuild, and the annotated tag is written and verified before any draft exists.
 - Successor work uses an isolated target branch, independent review, founder target-main merge/readback, then a fresh clone of the landed SHA for build/release.
 - Item 137 consumes the exact released tuple and is solely responsible for an installable runtime artifact.
 
