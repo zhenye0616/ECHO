@@ -63,3 +63,39 @@ The current private GitHub repository/account tier cannot enforce the exact revi
 ## ECHO MCP
 
 Zero ECHO MCP calls were made. Per the repository rule, no dogfooding journal entry is owed.
+
+---
+
+## Cycle-two R21 source-only repair
+
+- Builder actor: `codex-136-cycle2-builder-7f6a2d31`
+- Run ID: `cycle2-7f6a2d31-20260716`
+- Started: `2026-07-16T15:40:53Z`
+- Finished implementation verification: `2026-07-16T16:04:04Z`
+- Frozen input target head: `145868a67a85dbb651faed457ee4001370c0fad0`
+- Final target feature head: `358fb4da774287b6c55d287a46d53b5aff033e87`
+- Final target tree: `70c18b4c2e3f6e24b46c6cd8da56acc0eb13e76d`
+
+The founder-directed R21 scope cut supersedes the hosted/release portions of the
+cycle-one entry above. Cycle two preserved the source substrate and deterministic
+source artifact, added the injected frozen bootstrap-gate model, replaced the
+source/release verifier with the sole bounded source-mode fresh-clone state
+machine, and deleted every GitHub Actions workflow, hosted-evidence surface,
+release/publication controller, and hosted-policy test. The premature builder
+bootstrap migration record was removed; AC6 permits the persistent coordinator
+to create that record only after reviewed target-main landing and dual-build seal.
+
+### Cycle-two verification
+
+- `npm run verify:inventory` — passed; 340 packages and 22 executable/config sources.
+- `npm run verify:authority` — passed at exact final target head.
+- `npm run typecheck` and `npm run lint` — passed.
+- `npm run test:ci` — passed; 78 files, 1,041 passed, 17 skipped, zero failed.
+- Digest-pinned Gitleaks 8.30.1 top-level scan — passed against the complete local source-ref snapshot; zero findings.
+- Fresh `--no-local --no-hardlinks` sibling-free clone with temporary mode-0700 HOME, pinned Node/npm/Git, pinned sandbox scanner, and no inherited ECHO state — exact canonical wrapper passed.
+- `npm run test:operator` with explicit Project_echo Git dir and source SHA `2971310441b69735cbe759293abd8c4d044bf347` — passed 2/2.
+- Target feature push and remote readback — exact `358fb4da774287b6c55d287a46d53b5aff033e87`.
+
+No target-main or Project-main implementation merge/push, approval, tag,
+release, hosted artifact, install, live-state access, or authority transfer was
+performed. Zero ECHO MCP calls were made, so no dogfooding journal entry is owed.

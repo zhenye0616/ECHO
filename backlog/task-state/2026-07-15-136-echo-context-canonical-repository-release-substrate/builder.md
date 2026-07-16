@@ -2,49 +2,49 @@
 task_id: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 role: builder
 binding: codex
-claimed_by: codex-builder-136-20260716
-claimed_at: 2026-07-16T08:33:45Z
-last_updated: 2026-07-16T09:35:29Z
+claimed_by: codex-136-cycle2-builder-7f6a2d31
+claimed_at: 2026-07-16T15:40:53Z
+last_updated: 2026-07-16T16:04:31Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
 target_worktree: /Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate
 handoff_branch: agent/echo-context-canonical-repository-release-substrate
-handoff_head_sha: 61d993fe1022dfd903395b13d34c50ec9079774a
+target_head_sha: 358fb4da774287b6c55d287a46d53b5aff033e87
 handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 ---
 
 ## current_thesis
 
-Implemented the reviewed standalone repository, self-contained CI, deterministic non-installable source artifact, and fail-closed first-release controls as the fresh independent Codex builder. Exact hosted-green echo-context review candidate: `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e` / PR `https://github.com/zhenye0616/echo-context/pull/1`.
+Cycle two repaired the frozen cycle-one Project_echo head `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context head `145868a67a85dbb651faed457ee4001370c0fad0` without rebasing or rewriting either history. The reviewed R21 cut keeps local source acceptance and the deterministic artifact, deletes all hosted/release/controller machinery, and hands exact target head `358fb4da774287b6c55d287a46d53b5aff033e87` to an independent reviewer. This builder never lands target main, authors an approval, seals at canonical `M`, releases, installs, or changes runtime/state authority.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at 61d993fe1022dfd903395b13d34c50ec9079774a.
+- Lifecycle: COMPLETE — cycle-two source-only implementation and tests are ready for independent review.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
-- AC1: verify the exact clean 0cf7b006 baseline/tree/190-path closure and prepare the reviewed create-only bootstrap contract; the builder never creates the repository or pushes target main.
-- AC2: preserve all item-135 provenance bytes, add frozen-baseline and repository-authority records, and move current validation to generated runtime-inventory.v2.json.
-- AC3: commit the accepted standalone typecheck/lint configs and exact source/release fresh-clone verifier traces; no Project_echo or live-state dependency is allowed.
-- AC4: add immutable-action, least-privilege CI, fail-closed full-history secret scanning, hosting-control verification, and policy fixtures.
-- AC5: build exactly one deterministic source-only archive/checksum/manifest triple at version 0.1.0-dev.136.1 with authority:false and installed:false.
-- AC6: implement the guarded first-release-only workflow and sole publication controller, but do not merge, publish, release, install, or mutate runtime/state authority in this builder run.
-- Project_echo remains the coordination and installed/runtime/state authority throughout this item; echo-context feature work stays on the named target worktree and branch.
+- AC1: retain the completed repository/bootstrap history as immutable evidence and keep only the injected local repository-bootstrap gate plus exact scanner contract; never repeat either external operation.
+- AC2: preserve item-135 bytes, bind the frozen baseline and successor authority, generate runtime-inventory.v2 for the evolving successor tree, and state the source/runtime authority split honestly.
+- AC3: provide the sole source-mode fresh-clone acceptance trace with exact authenticated toolchain, scrubbed environment, bounded cleanup, one artifact build/verify, and no sibling or live-state dependency.
+- AC4: delete every workflow and hosted/release surface; a different fresh reviewer must rerun AC3 at exact target head before the coordinator constructs and authorizes literal merge object `M`.
+- AC5: build the deterministic `0.1.0-dev.136.1` source archive/checksum/manifest triple from committed Git objects with `installable:false`, `runtime_authority:false`, and `state_authority:false`.
+- AC6: dual-build sealing and the final bootstrap migration record occur only after coordinator landing at canonical `M`; the builder removed the premature cycle-one Project_echo bootstrap record and stops at pending review.
+- Verification at the exact target head passed inventory, authority, typecheck, lint, 1,041 CI tests, pinned full-ref secret scan, sibling-free fresh-clone acceptance, and the two-test operator replay.
 
 ## open_questions
 
-- Independent implementation review is required before either feature branch may merge.
-- The current private-repository/account tier cannot enforce the exact protected-main plus required-environment-reviewer contract, and the sole current repository identity cannot supply an independent required PR approval. The persistent coordinator must disposition and repair this external hosting gate before target-main or release execution.
+- None. Independent review and all coordinator-owned landing/seal operations remain intentionally pending.
 
 ## dont_touch
 
-- No LaunchAgent, installation, MCP/client registration, port, authentication, live database, checkpoint, config, credential, daemon, or authority transfer.
-- No context behavior changes, public package/repository, generic release framework, Project_echo deprecation, echo-brain, echo-loop, or Team-product maturity advance.
-- Do not edit target main in place, merge or push either main branch, publish a release, create tags, configure hosting controls, or execute the coordinator's delegated authority.
-- Do not edit wiki, item body, unrelated backlog items, historical item-135 provenance bytes, or unrelated user/agent worktrees.
+- Do not edit either main checkout in place, rebase/rewrite frozen cycle-one history, or merge/push either main branch.
+- Do not create `.github/workflows/**`, hosted evidence/plan/authorization schemas, release-publication or operation-host tooling, attempt ledgers, runners, controllers, tags, releases, or assets.
+- Do not author the coordinator-only target-main landing authorization, independent-review record, or post-landing bootstrap migration record.
+- Do not install, configure clients, touch LaunchAgents, credentials, databases, checkpoints, live state, ports, daemons, or any client/user path.
+- Do not change context behavior, Team-product maturity, wiki, unrelated backlog items, item-135 provenance bytes, or unrelated user/agent worktrees.
 
 ## canonical_anchors
 
 - spec: backlog/claimed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
-- reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/
+- reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r21/
