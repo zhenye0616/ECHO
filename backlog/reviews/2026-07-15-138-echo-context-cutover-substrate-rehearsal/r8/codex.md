@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-15-138-echo-context-cutover-substrate-rehearsal"
+round: 8
+reviewer: "codex"
+artifact_sha: "1f5729999154691efeb76161c17db8a186884b0f"
+completed_at: '2026-07-16T06:10:39Z'
+verdict: "pushback"
+findings:
+  - severity: "high"
+    where: "AC1 phase table and AC7 rollback writer-freeze paragraphs"
+    finding: "Rollback ordering is internally inconsistent: AC7 commits W1/C1 and the authority flip in one record step, while AC1 requires interval export and all restoration to complete before that flip. Those operations need durable bounds, and a crash leaves phase active with intentionally frozen or displaced writers that cannot satisfy active's one-writer resume proof. Add a durable rollback-pending substate that records W1/C1 without changing authority, define its replay/abort proofs, and commit rolled_back separately after restoration."
+  - severity: "high"
+    where: "AC1, AC2, AC4, and AC5 descriptor-relative and native-operation requirements"
+    finding: "The prescribed implementation surface is unavailable: Node's standard fs API does not provide the required dirfd-relative openat/unlinkat operations or renamex_np(RENAME_EXCL), while fs-ext is pinned only to flock/flockSync and every other native archive member is forbidden. Name and pin an allowlisted helper/addon with exact APIs and ownership, or replace these requirements with explicitly equivalent supported primitives; reconcile files_to_modify, manifests, native-member policy, and tests."
+  - severity: "high"
+    where: "AC5 approval record and deployment bootstrap trust chain"
+    finding: "An integrity SHA-256 plus an unnamed item-139-only authorization binding is not authentication; anyone can recompute an unkeyed hash, and no trusted component verifies the bootstrap's hash before substituted bootstrap bytes execute. Define the canonical signed or MACed schema, algorithm, trust-anchor provisioning, verifier ownership and ordering, replay policy, and fixture-versus-production authorization. Require root, prefix, mode, and artifact arguments to equal authenticated fields before mutation and test substitution and alias mismatches."
+  - severity: "high"
+    where: "AC1 active-to-rolled_back ordering and AC2 authority-lock startup handoff"
+    finding: "The restored launchd job must acquire authority.lock before startup, but the controller also holds that lock for the phase transition and must prove readiness after committing rolled_back. Holding it through readiness deadlocks; releasing it without a specified handoff permits a concurrent recutover transition. Specify commit-and-release, restored-job acquisition/start, controller reacquisition, unchanged-tuple revalidation, and rollback-completion journaling, with crash tests at every handoff boundary."
+  - severity: "medium"
+    where: "AC1 interrupted transaction.json.tmp validation"
+    finding: "The interrupted first planned commit cannot provide the required predecessor hash, generation, and phase because no canonical record exists. Define an exact genesis predecessor sentinel bound to root and plan identity. Also require descriptor/inode revalidation immediately before unlink, parent-directory fsync afterward, and forged-genesis plus replacement-race tests."
+  - severity: "medium"
+    where: "AC4 per-target CAS transition table"
+    finding: "The table omits the crash state where the physical target is the after-image but the apply result is not durably journaled, despite mandatory kills after rename. Delete-type apply and create-type rollback also have no atomic unlink and parent-fsync protocol. Add intent-before-mutation and result ordering, staged-inode reconciliation, explicit unlink recovery, and kill tests around rename, unlink, parent fsync, and result journaling."
+  - severity: "medium"
+    where: "AC1 authority.lock bootstrap and AC5 deployment transaction"
+    finding: "The sole-lock contract does not validate a preexisting lock's owner, mode, link count, size, or device, and the four-step deployment transaction is not serialized with deploy/deploy or deploy/execute activity. Require an empty euid-owned 0600 nlink-1 same-device lock, secure 0700 root creation, and acquisition of that same authority.lock before deployment mutation; add creator races and bootstrap-versus-bootstrap/execute/resume contention tests."
+  - severity: "medium"
+    where: "AC5 controller archive inspection and item-139 producer contract"
+    finding: "The tests require the controller archive to reject live adapters, yet the same artifact exposes production execute/resume entrypoints that item 139 must use for live filesystem, SQLite, service-control, and client operations; no later reviewed composition surface is named. Define exact per-artifact adapter and executable allowlists, including how item 139 obtains manifest-bound live adapters, and test that authorization gates invocation rather than banning required implementation bytes."
+---
