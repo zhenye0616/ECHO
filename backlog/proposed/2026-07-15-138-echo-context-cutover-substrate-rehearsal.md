@@ -21,6 +21,7 @@ files_to_modify:
   - package.json # residual/fenced-full package build and version identity
   - package-lock.json # exact Project_echo residual/rollback closure
   - src/daemon/index.ts # full-daemon authority fence before PID/DB/socket mutation
+  - src/daemon/lifecycle.ts # owns pre-open side effects (data-dir mkdirSync, PID-file write); AC2's fence must execute before these, so fence hooks/reordering land here
   - src/daemon/legacy-residual.ts # NEW product/loop-only composition root
   - src/daemon/context-authority.ts # NEW canonical authority-record validator
   - src/mcp/server.ts # explicit context/full/residual roster profiles
@@ -62,7 +63,6 @@ spec_refs:
   - raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md # cross-repo worktree/review/landing protocol
   - raw/internal/decisions/2026-07-12-g2-terminal-dispositions-and-repository-topology.md # per-repo authority checkpoint
   - src/daemon/index.ts # current mixed composition/startup order
-  - src/daemon/lifecycle.ts # current data/DB/PID resolution
   - src/mcp/tools/coord-emit.ts # wait/search descriptor that the mirror must preserve
   - src/coord/deadlines.ts # full-ledger reconstruction and watermark semantics
   - src/echo-home/adapters/codex-config.ts # current single echo client key
@@ -102,7 +102,7 @@ This internal substrate exists because unified machine context across Codex, Cla
 
 Add a controller with closed phases planned, backed_up, migrated, prepared, active, rolled_back, and recutover_prepared. One canonical transaction record on one filesystem is the commit point; immutable configs and non-authoritative projection records reference its generation/hash. Every filesystem, SQLite, service-control, client-config, clock, secret, process, port, and artifact operation is behind an injected interface with precondition/result journaling. Crash replay either finishes the current idempotent step or restores its protected before image; it never advances two authorities.
 
-The only runnable command in this item is rehearse --root <new-temporary-directory>. A production mutation guard rejects the real HOME, /Users/zhenye/Library, ~/.echo*, real client configs, launchctl GUI domains, ports 38478/38479, non-fixture processes, and any path outside the supplied root before file/socket/spawn mutation. The controller consumes item 137's context-authority schema unchanged and cannot create a live record without item 139's exact artifact/execute authorization.
+The only mutation-capable command in this item is rehearse --root <new-temporary-directory>. Non-mutating build/test/verification commands are also allowed and required: both repositories' standard package scripts (npm run build, npm run typecheck, npm run lint, npm test), the AC5 deterministic candidate build/verify entrypoints under /Users/zhenye/Desktop/echo-context/tools/** and tools/context-cutover/**, and the Tests-section checks (tools/sync-skills.sh --check, Codex skill-render dry run, git diff --check). None of these may write outside their repository's build/output directories or the supplied rehearsal root. A production mutation guard rejects the real HOME, /Users/zhenye/Library, ~/.echo*, real client configs, launchctl GUI domains, ports 38478/38479, non-fixture processes, and any path outside the supplied root before file/socket/spawn mutation. The rehearse command is permanently root-scoped and fake-service-only: this item ships no live-capable mutation mode, flag, or environment override, and the controller archive handed to item 139 contains no bypass of the mutation guard — live mutation becomes possible only through item 139's separately reviewed exact-artifact/execute authorization path. Every rejected guard precondition and every unrecoverable replay stop writes a redacted phase/error record under the supplied rehearsal root and exits non-zero; unattended rehearsal runs can never silently spin or leave evidence only in transient stderr. The controller consumes item 137's context-authority schema unchanged and cannot create a live record without item 139's exact artifact/execute authorization.
 
 ### AC2 — Package an explicit residual and fence every supported old-full start path
 
@@ -130,6 +130,8 @@ Every current 38478/echo caller is classified as context, residual, or both in a
 
 Add deterministic build/verify workflows for an operator-only echo-context cutover-controller archive and a Darwin x64 Project_echo residual/rollback-full package. Manifests bind both canonical source SHA/tree inputs, item 137's exact source/runtime artifacts, locks/SBOMs, bundled/runtime Node decisions, platform/architecture, entrypoints, schemas, inventories/modes, consumer/caller manifests, and authority_active_at_release false. Archives contain no source repository path, credential, state, client config, or mutable cache and reject traversal/symlink/hardlink/native/manifest drift.
 
+Candidate hashes are trusted only after an operational preflight gate on both /Users/zhenye/Desktop/echo-context and Project_echo: clean worktree with no untracked build inputs, no pending rebase/merge or autostash state, an explicitly pinned branch/ref whose head byte-for-byte matches the recorded input SHA, and no divergence from the canonical remote. Each landing additionally requires a post-merge readback whose landed SHA matches the recorded value exactly. Any violation aborts the build or landing, and every executed check with its result is recorded in the AC8 redacted migration record.
+
 Rehearsal builds from reviewed feature heads are test candidates only. Following the successor-repository protocol, the target branch lands first, then the Project_echo branch. Item 139 alone builds/releases the execute artifacts from fresh detached clones of both read-back canonical landed SHAs; no feature-head artifact may reach live paths.
 
 ### AC6 — Rehearse populated backup, migration, coordination import, and preexisting-home quarantine
@@ -152,7 +154,7 @@ While rolled back, inject additional old-full context and coord events. Recutove
 
 Independent reviewers inspect both exact repository heads, run all target and Project_echo suites, and validate the paired migration record. The founder separately approves target-main and Project_echo-main landings; canonical readback fills both landed SHAs. No live artifact is released and no user path/service/credential/config is touched.
 
-raw/internal/migrations/2026-07-15-138-echo-context-cutover-rehearsal.md binds landed SHAs/trees, candidate-build hashes, phase/crash matrix, fixture logical digests/counts, rosters, coord mirror lag/reconstruction, client/caller classification, mutation-guard sentinel before/after hashes, and verdict without content/secrets. Completion says cutover substrate ready; runtime authority remains Project_echo and item 139 is the only live gate.
+raw/internal/migrations/2026-07-15-138-echo-context-cutover-rehearsal.md binds landed SHAs/trees, candidate-build hashes, the AC5 operational preflight/landing gate checks and their results for both repositories, phase/crash matrix, fixture logical digests/counts, rosters, coord mirror lag/reconstruction, client/caller classification, mutation-guard sentinel before/after hashes, and verdict without content/secrets. Completion says cutover substrate ready; runtime authority remains Project_echo and item 139 is the only live gate.
 
 ## Out of Scope (Don't Drift)
 
