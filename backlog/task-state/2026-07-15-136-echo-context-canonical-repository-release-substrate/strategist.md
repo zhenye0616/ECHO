@@ -1,6 +1,6 @@
 ## current_thesis
 
-Turn the reviewed local echo-context extraction into the canonical private source repository and a verifiable source artifact. This gate changes source authority only; Project_echo remains installed runtime and live-state authority.
+Specification converged at R14 and the exact reviewed bytes are promoted to `ready/` with a fresh content seal. Await a fresh independent local builder; this strategist session must not claim/build item 136 or review its future implementation. The gate changes source authority only; Project_echo remains installed runtime and live-state authority.
 
 ## locked_decisions
 
@@ -20,12 +20,13 @@ Turn the reviewed local echo-context extraction into the canonical private sourc
 - AC1 private-repository creation rider: authenticate `GET /user` first; a negative name lookup, including HTTP 404, never proves absence; only the direct single-attempt `POST /user/repos` HTTP 201 response establishes created-by-this-run `id`/`node_id`, and any lost/ambiguous response or later ID mismatch means zero initial push.
 - R12 correction (2026-07-16, reframe verdict: propagation completion, not structural cut): the fresh-clone verifier spawns shell-free only (`shell:false`, executable + argv array) from exact per-mode argv templates with fixed order and once-only counts — the generic `npm run <script>` allowlist form is deleted; `test:operator` stays independently runnable but is rejected by both modes; source mode alone runs one `npm run build:artifact -- --source-sha <validated-full-HEAD> --out <verifier-owned-temp-dir>` then one derived-path `verify:artifact` with the build's carrier hash; release mode never builds and runs one caller-bound `verify:artifact`; three fail-closed `git status --porcelain=v1 --untracked-files=all` empty-stdout probes (pre-install, post-npm-ci, post-checks-after-verifier-temp-cleanup) plus HEAD equality bind the exercised bytes; the verifier may remove only its own recorded temp directory — any other mutation remains evidence and fails. Still exactly one Node verifier behind the thin exec-only wrapper; no second verifier or shell path.
 - R13 correction (2026-07-16, reframe verdict: propagation completion): R12's shorthand is superseded by complete ordered source/release child traces. Immutable expected SHA `S` is reasserted by `git rev-parse HEAD` and paired with the exact empty-status probe at all three boundaries (both counts=3); source build/derived verify counts are 1/1, release build/caller verify counts are 0/1, and every other listed child runs once. Source cleanup is one Node-internal operation over only recorded `T`, followed by exact-path `lstat` requiring `ENOENT`; cleanup failure or a surviving gitignored `T` fails while non-owned paths remain untouched. Persistent clean retarget is tested; adversarial transient retarget-and-restore is explicitly outside the probe guarantee. The sole Node verifier/thin wrapper and all no-retry/no-adoption/no-authority-expansion locks remain unchanged.
+- R14 convergence (2026-07-16): codex and codex-ops both returned `proceed` with zero findings on exact specification SHA `f130ba6fd89bd598a06e7603b700fb0f66c6dd54`; no specification edit followed those responses. Promoted bytes carry `ready_content_sha: 42d2d266660453fc204b6cd3ddaed3b41768c410e1e007ebca9465e60022833e`. Ready is claimable only by a fresh independent builder; no claim, build, release, installation, or authority mutation occurred in this strategist session.
 - Successor work uses an isolated target branch, independent review, founder target-main merge/readback, then a fresh clone of the landed SHA for build/release.
 - Item 137 consumes the exact released tuple and is solely responsible for an installable runtime artifact.
 
 ## open_questions
 
-- R14 must verify the R13 propagation-completion patch at its exact SHA: three immutable-`S` HEAD/status boundary pairs, complete ordered per-mode traces/counts, source exact-owned-path cleanup plus `ENOENT`, persistent-clean-retarget and ignored-temp cleanup-failure fixtures, and non-owned-sentinel preservation.
+- None blocking specification convergence. The next action is a fresh independent builder claim of the exact sealed `ready/` item followed by item-136-only implementation.
 - Reviewers must verify that every extraction-era exact-HEAD/no-remote invariant is either preserved at the frozen baseline or replaced by an equally strict successor rule.
 - The builder must stop if the target remote exists unexpectedly or the hosting tier cannot enforce the locked main controls.
 
@@ -36,5 +37,5 @@ Turn the reviewed local echo-context extraction into the canonical private sourc
 
 ## canonical_anchors
 
-- spec: backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
+- spec: backlog/ready/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/
