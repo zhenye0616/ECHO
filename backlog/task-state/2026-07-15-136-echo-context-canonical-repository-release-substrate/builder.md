@@ -4,16 +4,23 @@ role: builder
 binding: codex
 claimed_by: codex-builder-136-20260716
 claimed_at: 2026-07-16T08:33:45Z
-last_updated: 2026-07-16T08:33:45Z
+last_updated: 2026-07-16T09:20:16Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
 target_worktree: /Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate
+handoff_branch: agent/echo-context-canonical-repository-release-substrate
+handoff_head_sha: b5c94304f78043b1a0508899a2188065c29157da
+handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 ---
 
 ## current_thesis
 
-Claimed item 136 as the fresh independent Codex builder. Preserve the accepted item-135 extraction as an immutable baseline, then implement only the reviewed standalone repository, self-contained CI, deterministic non-installable source artifact, and first-release controls on isolated feature branches.
+Implemented the reviewed standalone repository, self-contained CI, deterministic non-installable source artifact, and fail-closed first-release controls as the fresh independent Codex builder. Exact echo-context review candidate: `4241ca989814c1b99a300d5cf861e7e040f4983b` / tree `61c670ce9dce494b685ff08448edc85e8f9addf2` / PR `https://github.com/zhenye0616/echo-context/pull/1`.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at b5c94304f78043b1a0508899a2188065c29157da.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -27,8 +34,8 @@ Claimed item 136 as the fresh independent Codex builder. Preserve the accepted i
 
 ## open_questions
 
-- None blocking at claim. The persistent coordinator owns the authority-operated empty-repository bootstrap and all target-main, release, hosting-control, or exact-operation checkpoints.
-- Escalate if the reviewed contract requires any unlisted path, dependency, live-state access, target-main write, or ambiguity that cannot be resolved from the cited records.
+- Independent implementation review is required before either feature branch may merge.
+- The current private-repository/account tier cannot enforce the exact protected-main plus required-environment-reviewer contract, and the sole current repository identity cannot supply an independent required PR approval. The persistent coordinator must disposition and repair this external hosting gate before target-main or release execution.
 
 ## dont_touch
 
@@ -41,3 +48,6 @@ Claimed item 136 as the fresh independent Codex builder. Preserve the accepted i
 
 - spec: backlog/claimed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/
+- target review: https://github.com/zhenye0616/echo-context/pull/1 at 4241ca989814c1b99a300d5cf861e7e040f4983b
+- evidence: raw/internal/migrations/2026-07-15-136-echo-context-repository-bootstrap.md
+- run log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
