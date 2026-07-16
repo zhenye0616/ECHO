@@ -19,8 +19,15 @@ Verify item 136 as the immutable predecessor, implement and seal an item-137 suc
 - Context preserves opaque coord:* retrieval compatibility but owns no coordination producers, tools, task-state readers, reviewer defaults, or protocol semantics.
 - The real shadow uses synthetic fixture state only, changes no AI-client config, and remains installed healthy after proof.
 - Target changes land through independent review and founder merge; source/runtime artifacts build only from the read-back canonical main SHA.
-- Exact runtime tgz/manifest/checksum/SBOM bytes are retained in a private prerelease and owned 0600 installer cache for item 139.
+- Exact runtime tgz/manifest/checksum/SBOM/bootstrap bytes are retained in a private prerelease and owned 0600 installer cache for item 139.
 - Final authority requires a matching active record that item 137 cannot create; shadow commands refuse final activation.
+- Founder decision 2026-07-15 ("yes keep and let them resume"): keep the architecture, accept all r3 findings as required spec patches, review-only, no build.
+- Builder authority ends at candidate-only handoff; phase two is founder-owned tools/release-runtime.mjs stage|resume over a durable FSM keyed by landed SHA+version, with a separate release approval bound to SHA/version/artifact-SHA-256/bootstrap-hash/asset-set-manifest-hash (merge approval never equals release approval); resume verifies/reuses staged and partially uploaded bytes and never rebuilds, retags, or replaces.
+- One published POSIX-sh bootstrap asset outside the tgz (size/hash/mode/version bound in manifest+approval) is the only repo-free installer entrypoint; it verifies itself, architecture, checksums, and full member inventory before extraction; it is not item 138's residual deployer.
+- Writer exclusion is flock(2) LOCK_EX|LOCK_NB on 0600 <home>/writer.lock held process-lifetime from before SQLite open until after close; owner metadata is diagnostic-only and atomically durable; stale metadata replaced only after lock acquisition; bounded 0600 last-refusal record with atomic update/clear; doctor uses the six-state truth table; distinct from item 138 cutover coordination.
+- Plist pins RunAtLoad true, KeepAlive true, ThrottleInterval 10s; logging is an always-on bundled supervisor sink (5 MiB x 4 chunks per stream, 64 MiB aggregate, 0700 dir, 0600 non-link files) that launchd stdout/stderr cannot bypass.
+- src/install/layout.ts is the single closed resolver (flag > config > shadow default, no ECHO/HOME fallback) for all roots/label/port/GUI-domain; candidate mode uses one disposable root, run-unique com.echo.context.candidate.<run-id> label, collision-reserved port never 39478/38478/38479, unconditional finally cleanup, and before/after sentinels on canonical labels/ports/real roots.
+- Architecture truth uses named bounded probes (sysctlbyname hw.optional.arm64 / sysctl.proc_translated, 5s arch -x86_64 probe, Mach-O header, 10s bundled-node probe) with typed exit mappings and separate doctor fields; pre-extraction failures leave zero mutation, bundled-node failure precedes plist/service/config/secret mutation.
 
 ## open_questions
 
