@@ -60,17 +60,21 @@ claimed_by: "codex-136-cycle2-builder-7f6a2d31"
 claimed_at: "2026-07-16T15:40:53Z"
 branch: "agent/echo-context-canonical-repository-release-substrate"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate"
-head_sha: "59db3c608ecbb3af0e7723e960bd80748d9e1326"
+head_sha: "5b99d896e9103e0047c31d19fc574d7eea92abc5"
 pr_url: ""
 agent_notes: |
-  Cycle-two R21 source-only repair completed by codex-136-cycle2-builder-7f6a2d31.
-  Echo-context feature head 358fb4da774287b6c55d287a46d53b5aff033e87 deletes
-  every hosted workflow/release/controller surface, adds the injected frozen bootstrap
-  gate plus exact source-only fresh-clone state machine, and preserves AC2/AC5.
-  Inventory, authority, typecheck, lint, 1,041 CI tests, pinned full-ref secret scan,
-  sibling-free fresh-clone acceptance, and operator replay all pass. Project feature
-  head 59db3c608ecbb3af0e7723e960bd80748d9e1326 removes the premature AC6 migration
-  record. No main push, approval, release, seal, install, or authority transfer occurred.
+  Cycle-two independent-review repairs completed by the same builder actor,
+  codex-136-cycle2-builder-7f6a2d31, without rewriting either branch history.
+  The first review rejected echo-context head 358fb4da774287b6c55d287a46d53b5aff033e87;
+  repaired target head 1a91750e5b9ce9db49e9c893f9974b318f12f38a closes the
+  bounded lifecycle, temporary-root, Promise-effect, exhaustive-ref, and bootstrap
+  porcelain findings. Typecheck, lint, inventory (340 packages/23 sources), authority,
+  60 focused tests, 1,066 CI tests with 17 intentional skips, pinned exhaustive-ref
+  secret scan, operator replay, a real isolated clone, and a fresh canonical HTTPS
+  clone all pass at that exact head. Project feature head
+  5b99d896e9103e0047c31d19fc574d7eea92abc5 records the repair evidence. The item
+  remains pending exact-head independent re-review. No implementation merge to either
+  main, approval, release, seal, install, live-state access, or authority transfer occurred.
 review_notes: |
   Implementation cycle 1 rejected — redo before merge.
   Reviewed Project_echo head: 25b833332bb22ec79700fcdf31b9c9f20eea79f5.
@@ -79,11 +83,17 @@ review_notes: |
   review-artifact blob 1cd16c1f31dab5c40ad76b70716846a09c98d845.
   The 2026-07-16 founder decision then deferred all hosted gates/release to item 140;
   cycle two implements this slimmed spec against the frozen cycle-one branch.
+  The first independent cycle-two implementation review rejected exact target head
+  358fb4da774287b6c55d287a46d53b5aff033e87. The same builder preserved both
+  histories and repaired only the bounded findings. Independent re-review must bind
+  Project_echo head 5b99d896e9103e0047c31d19fc574d7eea92abc5 and echo-context
+  head 1a91750e5b9ce9db49e9c893f9974b318f12f38a; no acceptance is asserted here,
+  and the reviewer-owned implementation-review record remains unwritten.
 target_repo: "/Users/zhenye/Desktop/echo-context"
 target_remote: "https://github.com/zhenye0616/echo-context.git"
 target_branch: "agent/echo-context-canonical-repository-release-substrate"
 target_worktree: "/Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate"
-target_head_sha: "358fb4da774287b6c55d287a46d53b5aff033e87"
+target_head_sha: "1a91750e5b9ce9db49e9c893f9974b318f12f38a"
 target_pr_url: "https://github.com/zhenye0616/echo-context/pull/1"
 target_landed_sha: ""
 project_landed_sha: ""

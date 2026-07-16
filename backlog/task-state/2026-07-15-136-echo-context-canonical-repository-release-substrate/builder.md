@@ -4,22 +4,22 @@ role: builder
 binding: codex
 claimed_by: codex-136-cycle2-builder-7f6a2d31
 claimed_at: 2026-07-16T15:40:53Z
-last_updated: 2026-07-16T16:08:28Z
+last_updated: 2026-07-16T17:01:17Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
 target_worktree: /Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate
 handoff_branch: agent/echo-context-canonical-repository-release-substrate
-handoff_head_sha: 59db3c608ecbb3af0e7723e960bd80748d9e1326
+handoff_head_sha: 5b99d896e9103e0047c31d19fc574d7eea92abc5
 handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 ---
 
 ## current_thesis
 
-Cycle two repairs the frozen cycle-one Project_echo head `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context head `145868a67a85dbb651faed457ee4001370c0fad0` without rebasing or rewriting either history. The reviewed R21 cut keeps the local source substrate and deterministic artifact, deletes all hosted/release/controller machinery, and hands exact feature heads to an independent reviewer. This builder never lands target main, authors an approval, seals at canonical `M`, releases, installs, or changes runtime/state authority.
+The first independent cycle-two implementation review rejected echo-context head `358fb4da774287b6c55d287a46d53b5aff033e87`. The same builder actor preserved both branch histories, repaired only the bounded findings, and handed off Project_echo head `5b99d896e9103e0047c31d19fc574d7eea92abc5` with repaired echo-context head `1a91750e5b9ce9db49e9c893f9974b318f12f38a` for exact-head re-review. This builder never lands target main, authors an approval, seals at canonical `M`, releases, installs, or changes runtime/state authority.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at 59db3c608ecbb3af0e7723e960bd80748d9e1326.
+- Lifecycle: PENDING REVIEW — repaired exact heads are ready for independent re-review at Project_echo `5b99d896e9103e0047c31d19fc574d7eea92abc5` and echo-context `1a91750e5b9ce9db49e9c893f9974b318f12f38a`.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -30,6 +30,7 @@ Cycle two repairs the frozen cycle-one Project_echo head `25b833332bb22ec79700fc
 - AC4: delete every workflow and hosted/release surface; a different fresh reviewer must rerun AC3 at exact target head before the coordinator constructs and authorizes literal merge object `M`.
 - AC5: build the deterministic `0.1.0-dev.136.1` source archive/checksum/manifest triple from committed Git objects with `installable:false`, `runtime_authority:false`, and `state_authority:false`.
 - AC6: dual-build sealing and the final bootstrap migration record occur only after coordinator landing at canonical `M`; the builder must remove the premature cycle-one Project_echo bootstrap record and stop at pending review.
+- Repaired-head evidence: typecheck, lint, authority, inventory (340 packages/23 sources), 60 focused tests, 1,066 CI tests with 17 intentional skips, pinned exhaustive-ref Gitleaks, operator replay, isolated-clone acceptance, and fresh canonical-HTTPS-clone acceptance all passed at exact target head `1a91750e5b9ce9db49e9c893f9974b318f12f38a`.
 - No target main push, Project main implementation merge, tag, hosted release, artifact publication, install, live mutation, retry/adoption controller, attempt ledger, credential helper, or authority transfer belongs to this builder.
 
 ## open_questions

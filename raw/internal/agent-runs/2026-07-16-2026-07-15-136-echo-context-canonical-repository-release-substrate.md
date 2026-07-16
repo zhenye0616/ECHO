@@ -155,3 +155,51 @@ coordinator-owned landing/seal sequence remain mandatory next steps.
 ### Drift Events
 
 None. No ECHO MCP calls were made, so no dogfooding journal entry is owed.
+
+---
+
+## Cycle-two independent-review repair continuation
+
+- Same builder actor: `codex-136-cycle2-builder-7f6a2d31`
+- Repair run ID: `cycle2-7f6a2d31-20260716-repair1`
+- Rejected target head: `358fb4da774287b6c55d287a46d53b5aff033e87`
+- Repair implementation commit: `3cb0d54` (`fix: close fresh-clone review gaps`)
+- Repaired target feature head: `1a91750e5b9ce9db49e9c893f9974b318f12f38a`
+- Repaired target tree: `ed851f9deb2ba3135af5f11955d878f5d1c9c802`
+- Repaired Project_echo feature head: `5b99d896e9103e0047c31d19fc574d7eea92abc5`
+- Finished repaired-head verification: `2026-07-16T16:59:16Z`
+
+The first independent cycle-two review reproduced a process-group lifecycle
+hole and rejected the candidate. This continuation preserved both branch
+histories and repaired only the bounded findings: the child adapter now returns
+one synchronous cancellable handle whose completion and idempotent
+`cancelAndSettle` retain PID/PGID/direct-exit/stdout/stderr state until all are
+terminal; mutable temporary-root creation uses synchronous production FS calls
+and records `T` immediately after `mkdtemp`; every Promise-bound dependency is
+explicitly read-only; the authenticated prefetch writes a strict advertised-ref
+manifest under the Git directory and the offline scanner compares the exact
+transformed ref-name/OID set; and bootstrap push parsing accepts only the full
+`To` / created-main / `Done` grammar. Cancellation, post-`T` survivor,
+TERM-resistant stream, cleanup timeout, stage-specific partial-`T`,
+never-settling read/cleanup/final-HEAD, aggregate deadline, successful scrubbed
+shell-to-Node, omitted branch/tag, and malformed/trailing porcelain fixtures
+were added. A read-only pre-freeze oracle reran the exact late-mutation
+reproducer and the complete focused set before the commits were frozen.
+
+### Repaired-head verification
+
+- `npm run typecheck` and `npm run lint` — passed.
+- Repair-focused Vitest set — passed; 60/60.
+- `npm run test:ci` — passed; 78 files, 1,066 passed, 17 intentionally skipped, zero failed.
+- `npm run verify:inventory` — passed; 340 packages and 23 executable/config sources.
+- `npm run verify:authority` — passed at exact repaired head.
+- Gitleaks 8.30.1 installed and digest-checked from the committed contract; exhaustive authenticated prefetch bound four canonical advertised refs and the top-level full-history scan passed with zero findings.
+- `npm run test:operator` with explicit Project_echo Git dir and source SHA `2971310441b69735cbe759293abd8c4d044bf347` — passed 2/2.
+- A real `--no-local` isolated clone at the exact repaired head passed the complete scrubbed wrapper trace.
+- After the target feature push, a fresh canonical HTTPS clone of `zhenye0616/echo-context` read back exact head `1a91750e5b9ce9db49e9c893f9974b318f12f38a`, bound all four advertised refs, and passed the complete scrubbed wrapper trace including one owned-root cleanup and final clean status/HEAD readback.
+- Remote target feature readback equals `1a91750e5b9ce9db49e9c893f9974b318f12f38a`.
+
+The item remains pending independent review. No target-main or Project-main
+implementation merge/push, approval, release, install, live-state access, or
+authority transfer occurred. Zero ECHO MCP calls were made, so no dogfooding
+journal entry is owed.
