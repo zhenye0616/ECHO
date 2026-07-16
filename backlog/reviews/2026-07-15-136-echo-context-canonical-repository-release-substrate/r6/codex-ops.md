@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-15-136-echo-context-canonical-repository-release-substrate"
+round: 6
+reviewer: "codex-ops"
+artifact_sha: "3d74d33bdf0a3bd81c409478b83b3702d4704c67"
+completed_at: '2026-07-16T03:55:13Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC4 — Add least-privilege CI and enforceable repository controls"
+    finding: "The CI and secret-scan workflows lack exact event contracts. Require both checks on every pull request targeting main and on pushes to main, without path filters or conditions that can omit required contexts; pin their check-run names and test the triggers so branch protection cannot remain pending or accept checks from the wrong SHA."
+  - severity: "high"
+    where: "AC1/AC4 — full-history secret scanning"
+    finding: "The hosted scan is not required to have complete Git history and refs; gitleaks with --all can silently pass against a shallow checkout. Require fetch-depth zero, complete tag/ref availability, a fail-closed shallow-repository preflight, and a governance fixture proving incomplete history fails."
+  - severity: "medium"
+    where: "AC1/AC3/AC4 — secret-scan executable and exit semantics"
+    finding: "One bootstrap binary digest cannot identify platform-specific gitleaks binaries while shared acceptance runs on macOS and Ubuntu. Define an exact supported OS/architecture digest map or one compatible pinned scan platform, fail on unsupported or mismatched binaries, and add fixtures proving leak and scanner-infrastructure failures remain nonzero through every redaction pipeline."
+  - severity: "high"
+    where: "AC6 — protected source-release environment"
+    finding: "Naming the environment does not prove its approval controls are active. Require configuration and API readback of the reviewer set exactly containing zhenye0616, the intended prevent-self-review setting compatible with founder dispatch, disabled administrative bypass, and main-only deployment; fail closed when the hosting tier cannot enforce any field."
+  - severity: "high"
+    where: "AC6 — workflow-dispatch inputs and approval tuple"
+    finding: "The dispatch version is never explicitly compared with the version derived from package.json at the approved source SHA. Before upload or approval, validate all inputs and require exact version equality across the dispatch, package.json, manifest, asset names, tuple, tag, and release name; add malformed- and wrong-version fixtures proving zero publication writes."
+  - severity: "medium"
+    where: "AC6 — run_attempt rerun rejection"
+    finding: "The requirement to fail a rerun before every job step is not implementable as written: false job conditions yield skipped or false-green jobs, while a failure requires execution. Define the observable rejected state, gate every build and publication job independently on run_attempt 1, and test full-workflow and failed-job reruns for zero checkout, upload, approval, or repository mutation."
+  - severity: "medium"
+    where: "AC6 — release API identity and flag readback"
+    finding: "The release request/readback contract is incomplete for unattended execution. Require draft target_commitish to equal the approved source SHA, send the API's string-valued make_latest false option, and name an authoritative observable not-latest postcondition because ordinary release readbacks do not persist that request field; add wrong-target and contradictory-latest fixtures."
+---
