@@ -6,8 +6,8 @@ codex_response: codex.md
 cursor_response: null
 codex-ops_response: null
 claude_response: claude.md
-patch_commit_sha: null
-next_round: null
+patch_commit_sha: 28f70ee057ddbeb588c5f0ca9e4bd77d3506bb03
+next_round: 5
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 ---
@@ -34,9 +34,9 @@ Removal proof matrix:
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | HIGH | codex | AC6 — cross-version partial-state preflight | accepted — structural cut | pending `spec-r4-patches`: scope item 136 to its first release from an authenticated, fully paginated empty release namespace; any tag, draft/published release, asset, listing failure, or pagination uncertainty stops for founder disposition. Remove Project_echo migration-record attribution and require item 137 to own a separately reviewed later-release generalization before publishing its successor release. |
-| 2 | HIGH | codex | AC6 — publication staging and run-owned identifier logging | accepted — patched within the cut | pending `spec-r4-patches`: persist a canonical same-run ownership marker in the draft body and annotated-tag message before the corresponding write; bind draft/assets/tag to the approved tuple; after any lost/ambiguous response, list/read back and continue only on exactly one marker plus exact name, source, bytes, and digest match. Zero/multiple/mismatch stops before repeating creation. The run log remains evidence only and no fourth asset is added. |
-| 3 | MEDIUM | codex | AC6 — non-cancelling concurrency | accepted — corrected to platform semantics | pending `spec-r4-patches`: `cancel-in-progress:false` protects the running run, but a newer dispatch may replace a not-yet-started pending run. Accept replacement only when platform/API history proves no job began and no external write occurred; cancellation after any job start follows the partial-state stop path. |
+| 1 | HIGH | codex | AC6 — cross-version partial-state preflight | accepted — structural cut | `28f70ee0`: scope item 136 to its first release from an authenticated, fully paginated empty release namespace; any tag, draft/published release, asset, listing failure, or pagination uncertainty stops for founder disposition. Remove Project_echo migration-record attribution and require item 137 to own a separately reviewed later-release generalization before publishing its successor release. |
+| 2 | HIGH | codex | AC6 — publication staging and run-owned identifier logging | accepted — patched within the cut | `28f70ee0`: persist a canonical same-run ownership marker in the draft body and annotated-tag message before the corresponding write; bind draft/assets/tag to the approved tuple; after any lost/ambiguous response, list/read back and continue only on exactly one marker plus exact name, source, bytes, and digest match. Zero/multiple/mismatch stops before repeating creation. The run log remains evidence only and no fourth asset is added. |
+| 3 | MEDIUM | codex | AC6 — non-cancelling concurrency | accepted — corrected to platform semantics | `28f70ee0`: `cancel-in-progress:false` protects the running run, but a newer dispatch may replace a not-yet-started pending run. Accept replacement only when platform/API history proves no job began and no external write occurred; cancellation after any job start follows the partial-state stop path. |
 
 ## Convergence call
 
