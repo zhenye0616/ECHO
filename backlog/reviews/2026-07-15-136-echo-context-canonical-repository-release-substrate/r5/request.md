@@ -1,7 +1,7 @@
 ---
 item_id: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 round: 5
-spec_commit_sha: 28f70ee057ddbeb588c5f0ca9e4bd77d3506bb03
+spec_commit_sha: 28f70ee0595ab062cd6bef628c85a0cadfabf119
 artifact_path: backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 class: structural-reform
 requested_at: '2026-07-16T03:15:45Z'
@@ -19,7 +19,7 @@ focus_hints: 'Verify the r4 structural cut: first-release empty namespace only w
 
 # What to review
 
-Read `backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md` at commit `28f70ee057ddbeb588c5f0ca9e4bd77d3506bb03`. Apply the canonical reviewer
+Read `backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md` at commit `28f70ee0595ab062cd6bef628c85a0cadfabf119`. Apply the canonical reviewer
 loop (see `.claude/commands/review-queue-<reviewer>.md`). Embed any
 prior-round context inline below; do not rely on out-of-band atom
 lookups for the review itself.
