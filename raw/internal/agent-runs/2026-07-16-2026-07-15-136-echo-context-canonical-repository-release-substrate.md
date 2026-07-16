@@ -234,3 +234,145 @@ implementation merge/push, release, install, live-state access, or authority
 transfer occurred. No drift event occurred.
 
 Zero ECHO MCP calls were made, so no dogfooding journal entry is owed.
+
+---
+
+## Run 3 — formal-review AC3 repair completion
+
+### Identities and immutable lineage
+
+- Builder actor: `codex-136-cycle3-builder-mendel-222cc09b`.
+- Builder run: `cycle3-mendel-222cc09b-20260716T184207Z`.
+- Formal reviewer actor: `codex-136-final-reviewer-b9e01c42`.
+- Formal reviewer run: `codex-136-final-review-20260716T182509Z`.
+- Exact spec/seal: `f80003a7fbd08755dbff669951ed07bf43b390d0` /
+  `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`.
+- Rejected target head/tree: `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7` /
+  `bc8b700fe5db3435d54a930a71d0c5455b85541b`.
+- Final target head/tree: `ad370ae0a666f366e1ff93c9ec5b920763e9cbb8` /
+  `3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec`.
+- Repair commits: `5455a40` (`fix: enforce monotonic verifier deadlines`) and
+  `ad370ae` (`chore: refresh verifier runtime inventory`).
+
+The formal reviewer found zero HIGH and exactly three MEDIUM AC3 defects at the
+rejected head: deadline rescue timestamped direct exit/error instead of the full
+terminal predicate and any initiated ceremony; production deadline math used
+`Date.now()`; and verifier-local synchronous filesystem calls were grouped
+rather than individually checked immediately before and after control returned.
+The fresh builder changed only those findings, retained every earlier target
+commit, and made a normal two-commit fast-forward. No commit was rebased,
+amended, dropped, or force-pushed.
+
+The three pinned reviewer reproducers remained byte-identical:
+
+- late terminal: `636dfb61badab446d49e7cdc6d89ad89b3abfa21c605aef6aa6388ca303120e0`;
+- backward clock: `799dc1796a359cc7b8ffb6a478ddac8d9bd4ad38d501d0f7e0caf339ea4f2120`;
+- filesystem sequencing: `67a4e3ea325456c802272352ad972fc5ebd1d13282fdf53386ac8cda8a9c7b85`.
+
+### Bounded implementation
+
+The verifier now uses one `performance.now()`-based production deadline clock
+and rejects non-finite or backward injected readings without allowing a clock
+regression to extend a budget. It assigns `outcomeAt` only after the complete
+terminal predicate is true and any already-started termination ceremony has
+finished. Every verifier-local synchronous filesystem operation goes through
+one immediate monotonic pre/post checker; a late return blocks all later setup.
+`mkdtempSync` is the sole special seam: its returned `T` is recorded immediately
+before the post-call deadline check so the existing single cleanup transition
+can remove it exactly once.
+
+The target delta from the rejected head is exactly three paths:
+
+```text
+provenance/runtime-inventory.v2.json            |   4 +-
+tests/governance/fresh-clone-acceptance.test.ts | 243 ++++++++++++++++++++++--
+tools/fresh-clone-verifier.mjs                  | 156 +++++++++++----
+3 files changed, 353 insertions(+), 50 deletions(-)
+```
+
+No wrapper argv, 17-step plan, deadline constant, hosted surface, `src/**`
+behavior, artifact builder/verifier, item-135 v1 provenance, or authority flag
+changed.
+
+### Exact-head verification
+
+All evidence below binds target head `ad370ae0a666f366e1ff93c9ec5b920763e9cbb8`
+and tree `3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec`:
+
+```text
+AC3 focus = 1 file passed; 49 passed / 49
+typecheck = passed
+lint      = passed
+inventory = runtime-inventory.v2 OK: 340 packages, 23 sources
+authority = repository-authority OK at ad370ae0a666f366e1ff93c9ec5b920763e9cbb8
+CI        = 78 files passed; 1,086 passed; 17 skipped; 0 failed
+operator  = 1 file passed; 2 passed / 2 at Project source 2971310441b69735cbe759293abd8c4d044bf347
+secrets   = 4 exhaustive advertised refs; full reachable history; passed
+no-local  = --no-local --no-hardlinks acceptance OK; exact H/tree; clean; no owned T
+HTTPS     = literal canonical origin; 4 refs; acceptance OK; exact H/tree; clean; no owned T
+oracle    = PASS at exact H/tree; zero HIGH and zero MEDIUM
+fsck      = passed
+remote    = feature ref and PR 1 head equal H; target main remains 0cf7b006eba665c0bf55e82ff04da70f19f01ebb
+```
+
+The exact late-terminal reproducer rejected the one-millisecond-late case with
+`clock=30001`, `outcomeAt=30001`, and one `SIGTERM`; the committed parameterized
+regression also accepts the exact 30000 boundary. The backward-clock reproducer
+rejected with `fresh-clone-verifier: monotonic clock regressed` after
+1,072,000 milliseconds of monotonic elapsed time. The filesystem reproducer
+rejected immediately after late `mkdirSync`, recorded no later event, and
+reported `laterMutationAfterLateMkdir=false`.
+
+The builder acceptance toolchain was:
+
+```text
+NODE = /usr/local/Cellar/node@22/22.22.1_1/bin/node (v22.22.1)
+NPM  = /usr/local/Cellar/node@22/22.22.1_1/lib/node_modules/npm/bin/npm-cli.js (10.9.4)
+GIT  = /usr/local/Cellar/git/2.37.3/bin/git (2.37.3)
+```
+
+The first top-level scan stopped before scanning because the expected scanner
+binary was absent. The coordinator provisioned the official Gitleaks v8.30.1
+Darwin x64 executable in a mode-0700 temporary root. The builder independently
+proved canonical regular nonsymlink mode-0700 identity, version `8.30.1`, and
+SHA-256 `cee01fea7173f1b779dff188e1c26ecbcb4027d394acc573b23aaf0be260e291`,
+which exactly matches the committed contract, then reran the unchanged scan
+successfully. No target byte changed during provisioning or replay.
+
+The isolated builder replay used a new mode-0700 root and HOME, cloned with
+`--no-local --no-hardlinks --no-checkout`, detached exact `H`, prefetched the
+four canonical advertised refs, and passed the committed source-mode wrapper.
+Readback proved exact HEAD/tree, empty porcelain, an empty acceptance-temp
+parent with no surviving `T`, canonical origin, non-shallow history, no
+alternate/promisor/replace state, and clean `git fsck --full`.
+
+After that gate, the builder normally fast-forwarded only
+`refs/heads/agent/echo-context-canonical-repository-release-substrate` from
+`02af4e4` to `ad370ae`. Exact remote readback proved both the feature ref and
+`refs/pull/1/head` equal `H`, while `refs/heads/main` remained the frozen
+baseline. A second new clone of literal
+`https://github.com/zhenye0616/echo-context.git` repeated the complete wrapper
+and every cleanup/clean/exact-HEAD postcondition at the same `H`.
+
+### Acceptance criteria and authority boundary
+
+- [x] AC1 — immutable repository/bootstrap evidence and scanner contract
+  preserved; neither bootstrap operation repeated.
+- [x] AC2 — item-135 bytes preserved; successor inventory and authority checks
+  pass at the exact final target head.
+- [x] AC3 — all three formal findings repaired; sole source trace, terminal
+  proof, monotonic deadlines, per-call filesystem checks, and cleanup pass.
+- [x] AC4 — feature candidate only is pushed and read back for a different
+  independent reviewer; target main is unchanged.
+- [x] AC5 — deterministic non-installable source artifact build/verification
+  passes inside both isolated acceptance traces.
+- [ ] AC6 — intentionally coordinator-owned after independent review and
+  canonical target-main landing; no merge object, tuple seal, or final migration
+  record was authored by this builder.
+
+The reviewer-owned implementation-review record remains absent. No target-main
+or Project-main implementation merge, tag, release, hosted artifact, install,
+live-state access, client mutation, or source/runtime/state authority transfer
+occurred. There are no open builder questions and no drift event.
+
+Zero ECHO MCP calls were made, so no dogfooding journal entry is owed.
