@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-15-137-echo-context-installable-shadow-runtime"
+round: 4
+reviewer: "codex-ops"
+artifact_sha: "65b9a0af5a4ab21a34ad71d6258c8e231427a180"
+completed_at: '2026-07-16T05:34:33Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC4 release-FSM paragraph; tests/install/release-fsm.test.ts"
+    finding: "Atomic checkpoints do not serialize concurrent stage or resume processes or close the crash window between a side effect and its checkpoint. Require a stable nonblocking kernel lock per landed-SHA/version held across journal read, build, upload, install, recording, and their checkpoints; write-ahead intent states; file and parent-directory fsync; monotonic compare-and-swap transitions; and explicit verify-and-adopt or hard-refuse recovery after every crash window. Add concurrent stage/stage, stage/resume, and resume/resume barrier tests plus termination at every boundary, proving exactly one build and mutator."
+  - severity: "high"
+    where: "AC4 paragraph beginning Ownership is two-phase and explicit"
+    finding: "The separate founder approval has no defined ingress: stage pauses, but the only interface is stage or resume, so direct journal mutation could impersonate approval. Require an explicit post-smoke approval input, such as resume with an independently created owner-checked 0600 approval file, binding the exact tuple, operator, timestamp, and nonce. Journal edits and merge metadata must never authorize progression; test absent, malformed, stale, replayed, pre-smoke, and wrong-tuple approvals."
+  - severity: "high"
+    where: "AC4 asset-set contract; AC5 repo-free bootstrap invocation; tests/install/bootstrap.test.ts"
+    finding: "The exact invocation executes the downloaded bootstrap before any trusted component verifies it; self-checking against a co-downloaded manifest is circular and permits consistent replacement of both. Require the founder-owned runner and repo-free ceremony to verify the bootstrap and manifest against an independently trusted approved hash before invoking /bin/sh, using protected staged bytes or an already-open descriptor to prevent verify/use swaps. Define non-recursive asset-set hash canonicalization, pin absolute system tools or a safe PATH, use umask 077 and an environment allowlist, and test whole-set substitution, swap races, hostile PATH, NODE_OPTIONS, DYLD variables, and missing utilities."
+  - severity: "high"
+    where: "AC1 shutdown and writer lock; AC5 launchd supervisor; AC6 writer-lock truth table; AC7 lifecycle tests"
+    finding: "The plist launches a long-lived supervisor while its runtime child owns SQLite, the listener, and writer.lock, yet doctor requires the launchd-reported supervisor PID to hold that lock. The same model lacks parent-death handling and exact stop semantics, so bootout or supervisor SIGKILL can orphan the runtime while KeepAlive starts a refusal loop. Specify separate supervisor and runtime-child identities, kernel-backed lock-holder attribution, close-on-exec lock descriptors, one-child and sole-restart authority, signal forwarding, bounded TERM-to-KILL escalation and reaping, and exact stop/disable/start/restart launchctl sequences. Real-launchd tests must kill or hang either process and prove child, listener, and lock convergence before restart."
+  - severity: "high"
+    where: "AC5 install idempotence and extraction; AC7 unconditional cleanup; tests/integration/shadow-install.test.ts"
+    finding: "Install has no crash transaction before extraction, secret/config/plist/shim creation, ownership-manifest commit, or job start. A kill before the ownership manifest exists can leave untracked bytes or a loaded job that rerun treats as foreign and manifest-only cleanup cannot remove. Require a durable 0600 install intent before the first mutation, a 0700 owned transaction directory, checkpointed resume or rollback, atomic final rename, no launchd start before commit, and ownership-fenced cleanup or verified adoption. Add kill-at-every-boundary tests proving safe retry, uninstall, and candidate cleanup with no real-path mutation."
+  - severity: "medium"
+    where: "AC5 bounded supervisor logs; AC6 doctor; tests/install/launchd.test.ts"
+    finding: "launchd owns the StandardOutPath and StandardErrorPath descriptors, but truncating their paths only on supervisor spawn does not bound output during a long-lived supervisor or sink failure and can erase the only crash evidence. Require continuously enforced descriptor-safe caps or guaranteed silent inherited outputs, plus a separate bounded durable last-exit record surfaced by doctor. Test supervisor-output, sink-failure, and pre-sink crash loops under real launchd without CLI reinvocation."
+  - severity: "medium"
+    where: "AC6 status and doctor; tests/cli/doctor.test.ts"
+    finding: "status --json and doctor --json define fields but not process exit semantics or stdout purity, leaving unattended callers unable to distinguish unhealthy, not-installed, timeout, usage, and internal-error outcomes reliably. Define stable exit codes, exactly one schema-valid JSON document on stdout for every operational outcome, credential-free diagnostics on stderr, and bounded probe behavior; assert exact bytes and exit status in subprocess tests."
+---
