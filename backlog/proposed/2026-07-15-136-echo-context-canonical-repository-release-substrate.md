@@ -9,7 +9,6 @@ blocked_by:
   - 2026-07-13-135-local-echo-context-source-extraction
 task_state_ref: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: 3a684ae49153c79c60a457c387249ae66f0d6e36499966ea8f80a6591d921793
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/.github/workflows/** # DELETE cycle-one hosted workflows; hosted CI is deferred to item 140 and no workflow file may remain
   - /Users/zhenye/Desktop/echo-context/package.json # prerelease identity and self-contained operator scripts
@@ -56,25 +55,13 @@ spec_refs:
   - /Users/zhenye/Desktop/echo-context/tests/migration/object-closure.test.ts # one-branch/no-remote extraction invariant to historicize
   - /Users/zhenye/Desktop/echo-context/tests/migration/parity-matrix.test.ts # source-dependent proof the CI suite cannot assume
   - /Users/zhenye/Desktop/echo-context/tests/migration/context-tool-evidence.test.ts # source replay seam and sealed eight-tool evidence
-claimed_by: "codex-136-cycle2-builder-7f6a2d31"
-claimed_at: "2026-07-16T15:40:53Z"
-branch: "agent/echo-context-canonical-repository-release-substrate"
-worktree: "/Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate"
-head_sha: "5b99d896e9103e0047c31d19fc574d7eea92abc5"
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
 pr_url: ""
-agent_notes: |
-  Cycle-two independent-review repairs completed by the same builder actor,
-  codex-136-cycle2-builder-7f6a2d31, without rewriting either branch history.
-  The first review rejected echo-context head 358fb4da774287b6c55d287a46d53b5aff033e87;
-  repaired target head 1a91750e5b9ce9db49e9c893f9974b318f12f38a closes the
-  bounded lifecycle, temporary-root, Promise-effect, exhaustive-ref, and bootstrap
-  porcelain findings. Typecheck, lint, inventory (340 packages/23 sources), authority,
-  60 focused tests, 1,066 CI tests with 17 intentional skips, pinned exhaustive-ref
-  secret scan, operator replay, a real isolated clone, and a fresh canonical HTTPS
-  clone all pass at that exact head. Project feature head
-  5b99d896e9103e0047c31d19fc574d7eea92abc5 records the repair evidence. The item
-  remains pending exact-head independent re-review. No implementation merge to either
-  main, approval, release, seal, install, live-state access, or authority transfer occurred.
+agent_notes: ""
 review_notes: |
   Implementation cycle 1 rejected — redo before merge.
   Reviewed Project_echo head: 25b833332bb22ec79700fcdf31b9c9f20eea79f5.
@@ -89,6 +76,11 @@ review_notes: |
   Project_echo head 5b99d896e9103e0047c31d19fc574d7eea92abc5 and echo-context
   head 1a91750e5b9ce9db49e9c893f9974b318f12f38a; no acceptance is asserted here,
   and the reviewer-owned implementation-review record remains unwritten.
+  The second independent cycle-two review rejected those exact heads with three AC3
+  medium blockers: late child completion, repeated-signal cancellation, and an
+  unimplementable hard-return promise for non-returning synchronous filesystem calls.
+  The persistent coordinator returned the item to proposed for the smallest truthful
+  scope correction and exact-SHA cross-vendor review; no failed evidence is waived.
 target_repo: "/Users/zhenye/Desktop/echo-context"
 target_remote: "https://github.com/zhenye0616/echo-context.git"
 target_branch: "agent/echo-context-canonical-repository-release-substrate"
@@ -171,7 +163,9 @@ On the success path, child step 15 is the verifier-owned cleanup transition. Cre
 
 Each common-prelude row and every table row other than the repeated boundary commands runs exactly once. Build/verify counts are 1/1. `test:operator` remains independently runnable but is explicitly rejected by the verifier. Gitignored `node_modules` and `T` do not themselves dirty the status probe, so cleanup is proven by the separate exact-path `ENOENT` assertion. The verifier consumes `H` only from the exact build carrier. Unknown, missing, duplicate, or non-source arguments fail with usage text rather than skipping a check. Any staged, unstaged, or nonignored-untracked entry, persistent clean retarget to a different HEAD between boundaries, install/check-time mutation, wrong executable/version/environment/count/order/vector, or failed check stops acceptance. These boundary probes target persistent accidental mutation; the spec makes no claim against adversarial transient retarget-and-restore or mutate-and-restore between probes.
 
-The AC3 deadline constants are exact and not caller-selectable: 30 seconds for each version/status/rev-parse child; 600 seconds for `npm ci`; 900 seconds each for `test:ci` and `scan:secrets`; 300 seconds for each remaining typecheck/lint/inventory/authority/build/artifact-verification/fsck child; 30 seconds for the cleanup child plus parent absence readback; and 3700 seconds total from entry into `runFreshClone` before identity checks through final HEAD read or failed cleanup. The verifier fixes `aggregate_end=entry+3700s` and `prefinal_cutoff=aggregate_end-120s`. Every step through 14 and every earlier failure/cancellation path must finish child execution by `prefinal_cutoff-10s` and terminal settlement by `prefinal_cutoff`; each effective execution deadline is the earlier of its class limit and that boundary. The final 120 seconds are reserved and nonborrowable: cleanup step 15, status step 16, and HEAD step 17 each receive a consecutive maximum 40-second envelope (30-second execution/readback plus ten-second termination/reap/stream settlement). On a prefinal failure after `T` creation, the same first reserved envelope runs the sole cleanup transition and the remaining reserve is guard. Timeout or cancellation closes stdin, sends TERM to the child PGID, waits exactly five seconds, sends KILL if the PGID remains, then allows at most five seconds for direct-child exit plus stdout/stderr closure and verifies no process remains addressable in that PGID. No next step starts before terminal settlement. A never-settling lightweight Git child, cleanup child, stream, or filesystem result is fatal within the same complete wall bound and cannot be reported as success.
+The AC3 deadline constants are exact and not caller-selectable: 30 seconds for each version/status/rev-parse child; 600 seconds for `npm ci`; 900 seconds each for `test:ci` and `scan:secrets`; 300 seconds for each remaining typecheck/lint/inventory/authority/build/artifact-verification/fsck child; 30 seconds for the cleanup child plus parent absence readback; and a 3700-second orchestration deadline from entry into `runFreshClone` before identity checks through final HEAD read or failed cleanup. The verifier fixes `aggregate_end=entry+3700s` and `prefinal_cutoff=aggregate_end-120s`. Every step through 14 and every earlier failure/cancellation path must either complete on time or trigger cancellation no later than `prefinal_cutoff`; each effective execution deadline is the earlier of its class limit and that boundary. The final 120 seconds are reserved and nonborrowable: cleanup step 15, status step 16, and HEAD step 17 each receive consecutive 40-second orchestration envelopes (30 seconds for execution/readback plus ten seconds to initiate termination/reap/stream settlement). On a prefinal failure after `T` creation, the first reserved envelope starts the sole cleanup transition and the remaining reserve is guard. Timeout or cancellation closes stdin, sends TERM to the child PGID, waits exactly five seconds, sends KILL if the PGID remains, then waits for direct-child exit plus stdout/stderr closure and verifies no process remains addressable in that PGID. SIGINT/SIGTERM handlers remain installed, idempotent, and non-defaulting until terminal cleanup/settlement and explicit disposal; repeated same or different signals only reaffirm the first cancellation. No timeout/cancellation failure may be reported and no next step may start before terminal settlement; completion after its execution deadline is late and fails even if it arrives inside the settlement reserve.
+
+The 3700-second value is an orchestration deadline under responsive kernel calls, not a hard verifier-return or process-exit bound. Managed-child deadlines trigger the stated TERM/KILL ceremony, and acceptance cannot succeed or advance without direct-child exit, stream closure, and PGID absence. Verifier-local synchronous filesystem calls are checked fail-closed against the monotonic deadline immediately before and after they return. Node 22 supplies no abortable `realpath`/`lstat`/`access`/`mkdir`/`mkdtemp`/`chmod`/`rm` primitive that can prove both bounded return and no later mutation: a call that never returns, or a cleanup PGID that cannot be proved absent, may keep the invocation pending past `aggregate_end`. It is never treated as success, followed by another step, retried, or abandoned while mutation remains possible. Item 136 adds no supervisor, worker, watchdog, controller, or extra production child to change that boundary.
 
 `tools/fresh-clone-verifier.mjs` exports one production `runFreshClone(argv, deps)` state machine and keeps the shell as the fixed scrub-and-exec bootstrap above; `tools/fresh-clone-cleanup.mjs` is its sole production cleanup child. Spawn, clock, cancellation, environment, executable-realpath, filesystem, temporary-directory, and cleanup-child operations are injected so executable tests exercise the real transition logic; production adapters remain the only operational path. The expected child plan in tests is a literal independent oracle derived from the common prelude and AC3 tables, never the production trace passed back as its own expected value. Cleanup errors, surviving cleanup child/PGID/owned temporary paths, carrier tampering, poisoned inherited state, and non-owned-sentinel mutation fail without being masked by the `finally` path.
 
@@ -220,6 +214,7 @@ The handoff to item 137 is: exact `M`, the six-field content tuple, and the migr
 - No GitHub Actions workflow, hosted CI, branch protection, ruleset, protected environment, check-run evidence, tag, GitHub Release, or release asset — all item-140 scope (`backlog/inbox/`).
 - No operation-host/launcher/envelope/askpass/authority-publisher machinery; the r15–r18 designs are historical evidence, not scope.
 - No multi-coordinator attempt-consumption ledger, hardened landing runner, pinned credential helper, or replacement execution controller; the locked single-coordinator topology plus the exact object/lease/approval/readback gate is the item-136 boundary.
+- No external supervisor, Worker-thread watchdog, or additional cleanup/process-control child solely to force a hard return from a non-returning kernel filesystem call; AC3 instead fails closed without success, advance, retry, or abandonment.
 - No LaunchAgent, machine-wide/per-user install, service composition root, MCP client registration, port, bearer-token, or loopback-exposure decision.
 - No live database, capture checkpoint, onboarding state, project config, credential, or client-config read/copy/migration.
 - No active daemon switch, dual-run, rollback ceremony, Project_echo context freeze, or runtime/state authority transfer.
@@ -234,6 +229,7 @@ The handoff to item 137 is: exact `M`, the six-field content tuple, and the migr
 - With hosted CI deferred, a regression could land on echo-context main if the local acceptance is skipped. Mitigation: the AC3 acceptance is mandatory twice (builder and reviewer, independently recorded) before any landing, and item 140 restores server-side enforcement later.
 - Hosted-runner cross-platform coverage (Ubuntu) is deferred with the workflows; until item 140, the acceptance proves macOS only. Item 137 separately owns the exact Darwin runtime closure, which is the only platform anything currently consumes.
 - The acceptance could appear green only because the founder machine supplies Project_echo or state. AC3 removes implicit paths and proves a clean sibling-free clone under a temporary HOME.
+- A local filesystem or kernel call can become non-responsive, so the 3,700-second value cannot be both a literal process-exit bound and a no-late-mutation proof inside the fixed single-process verifier. AC3 keeps every numeric orchestration deadline and fails closed after each returning call, while a non-returning call leaves the invocation pending and never accepted.
 - Publishing history could expose a secret. The AC1-bound scanner remains in the acceptance trace and blocks on leaks without printing values.
 - The current private personal Free topology cannot stop a malicious or compromised sole owner from bypassing policy. AC4 makes that limitation explicit and fails closed on drift and ambiguity; server enforcement is item-140 scope.
 - A source archive could be mistaken for an installable runtime. Its filename and manifest identify a source artifact with `installable:false`, `runtime_authority:false`, and `state_authority:false`; the authority and migration records separately bind `source_authority: echo-context/main`, `artifact_authority: versioned-source-artifact`, and `installed:false`.
@@ -249,7 +245,7 @@ The handoff to item 137 is: exact `M`, the six-field content tuple, and the migr
 - tests/operator/source-parity.test.ts, with explicit source Git dir/SHA, recomputes the item-135 source inventory and eight-tool parity aggregate; absence of those inputs fails clearly rather than skipping.
 - tests/migration/object-closure.test.ts and tests/migration/committed-source-only.test.ts prove the 190-file extraction baseline stays closed while successor HEAD may add reviewed files.
 - Existing tests/api/context-only-roster.test.ts and tests/integration/context-service.test.ts keep the exact eight-tool and service semantics unchanged.
-- `/Users/zhenye/Desktop/echo-context/tests/governance/fresh-clone-acceptance.test.ts` executes production `runFreshClone(argv,deps)` and cleanup through injected adapters for the single AC3 source trace without siblings or inherited `ECHO_*`. A literal independent oracle covers exact steps, side-effect-free imports, wrapper/path/executable authentication, scrubbed environment, process groups, deadlines, cleanliness, and the source argument vector; any other mode is rejected. Cleanup fixtures assert the first state action is `not_started→running` before fallible active-child settlement or helper authentication; failures at each pre-helper point set `failed`, spawn no helper where appropriate, and cannot cause a second transition/spawn in `finally`. Boundary-expiry, steps 16/17, cleanup timeout/failure, never-settling/TERM-resistant children/streams, PGID absence, exact `ENOENT`, primary-error preservation, and non-owned sentinel tests retain the complete 3,700-second bound.
+- `/Users/zhenye/Desktop/echo-context/tests/governance/fresh-clone-acceptance.test.ts` executes production `runFreshClone(argv,deps)` and cleanup through injected adapters for the single AC3 source trace without siblings or inherited `ECHO_*`. A literal independent oracle covers exact steps, side-effect-free imports, wrapper/path/executable authentication, scrubbed environment, process groups, deadlines, cleanliness, and the source argument vector; any other mode is rejected. Cleanup fixtures assert the first state action is `not_started→running` before fallible active-child settlement or helper authentication; failures at each pre-helper point set `failed`, spawn no helper where appropriate, and cannot cause a second transition/spawn in `finally`. Boundary-expiry, exact-on-time versus late completion, repeated SIGINT/SIGTERM, steps 16/17, cleanup timeout/failure, never-settling/TERM-resistant children/streams, PGID absence, exact `ENOENT`, primary-error preservation, and non-owned sentinel tests prove the 3,700-second orchestration deadline plus fail-closed no-success/no-advance behavior under controllable adapters. Injected never-Promise fixtures do not claim kernel-request cancellation or a hard verifier-return/process-exit bound; synchronous filesystem fixtures instead prove before/after monotonic checks reject a late return.
 - AC4's landing protocol is procedural coordinator work, not production code: its contract is enforced by the single-use approval record, the recorded exact commands, the retained porcelain proof, and the migration record — reviewed as evidence, not executed as fixtures. The AC1 bootstrap-gate suite already models the shared leased-porcelain-push grammar.
 
 ## After Completion (Strategist Notes)
