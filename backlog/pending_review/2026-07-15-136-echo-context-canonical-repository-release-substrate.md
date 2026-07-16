@@ -51,16 +51,20 @@ claimed_by: "codex-builder-136-20260716"
 claimed_at: "2026-07-16T08:33:45Z"
 branch: "agent/echo-context-canonical-repository-release-substrate"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate"
-head_sha: ""
+head_sha: "25b833332bb22ec79700fcdf31b9c9f20eea79f5"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  READY FOR INDEPENDENT REVIEW. Project_echo feature head 25b833332bb22ec79700fcdf31b9c9f20eea79f5 records the migration evidence and run/task-state handoff. Echo-context feature head 145868a67a85dbb651faed457ee4001370c0fad0 (tree 44ae95b77cd2298cd25b915f283b07bd7423100e) is pushed and opened as https://github.com/zhenye0616/echo-context/pull/1.
+  Builder verification passed: npm ci; typecheck; lint; 77-file test:ci with 1,025 passed/17 skipped/0 failed; 2/2 operator replay; inventory and authority verification; official digest-pinned full-ref Gitleaks scan; deterministic artifact build/verify; exact 16-step detached no-local clone trace; workflow-policy fixtures and YAML parse. Hosted CI run 29487447722 passed on macOS and Ubuntu, and hosted secret-scan run 29487447735 passed, all at the exact target head.
+  EXTERNAL GATE PRESERVED: the current private-repository/account tier cannot enforce the exact reviewed protected-main plus required-environment-reviewer controls, and the sole repository identity cannot supply an independent required PR approval. The implementation remains fail-closed. The persistent coordinator must disposition and repair that gate after independent review and before target-main/release execution.
+  No target-main merge, tag, release, hosting-control mutation, installation, live-state read/write, client rewiring, or authority transfer occurred. Runtime/state authority remains false and installed remains false.
 review_notes: ""
 target_repo: "/Users/zhenye/Desktop/echo-context"
 target_remote: "https://github.com/zhenye0616/echo-context"
 target_branch: "agent/echo-context-canonical-repository-release-substrate"
 target_worktree: "/Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate"
-target_head_sha: ""
-target_pr_url: ""
+target_head_sha: "145868a67a85dbb651faed457ee4001370c0fad0"
+target_pr_url: "https://github.com/zhenye0616/echo-context/pull/1"
 target_landed_sha: ""
 project_landed_sha: ""
 ---

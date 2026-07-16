@@ -15,7 +15,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| READY | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/ready/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-contained CI, and source-artifact authority | 3d | 2026-07-13-135-local-echo-context-source-extraction |
+| - | - | - | _(empty)_ | - | - | - |
 
 ## Claimed
 
@@ -27,7 +27,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| - | - | - | _(empty)_ | - | - | - |
+| PENDING_REVIEW | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/pending_review/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-contained CI, and source-artifact authority | 3d | 2026-07-13-135-local-echo-context-source-extraction |
 
 ## Complete
 
