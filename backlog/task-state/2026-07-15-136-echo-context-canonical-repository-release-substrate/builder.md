@@ -2,35 +2,36 @@
 task_id: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 role: builder
 binding: codex
-claimed_by: codex-136-cycle2-builder-7f6a2d31
-claimed_at: 2026-07-16T15:40:53Z
-last_updated: 2026-07-16T16:59:16Z
+claimed_by: codex-136-cycle2-final-builder-oracle-42c8
+claimed_at: 2026-07-16T17:45:27Z
+last_updated: 2026-07-16T18:20:33Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
 target_worktree: /Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate
 handoff_branch: agent/echo-context-canonical-repository-release-substrate
-target_head_sha: 1a91750e5b9ce9db49e9c893f9974b318f12f38a
+target_head_sha: 02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7
+target_tree_sha: bc8b700fe5db3435d54a930a71d0c5455b85541b
 handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 ---
 
 ## current_thesis
 
-Cycle two repaired the frozen cycle-one Project_echo head `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context head `145868a67a85dbb651faed457ee4001370c0fad0` without rebasing or rewriting either history. After the first independent review rejected target head `358fb4da774287b6c55d287a46d53b5aff033e87`, the same builder repaired only the bounded verifier/ref-manifest/bootstrap-parser findings and now hands exact target head `1a91750e5b9ce9db49e9c893f9974b318f12f38a` to the same independent reviewer. The R21 cut still keeps local source acceptance and the deterministic artifact, deletes all hosted/release/controller machinery, and never authorizes this builder to land target main, author an approval, seal at canonical `M`, release, install, or change runtime/state authority.
+R24 converged at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0` with ready seal `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`. Final builder `codex-136-cycle2-final-builder-oracle-42c8` preserved both feature histories and repaired only the converged deadline, signal, pre-spawn, positive-PID terminality, inherited-group, and ceremony-completion paths. The immutable target review candidate is now head `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7`, tree `bc8b700fe5db3435d54a930a71d0c5455b85541b`; every exact-head gate and a fresh read-only oracle passed. The source-only cut still deletes all hosted/release/controller machinery and leaves landing, tuple sealing, release, install, and authority transfer to an independent reviewer and the persistent coordinator.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — cycle-two source-only implementation and tests are ready for independent review.
+- Lifecycle: COMPLETE — exact target head `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7` is pushed, read back, and ready for independent implementation review.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
 - AC1: retain the completed repository/bootstrap history as immutable evidence and keep only the injected local repository-bootstrap gate plus exact scanner contract; never repeat either external operation.
 - AC2: preserve item-135 bytes, bind the frozen baseline and successor authority, generate runtime-inventory.v2 for the evolving successor tree, and state the source/runtime authority split honestly.
-- AC3: provide the sole source-mode fresh-clone acceptance trace with exact authenticated toolchain, scrubbed environment, bounded cleanup, one artifact build/verify, and no sibling or live-state dependency.
+- AC3: retain the sole source-mode 17-step trace and exact toolchain/environment. The 3,700-second value is an orchestration deadline under responsive kernel calls; no-PID pre-spawn failures and positive-PID spawned children have separate exhaustive terminal proofs, and no outcome reports or advances before its same-handle proof completes.
 - AC4: delete every workflow and hosted/release surface; a different fresh reviewer must rerun AC3 at exact target head before the coordinator constructs and authorizes literal merge object `M`.
 - AC5: build the deterministic `0.1.0-dev.136.1` source archive/checksum/manifest triple from committed Git objects with `installable:false`, `runtime_authority:false`, and `state_authority:false`.
 - AC6: dual-build sealing and the final bootstrap migration record occur only after coordinator landing at canonical `M`; the builder removed the premature cycle-one Project_echo bootstrap record and stops at pending review.
-- Verification at the exact repaired target head passed inventory (340 packages / 23 sources), authority, typecheck, lint, 1,066 CI tests with 17 intentional skips, the 60-test repair-focused set, pinned exhaustive-ref secret scan, local and canonical-HTTPS sibling-free fresh-clone acceptance, and the two-test operator replay.
+- Verification at exact head `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7` passed the 42-test AC3 focus set, typecheck, lint, inventory (340 packages / 23 sources), authority, all 78 CI files (1,079 passed / 17 skipped), four-ref exhaustive secret scan, two-test pinned operator replay, isolated no-local acceptance, and canonical HTTPS acceptance with exactly four advertised refs. A fresh read-only oracle found no remaining HIGH/MEDIUM blocker.
 
 ## open_questions
 
@@ -47,4 +48,4 @@ Cycle two repaired the frozen cycle-one Project_echo head `25b833332bb22ec79700f
 ## canonical_anchors
 
 - spec: backlog/claimed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
-- reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r21/
+- reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r24/

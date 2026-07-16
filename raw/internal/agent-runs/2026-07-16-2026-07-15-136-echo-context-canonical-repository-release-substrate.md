@@ -146,3 +146,91 @@ The item remains pending independent review. No target-main or Project-main
 implementation merge/push, approval, release, install, live-state access, or
 authority transfer occurred. Zero ECHO MCP calls were made, so no dogfooding
 journal entry is owed.
+
+---
+
+## Run 2 (resumed at 2026-07-16T17:45:27Z)
+
+### Exact reviewed input and final identities
+
+- Final builder: `codex-136-cycle2-final-builder-oracle-42c8`.
+- Converged R24 spec commit: `f80003a7fbd08755dbff669951ed07bf43b390d0`.
+- Fresh ready seal: `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`.
+- Prior remote target head: `1a91750e5b9ce9db49e9c893f9974b318f12f38a`.
+- Final target feature head: `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7`.
+- Final target tree: `bc8b700fe5db3435d54a930a71d0c5455b85541b`.
+
+### What I implemented
+
+Preserved the existing feature history and changed only the R24-converged AC3
+terminality surface. The verifier now separates terminal no-PID pre-spawn
+failures from positive-PID children; proves direct exit, both stream closures,
+and process-group absence for spawned children; starts one idempotent
+TERM/exact-five-second/conditional-KILL ceremony for surviving descendant
+groups; and withholds completion, cleanup advancement, and the original child
+outcome until the same handle re-proves terminal after the ceremony. The
+orchestration deadline remains bounded under responsive kernel calls without
+inventing a lifecycle failure when a reap observation expires.
+
+Previous target state was kept. No commit was rebased, amended, dropped, or
+force-pushed. Three target files changed from the prior remote head:
+
+- `tools/fresh-clone-verifier.mjs` — +222/-64.
+- `tests/governance/fresh-clone-acceptance.test.ts` — +523/-46.
+- `provenance/runtime-inventory.v2.json` — +2/-2, mechanically regenerated.
+
+### Acceptance criteria status
+
+- [x] AC1 — immutable bootstrap history and exact scanner contract preserved;
+  no repository/bootstrap external operation repeated.
+- [x] AC2 — item-135 bytes preserved; successor inventory and source/runtime
+  authority checks pass at the final target head.
+- [x] AC3 — both exhaustive terminal shapes, the sole 17-step source trace,
+  exact toolchain/environment, cleanup, deadlines, and original-outcome
+  withholding pass at the final target head.
+- [x] AC4 — no workflow or hosted/release surface was added; the immutable
+  feature candidate is pushed for a different independent reviewer.
+- [x] AC5 — the deterministic non-installable source artifact build/verify ran
+  inside both isolated acceptance traces with runtime/state authority false.
+- [ ] AC6 — intentionally coordinator-owned after independent review and
+  canonical target-main landing; no merge object, tuple seal, or final
+  migration record was authored by this builder.
+
+### Exact-head verification
+
+```text
+Target H  = 02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7
+Target T  = bc8b700fe5db3435d54a930a71d0c5455b85541b
+AC3 focus = 42 passed / 42
+typecheck = passed
+lint      = passed
+inventory = runtime-inventory.v2 OK: 340 packages, 23 sources
+authority = passed
+CI        = 78 files passed; 1,079 passed; 17 skipped; 0 failed
+secrets   = 4 advertised refs; full reachable history; passed
+operator  = 2 passed / 2 at Project source 2971310441b69735cbe759293abd8c4d044bf347
+no-local  = fresh-clone acceptance OK; exact H; clean status; no owned run root
+HTTPS     = canonical origin; 4 advertised refs; acceptance OK; exact H; clean status
+oracle    = explicit PASS at H/T; no remaining HIGH or MEDIUM blocker
+remote    = refs/heads/agent/echo-context-canonical-repository-release-substrate == H
+```
+
+One full-CI attempt exposed an unrelated `kill EPERM` race in the migration
+protocol-probe cleanup. It was not waived: the exact failing file reran 6/6,
+then the full exact-head suite reran green as reported above. The first
+no-local harness command also asserted that the acceptance parent directory
+must not exist; the reviewed cleanup intentionally removes only its owned
+`run-*` root and leaves the empty parent. A new no-local/no-hardlinks clone
+reran with the correct empty-parent/readback contract and passed. Neither
+event changed target bytes or H.
+
+### Decisions, open questions, and drift
+
+No implementation choice exceeded the R24 contract. A read-only fresh oracle
+checked the exact final H/T independently. Independent implementation review,
+target-main landing authorization, literal landing, dual-build tuple sealing,
+and Project completion remain pending. No target-main or Project-main
+implementation merge/push, release, install, live-state access, or authority
+transfer occurred. No drift event occurred.
+
+Zero ECHO MCP calls were made, so no dogfooding journal entry is owed.
