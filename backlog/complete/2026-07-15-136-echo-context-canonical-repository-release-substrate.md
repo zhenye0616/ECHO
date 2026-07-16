@@ -82,38 +82,67 @@ agent_notes: |
   both exact heads and independently rerun AC3. No target-main merge, Project-main
   implementation merge, release, install, live mutation, or authority transfer occurred.
 review_notes: |
-  Implementation cycle 1 rejected — redo before merge.
-  Reviewed Project_echo head: 25b833332bb22ec79700fcdf31b9c9f20eea79f5.
-  Reviewed echo-context head: 145868a67a85dbb651faed457ee4001370c0fad0.
-  Immutable review evidence: Project_echo commit 77c5e0c3f7f64c0bda1d99439d8d35eca54551ee,
-  review-artifact blob 1cd16c1f31dab5c40ad76b70716846a09c98d845.
-  The 2026-07-16 founder decision then deferred all hosted gates/release to item 140;
-  cycle two implements this slimmed spec against the frozen cycle-one branch.
-  The first independent cycle-two implementation review rejected exact target head
-  358fb4da774287b6c55d287a46d53b5aff033e87. The same builder preserved both
-  histories and repaired only the bounded findings. Independent re-review must bind
-  Project_echo head 5b99d896e9103e0047c31d19fc574d7eea92abc5 and echo-context
-  head 1a91750e5b9ce9db49e9c893f9974b318f12f38a; no acceptance is asserted here,
-  and the reviewer-owned implementation-review record remains unwritten.
-  The second independent cycle-two review rejected those exact heads with three AC3
-  medium blockers: late child completion, repeated-signal cancellation, and an
-  unimplementable hard-return promise for non-returning synchronous filesystem calls.
-  The persistent coordinator returned the item to proposed for the smallest truthful
-  scope correction and exact-SHA cross-vendor review; no failed evidence is waived.
-  The later formal R24 implementation review rejected target head
-  02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7 with zero HIGH and three MEDIUM
-  AC3 findings: late terminal-proof acceptance, non-monotonic production deadline
-  math, and grouped rather than per-call synchronous-filesystem deadline checks.
-  All other formal gates passed. No merge-ready implementation-review record exists;
-  a new exact target head and full independent re-review are mandatory.
+  Completed on 2026-07-16 under the founder-locked echo-context sequential-program
+  delegation and its immutable exact-operation authorization gate.
+
+  Conflicts resolved:
+  - None. The target merge preview was conflict-free and its tree exactly matched
+    independently reviewed target feature H.
+  - Project feature 7f156ba44b3ff17095a55198a7463ede713f81f7 was deliberately
+    not merged: canonical main already contained the complete Run-3 coordination
+    evidence, while that divergent feature carried no Project implementation bytes.
+
+  C3.5 cross-vendor consult: none invoked during landing. Exact-SHA specification
+  convergence used codex and codex-ops through R24 before implementation resumed.
+
+  Independent review:
+  - Builder codex-136-cycle3-builder-mendel-222cc09b / run
+    cycle3-mendel-222cc09b-20260716T184207Z produced target H
+    ad370ae0a666f366e1ff93c9ec5b920763e9cbb8.
+  - Different reviewer codex-136-final-reviewer-b9e01c42 / run
+    codex-136-final-rereview-20260716T192413Z returned merge_ready with zero HIGH
+    and zero MEDIUM in Project record 058eeed26f217e1a4d3f35fc7f2070138b2540a8.
+
+  Fixups applied:
+  - Closed the three formal AC3 findings at H: full-terminal completion time,
+    monotonic deadline accounting, and immediate per-call synchronous-filesystem
+    deadline checks. All affected and full gates were rerun; no finding was waived.
+
+  Fixups deferred to follow-up items:
+  - Item 137 owns independent tuple rebuild and any install/shadow-runtime work.
+  - Item 140 owns hosted CI, protection, tags, GitHub Releases, and release assets.
+
+  Canonical landing and seal:
+  - Replacement approval d7189a6f-813b-40d1-ae03-bb19eedf816a authorized the
+    sole successful leased target push; authenticated readback proved main
+    78bf523e87c8b9986d31ba28fdf987cf6ea66c29 and reviewed tree
+    3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec.
+  - Two independent builds from a fresh no-local canonical clone were byte-identical
+    and independently verified. Final tuple: version 0.1.0-dev.136.1;
+    source-archive SHA-256 3e7a76c930e7198bbf03b7b13390f5eb2341702d2d3c61ba6d89d00090647bef;
+    lock hash 13ead528470d91adfc4456d349ae628f03f768ba51d78aee8d0b2c42dc12784b;
+    manifest hash 6a5def0ec7ca27f9230c587f5f9e2bb7caedb0253171198a7bde380877a26e01.
+  - Migration evidence landed and read back at Project commit
+    e0506f30c399819305c5aa94e85acce407e738ca. Completion authorization ID is
+    d39627d1-d036-45f9-be6b-0d09d48d627e.
+
+  Verify: AC3 49/49; full CI 1,086 passed / 17 skipped; typecheck, lint,
+  inventory 340/23, repository authority, operator 2/2, four-ref secret scan,
+  two canonical acceptances, full fsck, exact-tree landing, two AC6 builds, and
+  two artifact verifications all pass.
+
+  Authority remains source-only DEV: source_authority echo-context/main;
+  artifact_authority versioned-source-artifact; runtime_authority:false;
+  state_authority:false; installed:false. No tag, release, hosted artifact,
+  install, client mutation, live-state access, or feature-branch deletion occurred.
 target_repo: "/Users/zhenye/Desktop/echo-context"
 target_remote: "https://github.com/zhenye0616/echo-context.git"
 target_branch: "agent/echo-context-canonical-repository-release-substrate"
 target_worktree: "/Users/zhenye/Desktop/echo-context--echo-context-canonical-repository-release-substrate"
 target_head_sha: "ad370ae0a666f366e1ff93c9ec5b920763e9cbb8"
 target_pr_url: "https://github.com/zhenye0616/echo-context/pull/1"
-target_landed_sha: ""
-project_landed_sha: ""
+target_landed_sha: "78bf523e87c8b9986d31ba28fdf987cf6ea66c29"
+project_landed_sha: "e0506f30c399819305c5aa94e85acce407e738ca"
 ---
 
 # Canonical echo-context repository, self-testing clean clone, and tuple-sealed source artifact

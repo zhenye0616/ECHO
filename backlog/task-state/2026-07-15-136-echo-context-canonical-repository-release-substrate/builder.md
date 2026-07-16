@@ -4,7 +4,7 @@ role: builder
 binding: codex
 claimed_by: codex-136-cycle3-builder-mendel-222cc09b
 claimed_at: 2026-07-16T18:42:07Z
-last_updated: 2026-07-16T19:22:25Z
+last_updated: 2026-07-16T20:27:08Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
@@ -18,37 +18,29 @@ target_tree_sha: 3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec
 
 ## current_thesis
 
-R24 remains converged at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0` with ready seal `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`. Formal independent review rejected target candidate `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7` with zero HIGH and exactly three MEDIUM AC3 defects. Fresh builder `codex-136-cycle3-builder-mendel-222cc09b` (run `cycle3-mendel-222cc09b-20260716T184207Z`) preserved both feature histories and repaired only full-terminal deadline rescue, monotonic production time, and immediate per-call synchronous-filesystem deadline checks. Final target `ad370ae0a666f366e1ff93c9ec5b920763e9cbb8`, tree `3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec`, passed every exact-head gate and independent oracle and is pushed through both feature and PR refs. No canonical-main, release, install, or authority mutation occurred.
-
-<!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at 7f156ba44b3ff17095a55198a7463ede713f81f7.
-<!-- builder-state-handoff:end -->
+Item 136 is complete at canonical target `78bf523e87c8b9986d31ba28fdf987cf6ea66c29`, tree `3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec`, with independently reviewed `merge_ready` implementation and zero HIGH/MEDIUM findings. Two fresh canonical builds produced the identical six-field source tuple, and the complete migration record landed at Project commit `e0506f30c399819305c5aa94e85acce407e738ca`. This is source-only DEV authority: no hosted release, installation, client mutation, runtime/state transfer, or live-state access occurred.
 
 ## locked_decisions
 
-- AC1: retain the completed repository/bootstrap history as immutable evidence and keep only the injected local repository-bootstrap gate plus exact scanner contract; never repeat either external operation.
-- AC2: preserve item-135 bytes, bind the frozen baseline and successor authority, generate runtime-inventory.v2 for the evolving successor tree, and state the source/runtime authority split honestly.
-- AC3: retain the sole source-mode 17-step trace and exact toolchain/environment. The 3,700-second value is an orchestration deadline under responsive kernel calls; no-PID pre-spawn failures and positive-PID spawned children have separate exhaustive terminal proofs, and no outcome reports or advances before its proof completes.
-- AC4: delete every workflow and hosted/release surface; a different fresh reviewer must rerun AC3 at exact target head before the coordinator constructs and authorizes literal merge object `M`.
-- AC5: build the deterministic `0.1.0-dev.136.1` source archive/checksum/manifest triple from committed Git objects with `installable:false`, `runtime_authority:false`, and `state_authority:false`.
-- AC6: dual-build sealing and the final bootstrap migration record occur only after coordinator landing at canonical `M`; the builder must remove the premature cycle-one Project_echo bootstrap record and stop at pending review.
-- Prior evidence through `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7` is historical only. At final head `ad370ae0a666f366e1ff93c9ec5b920763e9cbb8`, all three pinned formal reproducers, the 49-test AC3 focus set, typecheck, lint, inventory (340 packages / 23 sources), authority, all 78 CI files (1,086 passed / 17 skipped), four-ref exhaustive secret scan, two-test operator replay, isolated no-local/no-hardlinks acceptance, canonical HTTPS acceptance, and independent oracle passed.
-- Formal review of `02af4e411077063d2cf5d4931bd3e9c1c0f0a5c7` reproduced three uncovered AC3 gaps. Final regressions now prove exact-boundary versus one-millisecond-late complete terminal proof, backward wall-clock movement with monotonic orchestration unchanged, and an early late filesystem return that prevents every later operation; late `mkdtempSync` records `T` immediately before rejecting so cleanup remains possible.
-- No target main push, Project main implementation merge, tag, hosted release, artifact publication, install, live mutation, retry/adoption controller, attempt ledger, credential helper, or authority transfer belongs to this builder.
+- Exact spec/seal remain `f80003a7fbd08755dbff669951ed07bf43b390d0` / `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`; earlier rejected candidates remain immutable history, not waived evidence.
+- Fresh builder `codex-136-cycle3-builder-mendel-222cc09b` repaired only the three formal AC3 findings at feature `ad370ae0a666f366e1ff93c9ec5b920763e9cbb8`; different reviewer `codex-136-final-reviewer-b9e01c42` independently reran the gates and published the review at Project `058eeed26f217e1a4d3f35fc7f2070138b2540a8`.
+- The coordinator landed one literal merge object `M=78bf523e87c8b9986d31ba28fdf987cf6ea66c29` through the replacement single-use authorization; the consumed first authorization produced no target write and was never reused.
+- Final tuple: version `0.1.0-dev.136.1`; source-archive SHA-256 `3e7a76c930e7198bbf03b7b13390f5eb2341702d2d3c61ba6d89d00090647bef`; lock hash `13ead528470d91adfc4456d349ae628f03f768ba51d78aee8d0b2c42dc12784b`; manifest hash `6a5def0ec7ca27f9230c587f5f9e2bb7caedb0253171198a7bde380877a26e01`.
+- Project feature `7f156ba44b3ff17095a55198a7463ede713f81f7` is intentionally not merged because canonical main already carries the complete run evidence and the branch adds no Project implementation bytes.
+- Item 137 must consume exact `M`, the tuple, and migration record plus Project commit `e0506f30c399819305c5aa94e85acce407e738ca`; item 140 owns hosted CI/protection/tag/release/asset work.
+- Authority remains `source_authority:echo-context/main`, `artifact_authority:versioned-source-artifact`, `runtime_authority:false`, `state_authority:false`, `installed:false`, maturity `DEV`.
 
 ## open_questions
 
-- None. A different fresh reviewer must now bind the exact Project and target heads, independently rerun AC3, and own the implementation-review record.
+- None for item 136. The persistent coordinator may now revise item 137 only against these landed outputs.
 
 ## dont_touch
 
-- Do not edit either main checkout in place, rebase/rewrite frozen cycle-one history, or merge/push either main branch.
-- Do not create `.github/workflows/**`, hosted evidence/plan/authorization schemas, release-publication or operation-host tooling, attempt ledgers, runners, controllers, tags, releases, or assets.
-- Do not author the coordinator-only target-main landing authorization, the independent-reviewer-owned implementation review, or the post-landing bootstrap migration record.
-- Do not install, configure clients, touch LaunchAgents, credentials, databases, checkpoints, live state, ports, daemons, or any client/user path.
-- Do not change context behavior, Team-product maturity, wiki, unrelated backlog items, item-135 provenance bytes, or unrelated user/agent worktrees.
+- Do not rewrite `B`, `H`, `M`, the review/authorization/migration records, or either feature history.
+- Do not delete the retained target feature branch or infer tag/release/install/live authority from the source tuple.
+- Do not touch LaunchAgents, credentials, databases, checkpoints, ports, clients, live state, wiki, or unrelated backlog/worktree state.
 
 ## canonical_anchors
 
-- spec: backlog/pending_review/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
-- reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r24/
+- spec: backlog/complete/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
+- reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/

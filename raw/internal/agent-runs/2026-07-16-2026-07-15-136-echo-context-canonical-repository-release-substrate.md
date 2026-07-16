@@ -296,6 +296,126 @@ Zero ECHO MCP calls were made, so no dogfooding journal entry is owed.
 
 ---
 
+## Final coordinator completion validation
+
+This chronologically final section supersedes only the historical builder-state
+sentences immediately above that said AC6 and the reviewer record were pending;
+those statements remain preserved as exact earlier-run evidence.
+
+- [x] AC1 — immutable create/baseline approvals and secret-scan proof recorded.
+- [x] AC2 — frozen baseline and successor authority/readback identities recorded.
+- [x] AC3 — independently reviewed exact `H`; all mandatory gates green.
+- [x] AC4 — one authorized target-main fast-forward; readback exact `M`.
+- [x] AC5 — deterministic source artifact retained with non-installable flags.
+- [x] AC6 — two canonical builds and verifications agree; migration record
+  published and read back at Project `e0506f30c399819305c5aa94e85acce407e738ca`.
+
+Completion-payload validations passed:
+
+```text
+task-state lint             = PASS
+backlog index regeneration  = byte-stable, SHA-256 510706195d9dc2448c31aefc98a43272218b70c5e6f0185566dd8046229aa35a
+blocked.py --validate       = OK: 138 items across all stages, no errors
+coupled invariants          = PASS
+skill adapter sync          = PASS
+git diff --check            = PASS
+stage uniqueness            = one item-136 spec under backlog/complete only
+```
+
+The completion commit intentionally changes only the pending-to-complete item
+move, finalized builder pointer, deterministic backlog index, and this run-log
+evidence. The prior migration-record commit is not edited. No Project feature
+merge, branch/worktree deletion, target mutation, release, install, or live
+operation is part of completion.
+
+---
+
+## Coordinator completion — canonical landing, tuple seal, and Project evidence
+
+### Program and review identities
+
+- Persistent coordinator: Codex `/root`, acting under
+  `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md`.
+- Exact reviewed spec / seal: `f80003a7fbd08755dbff669951ed07bf43b390d0` /
+  `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`.
+- Builder actor / run: `codex-136-cycle3-builder-mendel-222cc09b` /
+  `cycle3-mendel-222cc09b-20260716T184207Z`.
+- Independent reviewer actor / run: `codex-136-final-reviewer-b9e01c42` /
+  `codex-136-final-rereview-20260716T192413Z`.
+- Reviewer-owned record Project commit:
+  `058eeed26f217e1a4d3f35fc7f2070138b2540a8`; verdict `merge_ready` with
+  zero HIGH and zero MEDIUM findings.
+
+### Canonical target landing
+
+- Baseline `B` / tree: `0cf7b006eba665c0bf55e82ff04da70f19f01ebb` /
+  `70c5cf8352652b3c4c1dce68cd1a5e40d44e4b05`.
+- Reviewed feature `H` / tree: `ad370ae0a666f366e1ff93c9ec5b920763e9cbb8` /
+  `3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec`.
+- Literal merge `M` / tree: `78bf523e87c8b9986d31ba28fdf987cf6ea66c29` /
+  `3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec`, ordered parents `[B,H]`.
+- First landing approval `372e5d50-ae1e-43c6-a557-ab874994784c` was consumed
+  by a client-side zsh refspec-expansion error before Git sent an update. It had
+  no porcelain row, and authenticated reconciliation returned `main=B`; it was
+  never retried or reused.
+- Replacement approval `d7189a6f-813b-40d1-ae03-bb19eedf816a`, published by
+  Project commit `66509501308942e18f00b78dbdc0fec3982c160f`, authorized one
+  fully literal leased push. That single attempt returned exactly one
+  fast-forward main row and authenticated readback `main=M`.
+- No second target push, target feature deletion, tag, release, asset, install,
+  client mutation, or live-state mutation occurred.
+
+### AC6 deterministic source seal
+
+A new mode-0700 root held a fresh canonical HTTPS `--no-local` clone detached at
+exact `M`, with temporary HOME/TMP/npm caches, fixed Node `v22.22.1`, npm
+`10.9.4`, and Git `2.37.3`. Two separate output roots each received exactly the
+source archive, checksum sidecar, and canonical manifest. Pairwise comparison
+proved all three files byte-identical; each build's committed verifier passed.
+An independent read-only agent repeated the clone, file, checksum, manifest,
+tuple, and verifier checks and returned PASS.
+
+Final six-field tuple:
+
+```text
+source SHA              = 78bf523e87c8b9986d31ba28fdf987cf6ea66c29
+source tree             = 3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec
+version                 = 0.1.0-dev.136.1
+source-archive SHA-256  = 3e7a76c930e7198bbf03b7b13390f5eb2341702d2d3c61ba6d89d00090647bef
+lock hash               = 13ead528470d91adfc4456d349ae628f03f768ba51d78aee8d0b2c42dc12784b
+manifest hash           = 6a5def0ec7ca27f9230c587f5f9e2bb7caedb0253171198a7bde380877a26e01
+```
+
+The manifest remains `artifact_kind:source`, `installable:false`,
+`runtime_authority:false`, `state_authority:false`, and `maturity:DEV`.
+
+### Project evidence and completion disposition
+
+- Migration-record publication approval
+  `aa41b29f-24a1-446b-b4b0-5513d1afdd12` landed at Project commit
+  `1833ea6796f65b97d987ae0e23c8f72813da110e`.
+- The independently audited 16,946-byte migration record landed as the sole
+  path in Project commit `e0506f30c399819305c5aa94e85acce407e738ca`,
+  SHA-256 `6c17caf511a1ea7712ed2ccc0c98137061475f2004b9f2cb349ff3ba5b05f2c4`,
+  blob `29660e321815180743553ba3e32de7e818be1f3d`; authenticated readback matched.
+- `project_landed_sha` therefore binds that migration-record commit, never the
+  later completion commit. `target_landed_sha` binds exact `M`.
+- Project feature `7f156ba44b3ff17095a55198a7463ede713f81f7` is intentionally not
+  merged: canonical main already contains the complete Run-3 coordination
+  evidence and the divergent feature contains no Project implementation bytes.
+- Completion authorization ID:
+  `d39627d1-d036-45f9-be6b-0d09d48d627e`; its create-only parent record binds
+  the exact completion payload before the final Project-main push.
+- Source authority is `echo-context/main`; source-artifact authority is the
+  versioned tuple. Project_echo remains installed runtime and live-state
+  authority. Item 137 is the independent rebuild/install consumer; item 140
+  owns all hosted governance and release publication.
+
+No ECHO MCP call was made during coordinator landing, sealing, evidence
+publication, or completion preparation. No dogfooding journal entry is owed.
+
+---
+
 ## Run 3 claim — consolidated formal-review repair
 
 - Claimed at: `2026-07-16T18:42:07Z`.
@@ -478,3 +598,14 @@ live-state access, client mutation, or source/runtime/state authority transfer
 occurred. There are no open builder questions and no drift event.
 
 Zero ECHO MCP calls were made, so no dogfooding journal entry is owed.
+
+---
+
+## Completion log terminus
+
+The chronologically final coordinator evidence and validation sections above
+supersede the earlier Run-3 pending-state statements while preserving them as
+historical builder evidence. Item 136 ends with canonical target `M`, migration
+record Project commit `e0506f30c399819305c5aa94e85acce407e738ca`, all AC1–AC6
+checks green, and only the separately authorized completion-state publication
+remaining in this commit.

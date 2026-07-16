@@ -27,7 +27,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| PENDING_REVIEW | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/pending_review/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-testing clean clone, and tuple-sealed source artifact | 1d | 2026-07-13-135-local-echo-context-source-extraction |
+| - | - | - | _(empty)_ | - | - | - |
 
 ## Complete
 
@@ -108,6 +108,7 @@ Do not edit by hand.
 | COMPLETE | HIGH | 2026-07-13 | [2026-07-13-133-local-echo-brain-source-extraction](../backlog/complete/2026-07-13-133-local-echo-brain-source-extraction.md) | Local standalone echo-brain source extraction and parity proof | 4d | 2026-07-13-132-product-graduation-foundation |
 | COMPLETE | HIGH | 2026-07-13 | [2026-07-13-134-local-echo-loop-source-extraction](../backlog/complete/2026-07-13-134-local-echo-loop-source-extraction.md) | Local standalone echo-loop source extraction and fixture proof | 5d | 2026-07-13-132-product-graduation-foundation |
 | COMPLETE | HIGH | 2026-07-13 | [2026-07-13-135-local-echo-context-source-extraction](../backlog/complete/2026-07-13-135-local-echo-context-source-extraction.md) | Local standalone echo-context source extraction and synthetic parity proof | 5d | 2026-07-13-132-product-graduation-foundation |
+| COMPLETE | HIGH | 2026-07-15 | [2026-07-15-136-echo-context-canonical-repository-release-substrate](../backlog/complete/2026-07-15-136-echo-context-canonical-repository-release-substrate.md) | Canonical echo-context repository, self-testing clean clone, and tuple-sealed source artifact | 1d | 2026-07-13-135-local-echo-context-source-extraction |
 | COMPLETE | MED | 2026-05-14 | [2026-05-14-053-reviewer-completed-at-coercion](../backlog/complete/2026-05-14-053-reviewer-completed-at-coercion.md) | Reviewer schema accepts/coerces unquoted-YAML completed_at timestamps (two-prong — quoted-example prompts + defensive coercion) | 0.5-1d | - |
 | COMPLETE | MED | 2026-05-16 | [2026-05-16-058-strategist-disposition-discipline-prefer-removal](../backlog/complete/2026-05-16-058-strategist-disposition-discipline-prefer-removal.md) | Strategist disposition discipline — prefer removal over deeper patching when findings target a recent-round patch | 0.25d | - |
 | COMPLETE | MED | 2026-05-17 | [2026-05-17-059-coord-emit-surface-daemon-rejection](../backlog/complete/2026-05-17-059-coord-emit-surface-daemon-rejection.md) | coord-emit.sh distinguishes daemon-rejection from daemon-unreachable (silent-failure observability gap) | 0.25-0.5d | - |
