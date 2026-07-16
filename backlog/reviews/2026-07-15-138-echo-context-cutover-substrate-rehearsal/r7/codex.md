@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-15-138-echo-context-cutover-substrate-rehearsal"
+round: 7
+reviewer: "codex"
+artifact_sha: "777c6f494c2b5acf9d5c138b24136c330b6e5ea4"
+completed_at: '2026-07-16T05:35:35Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC1/AC2, packet lines 194-206"
+    finding: "AC2 first makes `source_fenced` the rejecting boundary, then says only absent or `rolled_back` permits full mode. That excludes `planned` and `recutover_prepared`, allowing a pre-fence commit to block an old-full restart before its jobs are neutralized. Replace this contradiction with an exhaustive per-phase permit/reject table, define the rollback-authorization predicate, and test both pre-fence phases under start-versus-transition races."
+  - severity: "high"
+    where: "AC1/AC7, packet lines 194 and 244-246"
+    finding: "The closed transition graph has no `active -> rolled_back` edge, although AC7 requires rollback. AC2 also permits full mode at `rolled_back` without requiring interval imports, client/quarantine restoration, and service-control before-images to be durable first. Define the rollback transition and commit ordering, make those restorations fence preconditions, and add a kill-plus-competing-start test immediately after the flip."
+  - severity: "high"
+    where: "AC1 authority-lock contract, packet line 196"
+    finding: "Lock creation and `flock` acquisition are not atomic: on an empty root, the process that creates `authority.lock` can lose the acquisition race and time out after causing a root mutation, contradicting the timeout zero-write guarantee. Specify a creator/contender bootstrap protocol or narrow the guarantee to exempt creation of the sole stable lock, and add a multiprocess creator-loser test."
+  - severity: "medium"
+    where: "AC1 authority-lock and descriptor-relative filesystem mechanism, packet line 196"
+    finding: "The spec requires descriptor-relative no-follow open, unlink, rename, revalidation, and BSD `flock` in both Node packages but names only an unspecified pinned dependency. Name the exact shared dependency or bundled syscall helper, its version and APIs, source ownership, packaging/ABI contract, and a test proving both packaged binaries use that same implementation."
+  - severity: "high"
+    where: "AC2/AC5 installed identity and deployment entrypoints, packet lines 206 and 228"
+    finding: "The deployer receives only `--archive` and `--prefix`, while the binder receives only `--prefix` and `--root`; no canonical manifest or installed receipt conveys the verified archive SHA-256, package identity, and version to the binder. Define the manifest/receipt path and schema, descriptor-pinned handoff, staged atomic installation and recovery ordering, and the committed source owners for both entrypoints."
+  - severity: "high"
+    where: "AC4 client-transform transaction, packet lines 218-222"
+    finding: "The per-target filesystem `CAS` has no enforceable atomic or exclusion primitive. Descriptor-relative comparison alone cannot stop a foreign rename or chmod between validation and replacement, so the absolute promise that drift is never overwritten is not buildable. Specify the concrete primitive and journal/stage/commit/fsync ordering or narrow the guarantee, then add barrier-controlled concurrent byte and metadata writer races plus commit-boundary kill tests."
+  - severity: "medium"
+    where: "AC3 versus AC7 rollback interval, packet lines 214 and 244"
+    finding: "AC3 still specifies an open-ended import after baseline sequence `C`, while AC7 requires exactly `(C0,C1]`. Make AC3 use the same bounded interval, define how idempotency, deadlines, and checkpoints are cut at C1, and assert that replay imports no row or state above C1."
+---
