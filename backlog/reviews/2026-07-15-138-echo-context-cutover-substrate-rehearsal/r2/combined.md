@@ -6,7 +6,7 @@ codex_response: codex.md
 cursor_response: null
 codex-ops_response: codex-ops.md
 claude_response: null
-patch_commit_sha: null
+patch_commit_sha: 9c37bd8c9a2b7bc577269e0637f3e515de1da34a
 next_round: 3
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
@@ -34,4 +34,3 @@ Reframe gate: evaluated, not triggered — r1 was a no-response timeout with no 
 ## Convergence call
 
 needs R3 — focus_hints: Verify the five r2 patches: (1) AC1's mutation-capable vs. non-mutating command split is consistent with AC5/Tests and names the exact scripts; (2) src/daemon/lifecycle.ts now in files_to_modify with pre-open fence ownership; (3) AC5 operational preflight/landing gate is complete and recorded in the AC8 migration record; (4) AC1 durable redacted failure-evidence + non-zero exit covers all guard rejections and replay stops; (5) AC1 permanent root-scoping / no live-capable bypass in the 139 handoff archive.
-
