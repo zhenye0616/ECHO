@@ -6,8 +6,8 @@ codex_response: codex.md
 cursor_response: null
 codex-ops_response: codex-ops.md
 claude_response: null
-patch_commit_sha: null
-next_round: null
+patch_commit_sha: 0ef00dc09815a77ec237aadbc1df7de6d87c017d
+next_round: 17
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 ---
