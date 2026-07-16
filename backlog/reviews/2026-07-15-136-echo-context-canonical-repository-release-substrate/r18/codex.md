@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-15-136-echo-context-canonical-repository-release-substrate"
+round: 18
+reviewer: "codex"
+artifact_sha: "065feea6cda7f9824d54f9041fecc637dd1bccbc"
+completed_at: '2026-07-16T13:26:24Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    where: "AC4/AC6 — post-M hosted evidence"
+    finding: "No operation selects and verifies the new quality-macos, quality-ubuntu, and secret-scan carriers at M before release. land/write is capped at 900 seconds, while those jobs may run for 65 minutes, and collect validates only source-release-build within 2400 seconds. Add a fresh read-only phase with an adequate polling/deadline contract, exact carrier-selection rules, and binding of its result into P_S before publish."
+  - severity: "high"
+    where: "AC4 — coordinator/host aggregate start"
+    finding: "The selected host aggregate starts only after the host's internal parent-PID and liveness-EAGAIN check, but coordinator-facing stdout permits only the terminal frame and no separate readiness channel exists. The coordinator therefore cannot observe or enforce the exact aggregate start. Start the aggregate at a coordinator-known event such as direct-child spawn, or define a separate bounded authenticated readiness handshake and test the prelaunch-to-aggregate transition."
+  - severity: "high"
+    where: "AC4 — implementation_review CAS reconciliation"
+    finding: "After an ambiguous first implementation_review push, public main may still equal E and P_H therefore remains non-public. The reviewed-local P_H exception is limited to publication, so the required fresh reconcile host cannot satisfy normal public prelaunch authentication in the main=E case. Extend that exception narrowly to mutation-incapable reconciliation of the same reviewed candidate, or assign the exact credentialless disposition to the trusted coordinator."
+  - severity: "high"
+    where: "AC6 — final repository-bootstrap migration record"
+    finding: "The repository-bootstrap record must contain post-operation release IDs and N5 evidence, but only the pre-operation R, P_L, and P_S commits have defined CAS publishers. No actor, candidate parent, allowed-path set, authorization, commit identity, or public readback immutably publishes the completed record. Define a post-operation evidence commit and exact readback before item 137 may consume the handoff."
+  - severity: "medium"
+    where: "AC3 — source-mode cleanup transition"
+    finding: "The cleanup transition performs fallible child settlement and helper authentication before changing state from not_started to running. If explicit cleanup step 15 fails before that assignment, the surrounding finally observes not_started and re-enters cleanup, violating the one-attempt contract. Set running before any fallible or awaited cleanup work, make every later failure terminal, and test authentication and pre-spawn failures for exactly one attempt."
+  - severity: "medium"
+    where: "AC4 — hosted quality-job cleanup"
+    finding: "The 65-minute job timeout does not reserve execution time for the later always() HOME_JOB cleanup: the AC3 verifier may consume 3700 seconds, leaving only 200 seconds for all setup, evidence, and cleanup, and a job timeout can prevent the cleanup step from running. Specify a shorter substantive-step bound or larger job-level cleanup reserve, plus an exact bounded cleanup helper/vector and absence readback."
+  - severity: "medium"
+    where: "AC6 — GitHub CLI config path ownership"
+    finding: "Requiring every component of the absolute GitHub CLI config path to be owned by founder UID 501 cannot pass on macOS because system ancestors such as / and /Users are root-owned. Define a no-follow component policy that permits enumerated UID-0, non-group/world-writable system ancestors and requires UID-501 ownership for the user/config suffix, while retaining same-descriptor checks for hosts.yml."
+  - severity: "medium"
+    where: "frontmatter files_to_modify / AC4-AC6 Project_echo schemas"
+    finding: "The Project_echo allowlist includes only schemas/echo-context-operation-rpc.v1.schema.json, while the criteria also depend on implementation-review-evidence.v1, target-main-execution-plan.v1, project-echo-delegated-operation-authorization.v1, and source-release-publication-plan.v1 schemas. Add those Project_echo paths or a tightly scoped schema wildcard so the required authority records can be implemented and revised within scope."
+---
