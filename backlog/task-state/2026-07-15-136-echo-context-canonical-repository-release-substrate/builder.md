@@ -2,9 +2,9 @@
 task_id: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 role: builder
 binding: codex
-claimed_by: codex-136-cycle2-repair-builder-mendel-249e60
-claimed_at: 2026-07-16T17:38:20Z
-last_updated: 2026-07-16T17:38:20Z
+claimed_by: codex-136-cycle2-final-builder-oracle-42c8
+claimed_at: 2026-07-16T17:45:27Z
+last_updated: 2026-07-16T17:45:27Z
 branch: agent/echo-context-canonical-repository-release-substrate
 worktree: /Users/zhenye/Desktop/Project_echo--echo-context-canonical-repository-release-substrate
 target_branch: agent/echo-context-canonical-repository-release-substrate
@@ -16,10 +16,10 @@ handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-
 
 ## current_thesis
 
-R24 converged at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0` with ready seal `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`. The final repair builder preserves both feature histories and starts from local target commit `249e60dfd8b6615b55dadcd60737a9052da48364`, which contains the deadline and repeated-signal fixes but is not yet remote authority. It must implement the converged pre-spawn/spawned-child terminal shapes, rerun every exact-head gate, and stop at independent-review handoff.
+R24 converged at exact spec commit `f80003a7fbd08755dbff669951ed07bf43b390d0` with ready seal `a1570370f26201be2e2390dbc94407cce5ee2e65b76843ca6b787c8d20d7e5ca`. Builder `codex-136-cycle2-final-builder-oracle-42c8` preserves both feature histories and starts from local target commit `249e60dfd8b6615b55dadcd60737a9052da48364`, which contains the deadline and repeated-signal fixes but is not yet remote authority. It must implement the converged pre-spawn/spawned-child terminal shapes, rerun every exact-head gate, and stop at independent-review handoff.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: CLAIMED — builder `codex-136-cycle2-repair-builder-mendel-249e60` owns the final R24 implementation repair; no final target or Project handoff SHA exists yet.
+- Lifecycle: CLAIMED — builder `codex-136-cycle2-final-builder-oracle-42c8` owns the final R24 implementation repair; the prior assigned session made no byte change, and no final target or Project handoff SHA exists yet.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
