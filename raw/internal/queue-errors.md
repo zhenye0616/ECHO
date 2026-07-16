@@ -55,3 +55,4 @@
 2026-07-14T05:28:48Z PROMOTE_CONTENT_IDENTITY_MISMATCH: 2026-07-13-134-local-echo-loop-source-extraction r18 reviewed=ac66076440efb000ec822a975fe5ac4a3dd57f7d363db7eb86a3777a2af95cfe current=135bab0fd87554cc4ff3c052764d98b90debded4056ed8532c2cac0b9ebcb086
 2026-07-14T05:28:48Z PROMOTE_CONTENT_IDENTITY_MISMATCH: 2026-07-13-135-local-echo-context-source-extraction r18 reviewed=12be9e96d2d735a54d18f78bfd15d3a47b9d98ec9315fb919dcb0e70d252082e current=aa9fa9d89c30b2ba2823d6b3eecdc32e389120bb9f3bc46538b9335a301c8392
 2026-07-16T03:01:21Z PUSH-RACE-FALLBACK: journal: 138 r3 dispatch sha=da250ae547c49a8159d78f3bcdf3c39417aae9e0
+2026-07-16T03:16:31Z QUEUE-ERROR: reviewer=codex-ops failure=spec_sha_unreachable spec=backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md@28f70ee057ddbeb588c5f0ca9e4bd77d3506bb03
