@@ -2,12 +2,12 @@
 task_id: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 role: strategist
 binding: codex
-last_updated: 2026-07-16T17:27:46Z
+last_updated: 2026-07-16T17:31:50Z
 ---
 
 ## current_thesis
 
-Item 136 is back in proposed after the second independent cycle-two implementation review rejected exact Project head `5b99d896e9103e0047c31d19fc574d7eea92abc5` and target head `1a91750e5b9ce9db49e9c893f9974b318f12f38a`. R22 accepted the truthful orchestration-deadline cut conceptually, but Codex-Ops found one remaining medium ambiguity: terminal settlement was explicit for timeout/cancellation but not for an ordinary nonzero/error exit whose descendant survives, including before `T` exists. The R22 patch makes the terminal PGID invariant universal and adds the exact pre-`T` adversarial fixture; R23 must verify those bytes before implementation resumes.
+Item 136 is back in proposed after the second independent cycle-two implementation review rejected exact Project head `5b99d896e9103e0047c31d19fc574d7eea92abc5` and target head `1a91750e5b9ce9db49e9c893f9974b318f12f38a`. R23 reviewers agreed that the R22 universal terminality wording incorrectly required an exit event and PGID absence when spawn failed before either could exist. The R23 patch closes that propagation edge with two exhaustive immutable terminal shapes—pre-spawn without PID, and spawned child with PID—while retaining the same no-report/no-advance rule. R24 is the terminal verification target; another finding against this patch-added mechanism requires removal or executable reduction rather than more prose.
 
 ## locked_decisions
 
@@ -18,14 +18,14 @@ Item 136 is back in proposed after the second independent cycle-two implementati
 - Reframe 3,700 seconds only as an orchestration deadline under responsive kernel calls. Returning synchronous filesystem calls get monotonic before/after checks; a non-returning call or unproved PGID may keep the invocation pending past `aggregate_end` and is never accepted, advanced, retried, or abandoned.
 - Reject alternative supervisors, Worker watchdogs, controllers, or extra production children: they change the reviewed process topology and still cannot prove cancellation of a stuck kernel request.
 - The implementation must reject completion after its execution deadline, keep idempotent SIGINT/SIGTERM handlers until explicit post-cleanup disposal, and remain pending on an existing managed handle until direct exit, stream closure, and PGID absence are proven.
-- Direct-child exit, stdout/stderr closure, and PGID absence gate every child outcome, including ordinary nonzero/error exits before `T`; a surviving descendant triggers the same idempotent TERM/five-second/KILL ceremony and blocks reporting until absence is proven.
+- A no-PID pre-spawn failure proves error, no PID/PGID, and closure of materialized streams without waiting for an exit event or signaling a group. Once a positive PID exists, direct exit, stdout/stderr closure, and PGID absence gate every outcome; a surviving descendant triggers the same idempotent TERM/five-second/KILL ceremony and blocks reporting until absence is proven.
 - Every medium finding remains blocking. A fresh independent reviewer must rerun the exact target/Project heads after repair and own the implementation-review record.
 - Target main landing, Project integration, migration evidence, and completion publication remain separate coordinator operations with immutable single-use authorizations and exact remote readback.
 
 ## open_questions
 
-- R23 reviewers must decide only whether the universal managed-child terminality patch closes the R22 finding without reintroducing the removed supervisor/hosted architecture.
-- After R23 promotion, the repair builder must report whether waiting for terminal settlement requires an adapter-shape change beyond the two already-local fixes. Any such byte remains independently reviewable.
+- R24 reviewers must verify only that the pre-spawn/spawned-child split is exhaustive, implementable, and closes the converged R23 finding without reintroducing removed architecture.
+- After R24 promotion, the repair builder must implement the exact terminal-shape fixtures and report any adapter-shape change. Any such byte remains independently reviewable.
 
 ## dont_touch
 
