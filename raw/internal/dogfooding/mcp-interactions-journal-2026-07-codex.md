@@ -35,6 +35,15 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
 
+### 2026-07-16 08:33 PDT - active dispatch of item 136 R21 scope-cut verification
+
+- **Trigger:** The Codex persistent coordinator dispositioned R20, committed the founder-directed scope cut, and pushed the exact-SHA R21 request; the review-watcher protocol requires best-effort active invocation of each headless reviewer after dispatch.
+- **Query inputs:** `coord_invoke({role:"codex", request_path:"backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r21/request.md", correlation_id:"25107a2b-98fc-46d0-9006-393bb172508f"})`; same call with `role:"codex-ops"`.
+- **Returned:** Both calls returned HTTP 200 and schema-version-1 structured results. Codex invocation ID `345d3257-9e40-43e8-adab-45d596757d3b` selected `tools/review-queue/run-codex-reviewer.sh`; codex-ops invocation ID `1aee0ec5-1331-47da-903b-3e6817d220ed` selected `tools/review-queue/run-codex-ops-reviewer.sh`.
+- **Sources:** R21 request `backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r21/request.md`; pinned request `spec_commit_sha` `1c8814406d0667e98cff99784e59df5bb613f8f2` containing the exact spec patch `65059d49663e3a0cd1f5651ab22021d692d017fe`; ECHO coordination daemon `http://127.0.0.1:38478/mcp`.
+- **Verdict:** right - both exact-SHA reviewer wrappers were accepted immediately with distinct invocation IDs.
+- **Note:** This was active dispatch only, not reviewer success; canonical reviewer response commits remain the completion evidence. The launchd fallback remains redundant.
+
 ### 2026-07-15 22:31 PDT - read-only convergence audit of the active Codex review session
 
 - **Trigger:** Founder asked Codex to connect through ECHO to the Codex review session and determine whether review rounds are doing substantive work and converging.
