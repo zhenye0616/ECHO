@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-15-137-echo-context-installable-shadow-runtime"
+round: 5
+reviewer: "codex"
+artifact_sha: "7a79d6d479d872062bbb177c2cd8eb43e88f7cde"
+completed_at: '2026-07-16T06:00:40Z'
+verdict: "proceed_after_patches"
+findings:
+  - severity: "medium"
+    where: "AC4 release-set manifest and AC5 repo-free installation"
+    finding: "The authenticated trust chain stops at the bootstrap and release-set manifest: the literal bootstrap invocation does not receive the authenticated release-set manifest, while the tgz, runtime manifest, checksum, and SBOM remain ordinary download-directory paths. Patch the protocol so the runner verifies and protects all six assets before invoking the shell, or passes the authenticated release-set manifest and protected asset paths or descriptors to the bootstrap; require name, size, and SHA-256 verification before parsing or extraction, extraction from those same verified bytes, and checkpointing of the canonical release-set bytes and digest before smoke."
+  - severity: "medium"
+    where: "AC4 release approval ingress"
+    finding: "All listed approval-tuple values exist before smoke, and the origin of the single-use nonce plus the definition of stale are unspecified, so an approval file created before smoke could be submitted after the journal reaches smoked. Patch the journal to issue an unpredictable challenge only in the committed smoked checkpoint, bind the approval to that challenge, journal identity, generation, and smoke-evidence hash, define timestamp-age and clock rules, and consume the challenge with the approval CAS."
+  - severity: "medium"
+    where: "AC4 release FSM journal and tools/release-runtime.mjs"
+    finding: "The durable staging root remains an unresolved placeholder and the stage and resume command signatures do not state how landed SHA, version, root, or remote release identity are supplied. Patch AC4 with exact command forms, one closed staging-root resolver, owner/mode/type/symlink checks, an allowed concrete path in files_to_modify, and named schemas for release-journal.v1, approval, and the canonical release-set manifest."
+  - severity: "medium"
+    where: "AC5 install crash transaction and AC7 cleanup"
+    finding: "Writing the install intent before the first real-path mutation is impossible when the intent lives inside a freshly created transaction directory; a kill after directory creation but before intent persistence leaves bytes that neither the provisional nor committed ownership manifest can enumerate. Patch the transaction bootstrap and recovery protocol to cover support-root and transaction-directory creation, make pre-intent remnants deterministically discoverable and ownership-checked, enumerate every created parent, secret, log, shim, and staged path, and extend kill tests across mkdir, directory fsync, intent creation, and provisional-manifest creation."
+  - severity: "medium"
+    where: "AC5 candidate layout and close-bind handoff"
+    finding: "A launchd GUI domain such as gui/<uid> is not a filesystem path and cannot resolve beneath candidate-root, and no process is assigned ownership of the reservation socket across bootstrap, CLI, and launchd startup. Patch the candidate contract to confine only filesystem paths and writes beneath candidate-root while separately fixing the GUI domain and unique label, then specify which process binds the socket, how the reservation survives nested execution, and the exact close, kickstart, readiness, port-stolen, and cleanup sequence."
+  - severity: "medium"
+    where: "AC5 lifecycle sequences"
+    finding: "The claimed exact launchctl sequences are still expressed as bootstrap/enable and bootout/disable, without argument order, GUI targets, flags, idempotent error handling, or PID convergence points; requiring supervisor TERM after bootout is also ambiguous because bootout itself initiates job termination. Replace these shorthands with literal ordered commands for start, stop, disable, and restart and state where TERM-to-KILL forwarding, reaping, and launchd-state verification occur."
+  - severity: "medium"
+    where: "AC5 supervisor topology and durable last-exit record"
+    finding: "The supervisor cannot atomically record every runtime-child exit when the supervisor itself is killed before the child detects parent death and exits. Patch the ownership protocol for this crash window—either give the child a narrowly scoped atomic parent-death exit-record path or add another durable observation mechanism—and define serialization with a newly respawned supervisor so the record cannot regress or be overwritten by an older generation."
+  - severity: "medium"
+    where: "AC6 status and doctor process contract"
+    finding: "AC6 promises schema-valid exact-byte output but names no status or doctor schema, canonical serialization rule, or exit-code precedence when timeout, unhealthy, and internal failures coexist. Patch AC6 with concrete schema paths, the stdout encoding and trailing-newline contract, deterministic multi-failure precedence, and subprocess assertions for combined failures as well as the six individual outcomes."
+---
