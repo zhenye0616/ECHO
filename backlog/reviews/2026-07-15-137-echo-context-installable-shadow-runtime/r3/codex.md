@@ -1,0 +1,30 @@
+---
+item_id: "2026-07-15-137-echo-context-installable-shadow-runtime"
+round: 3
+reviewer: "codex"
+artifact_sha: "e9033277f938c94b3e71b88465f980e1aa5639c9"
+completed_at: '2026-07-16T03:06:06Z'
+verdict: "pushback"
+findings:
+  - severity: "high"
+    where: "AC4 release ownership and AC7 founder execute checkpoint"
+    finding: "AC4 initially assigns post-review sealing and building to the builder, while its later two-phase contract assigns release work to founder execute. Phase two also proceeds from build and smoke directly to publication, real installation, and evidence without a separate approval made after the bytes exist. Patch AC4/AC7 to end builder authority at candidate-only handoff, name the founder-owned release command, stage and verify the single release build, pause for approval explicitly bound to landed source SHA, version, and runtime artifact SHA-256, record that approval separately from merge approval, and define retry/refusal behavior that prevents a second release build."
+  - severity: "high"
+    where: "AC4, AC5, and AC7 installer bootstrap"
+    finding: "The install CLI, verifier, and bundled Node appear to exist only inside the runtime tgz, yet AC5 requires architecture and artifact verification before extraction while AC4/AC7 prohibit host-Node fallback, source-checkout dependency, or an alternative artifact. The repo-free clean-home and real installations therefore have no safe executable entrypoint. Define an exact published bootstrap asset or self-verifying package, bind it into the checksum/approval contract, specify the invocation and pre-extraction member validation, and test installation using only the published assets."
+  - severity: "high"
+    where: "AC1 single-writer lease and tests/runtime/composition.test.ts"
+    finding: "The owner tuple is diagnostic metadata, not an atomic exclusion mechanism. Two concurrent starters can both classify a lease as stale, reclaim it, and reach SQLite open. Specify the exact protected lease path, type, ownership, mode, atomic acquisition/reclaim primitive, metadata durability, and full-lifetime hold semantics. Add synchronized multi-process tests for simultaneous startup, concurrent stale reclaim, holder exit during inspection, PID reuse, and SIGKILL recovery, proving exactly one process opens storage."
+  - severity: "high"
+    where: "AC5 bounded logs and AC6 log-path diagnosis"
+    finding: "Launchd writes directly to stdout.log and stderr.log, but install/start-time rotation or truncation cannot bound output between CLI invocations or during an automatic crash loop. No numeric retained-byte or file-count cap is defined, so doctor also cannot determine whether retention is bounded. Prescribe an always-enforcing mechanism, exact per-stream and aggregate limits, safe regular-file/link/ownership/mode invariants, and a crash-loop test that exceeds the cap without reinvoking the CLI while asserting the on-disk aggregate remains bounded."
+  - severity: "high"
+    where: "AC3, AC5, and AC7 clean-home isolation"
+    finding: "AC3 promises a configuration-derived support root, AC5 prescribes literal founder paths, and AC7 requires temporary HOME/support/log/state roots with ECHO_* cleared, but no schema fields, resolver precedence, install flags, or exact invocation connect those modes. Filesystem prefixes also do not isolate the fixed launchd label and TCP port. Define one resolver and CLI contract for every mutable path, require candidate mode to reject real founder paths, use a unique disposable label and port for smoke runs, and test that every write and launchctl action remains inside the disposable namespace."
+  - severity: "medium"
+    where: "AC5 architecture preflight, AC6 doctor output, and related tests"
+    finding: "The spec does not define authoritative sources for physical host architecture, Rosetta availability, bundled-node architecture, and the running service's actual translation state. Define bounded probe commands or APIs, timeouts and exit mappings, plus stable doctor schema fields distinguishing Intel-native, Apple-Silicon-translated, and unavailable states. Add tests proving pre-extraction failure creates no extracted files, post-extraction bundled-node failure creates no plist or service, and doctor fails for incompatible or missing translation."
+  - severity: "medium"
+    where: "AC1 and AC6 lease/doctor truth"
+    finding: "A healthy daemon necessarily holds a live matching lease, while AC6 can be read to fail whenever a live owner blocks another startup; the required durable blocking evidence also has no named record or lifecycle. Define a truth table for the expected launchd-correlated holder, duplicate manual starter, foreign holder, stale record, running-without-lease, and stopped-with-holder states. Name and schema the durable refusal record, its permissions and atomic update/clear rules, and test each state without making the correctly correlated healthy service fail."
+---
