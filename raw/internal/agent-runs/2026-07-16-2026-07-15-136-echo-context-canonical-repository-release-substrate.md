@@ -1,7 +1,7 @@
 ---
 backlog_item: 2026-07-15-136-echo-context-canonical-repository-release-substrate
 agent_run_started: 2026-07-16T08:33:45Z
-agent_run_ended: 2026-07-16T09:18:35Z
+agent_run_ended: 2026-07-16T09:34:40Z
 status: ready_for_review
 test_status: passing
 ---
@@ -10,7 +10,7 @@ test_status: passing
 
 ## Outcome
 
-Implemented item 136 on isolated Project_echo and echo-context feature branches. The exact target feature head is `4241ca989814c1b99a300d5cf861e7e040f4983b`, tree `61c670ce9dce494b685ff08448edc85e8f9addf2`, and pull request `https://github.com/zhenye0616/echo-context/pull/1`.
+Implemented item 136 on isolated Project_echo and echo-context feature branches. The exact target feature head is `145868a67a85dbb651faed457ee4001370c0fad0`, tree `44ae95b77cd2298cd25b915f283b07bd7423100e`, and pull request `https://github.com/zhenye0616/echo-context/pull/1`.
 
 The builder pushed only the target feature branch. It did not merge or push target main, create a tag/release, configure hosting controls, install anything, read live state, or transfer runtime/state authority.
 
@@ -30,7 +30,7 @@ The builder pushed only the target feature branch. It did not merge or push targ
 - `npm ci` — passed; 291 packages, zero audit vulnerabilities.
 - `npm run typecheck` — passed.
 - `npm run lint` — passed.
-- `npm run test:ci` — passed; 77 files, 1,024 passed, 17 skipped, zero failed.
+- `npm run test:ci` — passed; 77 files, 1,025 passed, 17 skipped, zero failed.
 - `npm run test:operator` with explicit Project_echo Git dir/SHA — passed; 2/2.
 - `npm run verify:inventory` — passed; 340 lock-closure packages and 25 successor executable/config sources.
 - `npm run verify:authority` — passed.
@@ -38,11 +38,15 @@ The builder pushed only the target feature branch. It did not merge or push targ
 - Deterministic source artifact build/verify — passed at the exact feature head.
 - Detached no-local clone under a temporary HOME, with no sibling repository and all ECHO variables absent — passed the exact 16-step source trace.
 - Workflow YAML structural parse — passed.
+- Hosted CI run `29487447722` — passed at the exact target head on macOS and Ubuntu.
+- Hosted secret-scan run `29487447735` — passed at the exact target head.
 - `git diff --check`, target cleanliness, remote feature-head readback, and PR head readback — passed.
 
 ## Repaired Gate
 
-The first detached-clone trace failed at secret-scan step 14 because the verifier accepted an absolute scanner path but did not resolve a PATH-only executable. I fixed the resolver, refreshed the sealed v2 inventory, reran scanner/type/lint fixtures, and reran the complete detached clone successfully. The failure was not waived.
+The first detached-clone trace failed at secret-scan step 14 because the verifier accepted an absolute scanner path but did not resolve a PATH-only executable. I fixed the resolver, refreshed the sealed v2 inventory, reran scanner/type/lint fixtures, and reran the complete detached clone successfully.
+
+Hosted runs `29486617903` and `29486617921` then exposed founder-machine Node/Git paths plus a binary-file `GITHUB_PATH` entry. I changed CI Node launchers to `process.execPath`, made Git PATH-resolved, changed the scanner installer to emit and verify its directory PATH entry, and added regression tests. The following CI run `29487188805` exposed one nested Node hardcode in the parity verifier while secret-scan run `29487188736` passed; I changed that launcher to `process.execPath` and extended the regression test. After each repair I refreshed runtime-inventory.v2 and reran the relevant focused tests plus the full local and detached-clone gates. Final hosted runs `29487447722` and `29487447735` passed. No failure was waived or merely rerun without a cause-level repair.
 
 ## External Gate Preserved
 

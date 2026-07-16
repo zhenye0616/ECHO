@@ -16,7 +16,7 @@ handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-
 
 ## current_thesis
 
-Implemented the reviewed standalone repository, self-contained CI, deterministic non-installable source artifact, and fail-closed first-release controls as the fresh independent Codex builder. Exact echo-context review candidate: `4241ca989814c1b99a300d5cf861e7e040f4983b` / tree `61c670ce9dce494b685ff08448edc85e8f9addf2` / PR `https://github.com/zhenye0616/echo-context/pull/1`.
+Implemented the reviewed standalone repository, self-contained CI, deterministic non-installable source artifact, and fail-closed first-release controls as the fresh independent Codex builder. Exact hosted-green echo-context review candidate: `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e` / PR `https://github.com/zhenye0616/echo-context/pull/1`.
 
 <!-- builder-state-handoff:start -->
 - Lifecycle: COMPLETE — ready for review at b5c94304f78043b1a0508899a2188065c29157da.
@@ -48,6 +48,6 @@ Implemented the reviewed standalone repository, self-contained CI, deterministic
 
 - spec: backlog/claimed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/
-- target review: https://github.com/zhenye0616/echo-context/pull/1 at 4241ca989814c1b99a300d5cf861e7e040f4983b
+- target review: https://github.com/zhenye0616/echo-context/pull/1 at 145868a67a85dbb651faed457ee4001370c0fad0
 - evidence: raw/internal/migrations/2026-07-15-136-echo-context-repository-bootstrap.md
 - run log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-canonical-repository-release-substrate.md

@@ -80,10 +80,10 @@ This evidence permits only the separately authorized create-only empty-repositor
 - Project_echo feature branch: `agent/echo-context-canonical-repository-release-substrate`
 - Project_echo feature HEAD: recorded by the backlog handoff after this evidence commit (the record cannot self-bind its containing commit)
 - Echo-context feature branch: `agent/echo-context-canonical-repository-release-substrate`
-- Echo-context feature HEAD: `4241ca989814c1b99a300d5cf861e7e040f4983b`
-- Echo-context feature tree: `61c670ce9dce494b685ff08448edc85e8f9addf2`
+- Echo-context feature HEAD: `145868a67a85dbb651faed457ee4001370c0fad0`
+- Echo-context feature tree: `44ae95b77cd2298cd25b915f283b07bd7423100e`
 - Echo-context pull request: `https://github.com/zhenye0616/echo-context/pull/1`
-- Remote feature-branch readback: `4241ca989814c1b99a300d5cf861e7e040f4983b`
+- Remote feature-branch readback: `145868a67a85dbb651faed457ee4001370c0fad0`
 - Canonical echo-context landed main HEAD/tree: pending independent review and delegated authorization
 - Canonical Project_echo landed main HEAD/tree: pending independent review and delegated authorization
 
@@ -92,16 +92,20 @@ This evidence permits only the separately authorized create-only empty-repositor
 - `npm ci`: passed; 291 packages, zero audit vulnerabilities
 - `npm run typecheck`: passed
 - `npm run lint`: passed
-- `npm run test:ci`: passed; 77 files, 1,024 passed, 17 skipped, zero failed
+- `npm run test:ci`: passed; 77 files, 1,025 passed, 17 skipped, zero failed
 - `npm run test:operator` with explicit source Git dir and SHA `2971310441b69735cbe759293abd8c4d044bf347`: passed; 2/2, including 217-path extraction replay and eight-tool parity aggregate
 - `npm run verify:inventory`: passed; runtime-inventory.v2 closes 340 packages and 25 successor executable/config sources
 - `npm run verify:authority`: passed; the accepted extraction baseline is an ancestor and authority remains false
 - `npm run scan:secrets`: passed against every advertised remote ref with the official digest-pinned Gitleaks 8.30.1 binary; zero findings
 - Detached sibling-free, temporary-HOME source acceptance: passed all 16 exact child steps with no Project_echo checkout or ECHO state
 - Workflow YAML parse: passed; exact jobs are `quality-macos`, `quality-ubuntu`, `secret-scan`, `build-artifact`, `publish-release`, and `rerun-sentinel`
+- Hosted CI run `29487447722`: passed at the exact feature head; both `quality-macos` and `quality-ubuntu` completed the exact clean-clone source acceptance
+- Hosted secret-scan run `29487447735`: passed at the exact feature head against full reachable history
 - Target worktree: clean at the exact feature head
 
-The first detached-clone run exposed a PATH-only scanner-resolution defect at step 14. The builder fixed the resolver, refreshed runtime-inventory.v2, reran focused scanner/type/lint checks, and reran the complete 16-step detached trace to success. No failed gate was waived.
+The first local detached-clone run exposed a PATH-only scanner-resolution defect at step 14. The builder fixed the resolver, refreshed runtime-inventory.v2, reran focused scanner/type/lint checks, and reran the complete 16-step detached trace to success.
+
+The first hosted runs (`29486617903`, `29486617921`) then exposed founder-machine Node/Git paths in CI tests plus a scanner installer that wrote the binary path rather than its directory to `GITHUB_PATH`. The builder changed CI test Node launchers to `process.execPath`, made Git PATH-resolved, changed the scanner installer to return a verified directory PATH entry, added regression coverage, refreshed runtime-inventory.v2, and reran all gates. The next hosted run (`29487188805`) exposed the same Node hardcode one layer deeper in the parity verifier's protocol-probe child; its paired secret-scan run `29487188736` had already passed. The builder changed that internal launcher to `process.execPath`, extended the regression test, refreshed inventory, and reran the complete local and hosted gates. Final runs `29487447722` and `29487447735` are both green. No failed gate was waived or merely rerun without an underlying fix.
 
 ## Source artifact and release identities
 
@@ -117,7 +121,7 @@ The first detached-clone run exposed a PATH-only scanner-resolution defect at st
 - Release ID: pending platform allocation
 - Asset IDs: pending platform allocation
 
-Ephemeral verification builds from the exact feature head were created only under temporary directories and removed. Their repeatable test tuple was source-archive SHA-256 `17954cff1c95f6cd4b85b18112817e71468d5d94d712ff06368f9e6aa6a24b12`, lock hash `13ead528470d91adfc4456d349ae628f03f768ba51d78aee8d0b2c42dc12784b`, and manifest hash `348f6e8c42ba57a92a977a9f49502dcbc16bd3de5b7d065b60fc65d206b4f7c3`. These values are verification evidence only: they are not the authoritative AC6 build-once tuple, do not authorize publication, and must not be fed to item 137. Exact release fields are populated only from the later fresh detached clone of reviewed and read-back canonical main.
+Ephemeral verification builds from the exact feature head were created only under temporary directories and removed. Their repeatable test tuple was source-archive SHA-256 `c6e94446c6f9bc3042c30f1759ec298a8ac4b5fd44f1eec76d0c659c7264cfee`, lock hash `13ead528470d91adfc4456d349ae628f03f768ba51d78aee8d0b2c42dc12784b`, and manifest hash `8f3fa93be853617c5a5e3e7ce2426236923d601ef3236b8e88a763e69ade4e3f`. These values are verification evidence only: they are not the authoritative AC6 build-once tuple, do not authorize publication, and must not be fed to item 137. Exact release fields are populated only from the later fresh detached clone of reviewed and read-back canonical main.
 
 ## Unresolved external hosting gate
 
