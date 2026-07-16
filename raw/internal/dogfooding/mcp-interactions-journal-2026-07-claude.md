@@ -716,3 +716,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** daemon coord registry @ 127.0.0.1:38478 (prod MCP).
 - **Verdict:** ✅ right — active trigger accepted both roles; launchd fallback remains the redundant path.
 - **Note:** One concurrent-push rebase this tick (sibling 137 r3 reviewer responses + journals landed between combine and spec-patch push); spec-patch SHA stable at bb16485a post-rebase, r3 spec_commit_sha pins cadd1a8b (disposition commit; contains patched bytes from bb16485a). Prior tick's 138-dispatch journal push hit a push race (queue-errors PUSH-RACE-FALLBACK at 2026-07-16T03:01Z) but landed as da250ae5 — no action needed.
+
+## 2026-07-15 20:11 PDT — 137 r3 divergent escalation to founder (zero MCP calls — escalation branch)
+
+- **Trigger:** Watcher tick combined 137 r3 → `combined_verdict: divergent`, `escalated_to_founder: true`. codex=`pushback` (5 HIGH + 2 MEDIUM) vs codex-ops=`proceed_after_patches` (3 HIGH + 3 MEDIUM) crosses the `{proceed*, pushback}` boundary. Queue path: `backlog/reviews/2026-07-15-137-echo-context-installable-shadow-runtime/r3/combined.md` @ 54ad7408; round reviewed at spec_commit_sha e9033277.
+- **Query inputs:** none — the escalation branch makes no `coord_invoke`; this entry is the skill-mandated escalation record (§Out of Scope #7: strategist does not adjudicate divergence).
+- **Returned:** n/a.
+- **Sources:** repo state only — r3 combined.md frontmatter + reviewer response verdict lines in the ephemeral watcher worktree; no ECHO retrieval.
+- **Verdict:** ✅ right — boundary-cross detection and founder handoff are exactly the designed behavior; no strategist disposition attempted.
+- **Note:** Both reviewers landed 13 findings across the same AC surface (AC1 single-writer lease/doctor truth, AC4/AC7 release-ownership + install sequence, AC5/AC6 launchd logs + preflight ordering) but split on severity-to-verdict mapping. 137's lane history: r1 no_responses escalation → r2 responsive after roster rebind → r3 divergent. Founder decides adjudication direction per the escalation contract; all 13 disposition cells left as `_strategist fills_` pending that call.
