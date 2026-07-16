@@ -1,6 +1,6 @@
 ## current_thesis
 
-Implementation cycle one was independently rejected at Project_echo head `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context head `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e`. The exact rejection sidecar is sealed at Project_echo commit `77c5e0c3f7f64c0bda1d99439d8d35eca54551ee`, blob `1cd16c1f31dab5c40ad76b70716846a09c98d845`. Item 136 is reopened in `proposed/` for R15 structural reframe; both implementation branches remain frozen until a fresh content seal and fresh Codex builder claim.
+Implementation cycle one was independently rejected at Project_echo head `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context head `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e`. The exact rejection sidecar is sealed at Project_echo commit `77c5e0c3f7f64c0bda1d99439d8d35eca54551ee`, blob `1cd16c1f31dab5c40ad76b70716846a09c98d845`. R15 accepted every finding and applied one structural cut: remote release publication and the target authorization ref are removed in favor of a read-only correlated Actions build plus an exact-plan local publisher. R16 must verify the patched same SHA; both implementation branches remain frozen until a fresh content seal and fresh Codex builder claim.
 
 ## locked_decisions
 
@@ -11,10 +11,16 @@ Implementation cycle one was independently rejected at Project_echo head `25b833
 - Cycle-one review accepted every substantive high/medium finding: executable bootstrap/recovery/fault fixtures; injected production controller/fresh-clone seams; exact mutation-response validation; tag porcelain evidence; final captured release/asset ID and byte readback; and structural workflow-policy tests.
 - The private personal Free topology cannot server-enforce branch protection, administrator enforcement, required PR approval, or a private environment reviewer. The spec states this limitation and does not claim protection from a malicious/compromised sole owner.
 - Target-main landing instead binds authenticated `B`/reviewed `H`/prepared merge `M`, exact independent-review evidence, exact successful app-bound check runs, `M` parent order/tree, a single-use Project_echo authorization and plan hash, one leased porcelain fast-forward push, readback, and post-merge checks.
-- Release is two dispatches: read-only build then write-scoped publish. Between them, a one-file canonical authorization commit parented to landed `M` is bound by an immutable public Project_echo approval and pushed once to `refs/heads/release-authorizations/<nonce>` with empty-expect porcelain proof.
-- The publisher fetches Project_echo only as a public read-only authorization ledger; no new local/GitHub credential or Project_echo write exists in the target workflow.
-- A nonce/ref is single-use. Reruns, another dispatch, or any pre-write failure consume it; recovery requires a fresh build, nonce, authorization commit/ref, and Project_echo record.
+- Landing additionally requires both frozen-baseline→H and B→H ancestry; a feature head that omits current main must become a new reviewed descendant before M can exist.
+- Release is one retry-free correlated read-only Actions build followed by one exact-plan local publication controller. No remote job has write scope, and no authorization ref or off-main approval object exists.
+- The build-dispatch controller makes one API-version-`2026-03-10` HTTP 200/run-ID dispatch attempt, resolves that exact correlation-bearing run/job through fully paginated bounded readback, and never redispatches or adopts an ambiguous/abandoned run.
+- The local publisher fetches the pinned Project_echo authorization only through a host-pinned credentialless public adapter. Target authentication is isolated to exact private-target operations; no new credential/signing state is introduced.
+- GitHub REST is pinned to API version `2026-03-10`; workflow dispatch accepts only the direct HTTP 200 run-ID/URL response, and all Actions/release binary downloads use one controlled signed-host redirect with credentials stripped.
+- Private-target authentication is the existing `zhenye0616` GitHub CLI keyring OAuth/HTTPS identity and exact current scope set; Git credentials cross only an anonymous askpass pipe and never enter durable state.
+- Canonical Project_echo implementation-review, target-main plan/authorization, and source-publication plan/authorization files own every builder/reviewer, run/job/carrier, object, hash, operation, response, readback, and retry-policy identity.
+- The full annotated-tag body, tagger fields, raw-byte SHA-256, and immutable Git tag-object OID are authorization inputs. Asset uploads bind captured release-scoped endpoints plus exact-ID enumeration/metadata/download, not a nonexistent response `release_id`.
 - Destination namespace authenticated readback remains the sole durable publication authority. No run log, retry, adoption, automatic cleanup, or authority expansion is allowed.
+- Nonempty destination state mechanically blocks cold replay. With no separate consumption marker, an empty-namespace cold process cannot distinguish a prior pre-write attempt; fresh build/plan/authorization is trusted-coordinator policy, not falsely claimed server enforcement.
 - The production publication controller retains exact release/asset IDs and approved bytes, validates every mutation response body, emits sanitized tag porcelain proof, and repeats exact-ID metadata/download verification at the final exhaustive namespace boundary.
 - Version `0.1.0-dev.136.1` remains source-only, deterministic, `installable:false`, `runtime_authority:false`, `state_authority:false`, maturity DEV.
 - Founder delegation at `raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md` authorizes the persistent coordinator but does not waive exact-SHA convergence, fresh builder/reviewer independence, immutable operation records, tests, or readback.
@@ -22,8 +28,8 @@ Implementation cycle one was independently rejected at Project_echo head `25b833
 
 ## open_questions
 
-- None requiring founder input. R15 reviewers must decide whether the exact-SHA landing gate and two-dispatch authorization carrier are executable and sufficiently honest for the fixed single-owner Free-tier threat boundary.
-- Any R15 finding accepted into a spec edit requires R16+ same-SHA verification before fresh promotion.
+- None requiring founder input. R15 is dispositioned `proceed_after_patches`; R16 must verify exact feature-head carriers, actor/plan/build/tag identities, credential isolation, the local-publication structural cut, and protocol-faithful fault fixtures on the patched same SHA.
+- Any R16 finding accepted into another spec edit requires R17+ same-SHA verification before fresh promotion.
 
 ## dont_touch
 
@@ -36,4 +42,5 @@ Implementation cycle one was independently rejected at Project_echo head `25b833
 - spec: backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md
 - rejected_review: backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.review.md
 - reviews: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/
+- r15_combined: backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r15/combined.md
 - delegation: raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md

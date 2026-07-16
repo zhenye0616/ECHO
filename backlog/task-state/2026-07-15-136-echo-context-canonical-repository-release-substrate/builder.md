@@ -16,7 +16,7 @@ handoff_run_log: raw/internal/agent-runs/2026-07-16-2026-07-15-136-echo-context-
 
 ## current_thesis
 
-Implementation cycle one is rejected after independent review and is historical evidence only. Frozen cycle-one heads are Project_echo `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e` / PR `https://github.com/zhenye0616/echo-context/pull/1`. Neither branch may resume, merge, or release until the AC4/AC6 reframe converges and a fresh builder claim is issued.
+Implementation cycle one is rejected after independent review and is historical evidence only. Frozen cycle-one heads are Project_echo `25b833332bb22ec79700fcdf31b9c9f20eea79f5` and echo-context `145868a67a85dbb651faed457ee4001370c0fad0` / tree `44ae95b77cd2298cd25b915f283b07bd7423100e` / PR `https://github.com/zhenye0616/echo-context/pull/1`. R15 findings are accepted and the specification is patched for R16 verification; neither branch may resume, merge, or release until exact-SHA convergence, a fresh content seal, and a fresh builder claim.
 
 <!-- builder-state-handoff:start -->
 - Lifecycle: ESCALATED/REJECTED — cycle-one review evidence is sealed at Project_echo commit 77c5e0c3f7f64c0bda1d99439d8d35eca54551ee; specification reopened for R15.
@@ -34,7 +34,7 @@ Implementation cycle one is rejected after independent review and is historical 
 
 ## open_questions
 
-- R15+ exact-SHA specification convergence and a fresh claim are required before any cycle-two implementation edit.
+- R16+ exact-SHA specification convergence and a fresh claim are required before any cycle-two implementation edit. The pending contract removes remote publication/auth-ref state and requires a correlated read-only build plus the local exact-plan publisher; this is not implementation authority until sealed.
 - Cycle-one accepted findings are immutable in `backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.review.md`; all high/medium findings remain blocking.
 
 ## dont_touch
