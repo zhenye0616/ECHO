@@ -1,0 +1,33 @@
+---
+item_id: "2026-07-15-138-echo-context-cutover-substrate-rehearsal"
+round: 6
+reviewer: "codex"
+artifact_sha: "38b2f9d70c326577ca9f5679fa6f05c3b286d915"
+completed_at: '2026-07-16T04:24:19Z'
+verdict: "pushback"
+findings:
+  - severity: "high"
+    where: "AC1 — lock-only bootstrap state and durable canonical-record commits"
+    finding: "The sole admitted lock-only state is incompatible with the required temp-write, fsync, and rename protocol for the first planned-record commit. A kill after visible temp creation but before rename leaves authority.lock plus a temp file, which is neither the admitted lock-only state nor a valid canonical-record state, so replay rejects permanently. Name the record and temp paths and either define a strictly validated recoverable temp state or a Darwin-supported publication primitive that leaves no visible temp; kill-test every create, write, fsync, and rename boundary, including the first commit."
+  - severity: "high"
+    where: "AC1 and AC2 — authority.lock acquisition"
+    finding: "authority.lock names an inode but not the interprocess exclusion primitive shared by the two Node packages. Specify the supported Darwin locking API or dependency, descriptor-relative no-follow open and inode validation, nonblocking monotonic acquisition deadline, descriptor inheritance policy, and close behavior on every exit. Add real multiprocess tests proving both binaries lock the same inode, never overlap, and exit within a normative deadline when a contender is stuck."
+  - severity: "high"
+    where: "AC1 durable-journaling rule and AC2 timeout/evidence paragraphs"
+    finding: "A controller that times out acquiring authority.lock cannot satisfy AC2's requirement to persist a failure record under the root because AC1 permits durable journaling only while that lock is held. AC2 also requires persisted fence failure evidence before later declaring all fence evidence best-effort. Separate the cases: acquisition timeout must make no root write and report nonzero plus redacted stderr; post-acquisition failures may journal while holding the lock; fence evidence must remain best-effort for every rejection. Update the stuck-lock and unavailable-sink fixtures accordingly."
+  - severity: "high"
+    where: "AC2 — installed authority-root identity record"
+    finding: "The immutable installed identity record has no exact path, schema, ownership and integrity rules, atomic installer command, or definition of root aliasing. The controller and fence can therefore implement incompatible bindings or remain vulnerable to root replacement between path resolution and lock open. Define the install entrypoint and flags, record fields and location, durable creation sequence, canonical-path plus filesystem-identity binding, and descriptor-pinned no-follow verification through lock acquisition; add symlink, alternate spelling, parent traversal, and root-replacement race fixtures."
+  - severity: "high"
+    where: "AC5 — candidate staging and publication"
+    finding: "A manifest and archive cannot be atomically published with two independent file renames, and the spec names neither final paths nor discovery and concurrent-publisher rules. Define a fresh same-filesystem release directory, fsync its contents and directory, expose the complete pair with one atomic directory rename to an immutable final path, fsync the parent, and ignore staging or orphan paths during discovery. Add kill-point and concurrent-build tests proving no incomplete pair or failed-run manifest is publishable."
+  - severity: "high"
+    where: "AC5 self-binding and AC8 reviewed-to-landed identity"
+    finding: "Checking a manifest SHA and tree only against repository object existence permits substitution of another valid in-repository pair, while AC8 does not require the landed tree to equal the independently reviewed tree. Require each manifest SHA to equal the build checkout HEAD, derive its tree from that SHA, bind the archive provenance to both, and record either per-repository reviewed-tree equality at canonical readback or a re-review of the landed tree. Add negative tests using another valid commit/tree pair and a landed-tree drift fixture."
+  - severity: "medium"
+    where: "AC5 and Tests — deterministic candidate builds"
+    finding: "No named test falsifies the deterministic-build claim. Specify canonical entry order, timestamps, uid/gid, modes, compression metadata, manifest serialization, locale, timezone, and toolchain inputs, then build twice from independent clean checkouts of the same SHA and require byte-identical manifest and archive hashes."
+  - severity: "high"
+    where: "AC7 — W/C cut chronology and rollback export"
+    finding: "The chronology places the W and C cuts after G1-era writes but then exports only rows after W and C during rollback, which can omit the entire G1 delta. Define activation baselines W0/C0 before the initial authority flip and rollback upper bounds W1/C1 while the rollback freeze is held, persist all four bounds, and export the intervals (W0,W1] and (C0,C1]. Test rows exactly on both boundaries and crash replay before and after each flip."
+---
