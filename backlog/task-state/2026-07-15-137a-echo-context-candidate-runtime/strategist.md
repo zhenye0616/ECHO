@@ -31,6 +31,11 @@ converging.
   solely owns the runtime-liveness writer and relays the runtime PID/start
   identity before ready. Third-runner outer/inner SIGKILL tests prove bounded
   absence without an unknown-PID signal or restart authority.
+- Post-landing `--mode full` exercises both existing liveness faults through
+  the third proof runner: outer SIGKILL after relayed `ready`, then, only after
+  complete absence and a fresh outer invocation, inner SIGKILL after relayed
+  `runtime_spawned` and before `ready`. Both require bounded identity,
+  listener, main-database-handle, and lease absence with no retry or restart.
 - Staging copies emitted runtime and regular lock-matching production
   dependencies only. Generated inventory+digest bind the clean head and exact
   executed members without self-reference. Absolute host Node v22.22.1 is
@@ -50,9 +55,9 @@ converging.
 
 ## open_questions
 
-- R3 must delta-verify the two recurring R2 families: the exact five-command
-  surface and the two-level outer→inner→runtime EOF/identity chain. It must
-  also confirm the seven R2-closed families remain closed.
+- R4 must delta-verify that the fresh detached-clone `--mode full` proof runs
+  both third-observer kill cases, that only the third runner launches a fresh
+  outer after complete absence, and that all other families remain closed.
 - Builder may refine file decomposition inside the listed runtime paths but
   may not add install, launchd, status/doctor, or real-path surfaces.
 

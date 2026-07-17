@@ -341,9 +341,10 @@ allowed process-scoped flow without attributing unrelated host traffic.
 Normal stop closes the inner's liveness writer and proves absence. The orphan
 case has the outer SIGKILL only the identity-matched inner; kernel closure of
 the sole writer triggers runtime EOF, while the surviving outer performs the
-bounded absence checks and cleanup evidence. A restart begins only after
-complete prior absence and creates a new inner, runtime, pipes, PID/start
-identity, and run ID; old control/ready records are rejected. There is no
+bounded absence checks and cleanup evidence. Only the third proof runner may
+start another exact command-3 outer after complete prior absence; that fresh
+outer creates a new inner, runtime, pipes, PID/start identity, and run ID, and
+old control/ready records are rejected. There is no
 launchd, supervisor, detached group, persistent lifecycle command, automatic
 retry, shared ready path, or second restart authority.
 
@@ -378,17 +379,27 @@ smoke:
 3. authenticate and list exactly eight tools;
 4. retrieve the synthetic event;
 5. prove auth negatives and capture-disabled with zero application body consumption;
-6. stop/restart and prove state persists;
-7. have the surviving outer controller SIGKILL the inner lifecycle owner and
-   prove parent-EOF orphan cleanup;
+6. stop, prove complete absence, have the third proof runner launch a fresh
+   exact command-3 outer lifecycle, and prove state persists;
+7. through the third proof runner, exercise both AC4 EOF chains without retry
+   or restart:
+   a. after relayed `ready`, SIGKILL the outer and prove the inner and runtime
+      identities, listener, main-database handles, and writer lease disappear
+      within AC4's bound;
+   b. only after complete absence, launch a fresh exact command-3 outer, wait
+      for relayed `runtime_spawned` and no relayed `ready`, SIGKILL that inner,
+      and prove the surviving outer observes the inner/runtime identities,
+      listener, main-database handles, and writer lease disappear within the
+      same bound;
 8. prove the one disposable run root is the only mutated path;
 9. validate the sandbox and process-scoped socket evidence, including no
    candidate bind/connect involving 39478, 38478, or 38479;
 10. remove that run root only after every identity and absence check.
 
 The Project_echo evidence binds canonical target SHA/tree, candidate version,
-lock hash, diagnostic stage hash, Node/npm/ABI identity, tests, roster,
-capture/authority values, and states exactly:
+lock hash, diagnostic stage hash, Node/npm/ABI identity, tests, roster, both
+post-landing liveness-case absence/no-retry results, capture/authority values,
+and states exactly:
 `installable:false`, `installed:false`, `launchd_exercised:false`,
 `portable_dependency_closure:false`, `runtime_authority:false`, and
 `state_authority:false`. Completion advances neither Team-product maturity
@@ -476,7 +487,9 @@ nor context authority.
   slice, the exact five shell-free commands and role discriminators, cwd,
   positive environment, flags, FD maps, observed argv, rejection of every
   extra mode, exit map/stdout-stderr caps, one-root mutation set, and
-  fixed-port sentinels.
+  fixed-port sentinels. Its `--mode full` path executes both AC5 7(a) and 7(b),
+  proves bounded absence, and proves no later `inner_spawned` or
+  `runtime_spawned` retry record appears.
 - `tests/security/candidate-scope.test.ts` rejects runtime literals/imports
   for launchd, fixed ports, real paths, install/bootstrap/status/doctor/
   authority and Project-specific coordination code.
