@@ -234,17 +234,35 @@ The entire executable surface and arguments are closed:
 
 1. stage — `<node-abs> <source>/tools/stage-candidate-runtime.mjs --run-root
    <run-root>`;
-2. seed — `<node-abs> <run-root>/stage/bin/candidate-runtime.mjs seed
-   --run-root <run-root> --fixture-id synthetic-v1`;
-3. smoke controller — `<node-abs>
+2. seed — `/usr/bin/sandbox-exec -f
+   <run-root>/work/evidence/candidate.sb <node-abs>
+   <run-root>/stage/bin/candidate-runtime.mjs seed --run-root <run-root>
+   --fixture-id synthetic-v1`;
+3. smoke outer controller — `<node-abs>
    <run-root>/stage/bin/candidate-smoke.mjs --run-root <run-root> --mode
-   full`; and
-4. the inner lifecycle owner alone spawns `<node-abs>
+   full --observer-fd 3`;
+4. the outer alone spawns its inner lifecycle owner — `<node-abs>
+   <run-root>/stage/bin/candidate-smoke.mjs --inner-owner --run-root
+   <run-root> --control-fd 3 --outer-liveness-fd 4`; and
+5. the inner alone spawns the runtime — `/usr/bin/sandbox-exec -f
+   <run-root>/work/evidence/candidate.sb <node-abs>
    <run-root>/stage/bin/candidate-runtime.mjs serve --run-root <run-root>
    --ready-fd 3 --parent-fd 4`.
 
 No other flag, positional argument, environment override, or executable
-entrypoint is accepted. Exit 0 means completed success/no-op; 64 means
+entrypoint or private role discriminator is accepted. All five launches are
+shell-free with cwd exactly `<run-root>/work`, umask 077, the positive
+environment below, and only these FD maps: stage and seed receive fd 0 from
+`/dev/null` and separate fd 1/2 pipes continuously drained by the proof
+runner; the outer receives the same fd 0/1/2 map plus record-writer fd 3; the
+inner receives fd 0 from `/dev/null`, separate fd 1/2 writers drained by the
+outer, control-writer fd 3, and outer-liveness-reader fd 4; the runtime
+receives fd 0 from `/dev/null`, inherits only those inner fd 1/2 writers, and
+receives ready-writer fd 3 plus runtime-liveness-reader fd 4. Every other
+descriptor is close-on-exec at each boundary. The generated sandbox profile
+is written and fsynced 0600 under the named evidence path, its hash is bound
+before seed/serve, and `sandbox-exec` itself receives no other option.
+Exit 0 means completed success/no-op; 64 means
 argument/config/path contract failure; 65 fixture identity/refusal; 66
 stage/inventory/source mismatch; 69 Node/ABI/native-load failure; 70 malformed
 ready/internal protocol; 75 immediate writer contention; 124 bounded shutdown
@@ -259,21 +277,28 @@ repository variables, credentials, and every unlisted inherited name are
 absent. Tests poison each excluded variable and prove it neither changes
 pre-entry execution nor survives in the candidate.
 
-The staged smoke controller is the surviving observer, not a restart
-authority. It spawns one inner lifecycle owner with stdout/stderr as
-continuously drained pipes and fd 3 as a bounded write-only control channel
-from inner to observer. The observer never inherits or writes the runtime
-liveness pipe. The inner alone spawns one non-detached runtime: runtime fd 3 is
-the write-only ready pipe (inner holds the read end), runtime fd 4 is the
-read-only liveness pipe (inner holds the sole write end), and all other
-non-stdio descriptors are close-on-exec. Runtime stdout/stderr inherit only the
-inner's corresponding pipe writers, while the outer holds the sole readers and
-keeps draining even if the inner dies. The inner validates exactly one
-`{pid,start_time,port,run_id,version}` record plus LF, captures the runtime's
-Darwin process start identity twice consistently via
-`/bin/ps -p <pid> -o lstart=` under `LC_ALL=C`, then relays both identities
-once over its control fd. Multiple/malformed/stale records are exit 70 and
-identity-bound cleanup. The outer records the tuple before any probe.
+The staged smoke outer is the lifecycle observer, not a restart authority. A
+third proof runner owns the read end of outer fd 3 and receives bounded
+`inner_spawned`, `runtime_spawned`, `ready`, and `exited` records so it
+can test outer death; it never owns either liveness writer. The outer spawns
+one inner: inner fd 3 is the write-only control pipe whose sole reader is the
+outer, and inner fd 4 is the read-only outer-liveness pipe whose sole writer is
+the outer. The outer continuously drains inherited stdout/stderr and relays
+each identity record to the third runner before any readiness wait.
+
+The inner alone spawns one non-detached runtime through exact command 5:
+runtime fd 3 is the write-only ready pipe whose sole reader is the inner, and
+runtime fd 4 is the read-only runtime-liveness pipe whose sole writer is the
+inner. Runtime stdout/stderr inherit only the inner's corresponding pipe
+writers while the outer holds the sole readers; all other descriptors at both
+boundaries are close-on-exec. Immediately after spawn, before waiting for
+readiness, the inner captures PID plus Darwin start identity twice consistently
+through `/bin/ps -p <pid> -o lstart=` under `LC_ALL=C` and sends one
+`runtime_spawned` record; the outer durably relays it to the third runner.
+The inner then validates exactly one
+`{pid,start_time,port,run_id,version}` ready record plus LF, requires its PID
+and start identity to match the spawned record, and relays it. Multiple,
+malformed, stale, or mismatched records are exit 70 and identity-bound cleanup.
 
 Both runtime output pipes are drained until EOF regardless of volume into
 separate 1 MiB capped ring buffers; bytes beyond the cap are discarded while
@@ -298,9 +323,9 @@ absent after staging. The inner/runtime process boundary is
 `/usr/bin/nettop`, and identity/descriptor snapshots use `/bin/ps` and
 `/usr/sbin/lsof`. Absence of any absolute tool or failure of a same-profile
 direct and grandchild deny-probe blocks the proof with no fallback. A
-generated, evidence-hashed profile permits
-read/execute only for the recorded Node/system runtime/stage closure, writes
-only under `work`, loopback bind/accept only, and denies outbound network,
+generated, evidence-hashed profile permits read/execute only for the recorded
+Node/system runtime/stage closure, read/write only under `work`, loopback
+bind/accept only, and denies outbound network,
 DNS, non-loopback, package-manager execution, and source/sibling access for the
 candidate and descendants. The observer remains outside the sandbox so it can
 connect only to the ready-record port. From the spawned identity it starts and
@@ -321,6 +346,16 @@ complete prior absence and creates a new inner, runtime, pipes, PID/start
 identity, and run ID; old control/ready records are rejected. There is no
 launchd, supervisor, detached group, persistent lifecycle command, automatic
 retry, shared ready path, or second restart authority.
+
+Outer death is a second EOF chain, not a second owner: EOF on inner fd 4 makes
+the inner immediately close the runtime-liveness writer and run the same
+bounded exact-identity cleanup before exiting. Third-runner tests wait for the
+relayed identities, then (a) SIGKILL the outer after ready and prove inner,
+runtime, listener, database handles, and lease disappear, and (b) SIGKILL the
+inner after `runtime_spawned` but before ready and prove the outer observes
+the same absence. If an inner dies before a spawn record exists, runtime
+liveness EOF plus descendant/lease/listener absence is required and no unknown
+PID is signaled. Neither path retries or restarts.
 
 ### AC5 — Independently review, land, and record the non-installable handoff
 
@@ -385,8 +420,9 @@ nor context authority.
 - Fixture hashing followed by path reopen recreates the R8 TOCTOU. The
   same-descriptor bounded buffer is the only parse/insert input.
 - A liveness descriptor inherited by the observer or helper can prevent EOF.
-  The explicit FD map, close-on-exec inventory, sole inner writer, and
-  outer-observer SIGKILL test prove closure.
+  The explicit two-level FD map, close-on-exec inventory, sole outer-to-inner
+  and inner-to-runtime writers, pre-ready identity relay, and third-runner
+  outer/inner SIGKILL tests prove closure without signaling an unknown PID.
 - A partial request or full output pipe can deadlock shutdown. Socket
   destruction deadlines and always-draining capped rings bound both paths.
 - A diagnostic stage can be mistaken for an installable artifact. Schema,
@@ -421,11 +457,14 @@ nor context authority.
   dirty/mismatched source and wrong Node-path/hash/version/ABI/native-load
   refusal, and explicit non-installable identity.
 - `tests/candidate/lifecycle.test.ts` proves ready/liveness FD ownership,
-  outer/inner/runtime inheritance map, authoritative start identity, stale-run
-  rejection, restart identity, normal shutdown, outer-observed inner-SIGKILL
-  orphan cleanup, active keep-alive/partial-body forced close, continuously
-  drained over-cap output with truncation evidence, every pre-ready failure
-  cleanup/escalation path, early loader failure capture, and no retry.
+  outer/inner/runtime inheritance map, the outer-to-inner and
+  inner-to-runtime EOF chain, `runtime_spawned` identity relay before ready,
+  authoritative start identity, stale-run rejection, restart identity, normal
+  shutdown, third-runner outer-SIGKILL after ready, inner-SIGKILL before
+  ready, no unknown-PID signal before the spawn record, active
+  keep-alive/partial-body forced close, continuously drained over-cap output
+  with truncation evidence, every pre-ready failure cleanup/escalation path,
+  early loader failure capture, and no retry.
 - `tests/candidate/repo-free.test.ts` poisons every excluded environment
   variable, proves absolute shell-free Node execution and source absence, then
   validates the `sandbox-exec` direct/grandchild deny probes, descendant
@@ -434,8 +473,10 @@ nor context authority.
   outbound/DNS/non-loopback/package-manager/sentinel-port operations.
 - `tests/candidate/smoke.test.ts` proves the complete seed/start/auth/
   eight-tool/retrieval/capture-off/restart/inner-kill/outer-observe/cleanup
-  slice, exact closed commands/flags/FDs/exit map/stdout-stderr caps, one-root
-  mutation set, and fixed-port sentinels.
+  slice, the exact five shell-free commands and role discriminators, cwd,
+  positive environment, flags, FD maps, observed argv, rejection of every
+  extra mode, exit map/stdout-stderr caps, one-root mutation set, and
+  fixed-port sentinels.
 - `tests/security/candidate-scope.test.ts` rejects runtime literals/imports
   for launchd, fixed ports, real paths, install/bootstrap/status/doctor/
   authority and Project-specific coordination code.

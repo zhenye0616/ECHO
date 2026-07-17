@@ -23,17 +23,21 @@ converging.
   a loser touches neither the main DB nor listener, and crash releases it.
 - Fixture lookup is ID-only. One O_NOFOLLOW descriptor supplies one bounded
   buffer used for hash, parse, validation, and insert; no path reopen exists.
-- The harness owns the sole child plus ready and parent-liveness pipes. EOF
-  architecture is outer observer → inner lifecycle owner → runtime. Only the
-  inner owns the liveness writer; the outer survives inner SIGKILL and proves
-  exact-identity absence without becoming a restart authority.
+- The executable surface is exactly five shell-free launches: stage, sandboxed
+  seed, smoke outer, smoke inner-owner mode, and sandboxed serve. Every argv,
+  cwd, positive environment, role discriminator, and FD map is closed.
+- EOF architecture is third proof runner → outer observer → inner lifecycle
+  owner → runtime. The outer solely owns the inner-liveness writer; the inner
+  solely owns the runtime-liveness writer and relays the runtime PID/start
+  identity before ready. Third-runner outer/inner SIGKILL tests prove bounded
+  absence without an unknown-PID signal or restart authority.
 - Staging copies emitted runtime and regular lock-matching production
   dependencies only. Generated inventory+digest bind the clean head and exact
   executed members without self-reference. Absolute host Node v22.22.1 is
   hashed and pinned for proof but not bundled.
 - Runtime descendants execute under a positive environment allowlist and a
-  validated sandbox profile: only stage/system reads, work writes, loopback
-  bind/accept, and no outbound network/source/package-manager access.
+  validated sandbox profile: only stage/system reads, work reads/writes,
+  loopback bind/accept, and no outbound network/source/package-manager access.
 - Raw Host/auth validation precedes every application body consumer; the claim
   deliberately excludes bytes buffered below Node's application boundary.
 - Output pipes always drain into capped rings, and tracked sockets are forced
@@ -46,10 +50,9 @@ converging.
 
 ## open_questions
 
-- R2 must verify all nine R1 families: closed commands/environment, one-root
-  topology, application body boundary, generated inventory, zero-timeout
-  lease, outer-observed parent EOF, active-socket deadline, continuous output
-  drain/failure cleanup, and process-scoped sandbox/network proof.
+- R3 must delta-verify the two recurring R2 families: the exact five-command
+  surface and the two-level outer→inner→runtime EOF/identity chain. It must
+  also confirm the seven R2-closed families remain closed.
 - Builder may refine file decomposition inside the listed runtime paths but
   may not add install, launchd, status/doctor, or real-path surfaces.
 
