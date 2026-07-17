@@ -15,7 +15,8 @@ converging.
   and committed source verification are mandatory before branching.
 - Candidate version is `0.1.0-dev.137a.1`.
 - All stage, secret, state, database, lease, fixture, temp, and log paths stay
-  under a disposable caller-created root; host is 127.0.0.1 and port is 0.
+  under one disposable caller-created root with immutable `stage` and
+  writable `work` siblings; host is 127.0.0.1 and port is 0.
 - Runtime has exactly eight existing tools, one SQLite storage, bearer auth,
   capture disabled, and authority false.
 - One dedicated SQLite exclusive transaction is the candidate writer lease;
@@ -23,9 +24,20 @@ converging.
 - Fixture lookup is ID-only. One O_NOFOLLOW descriptor supplies one bounded
   buffer used for hash, parse, validation, and insert; no path reopen exists.
 - The harness owns the sole child plus ready and parent-liveness pipes. EOF
-  causes bounded shutdown; SIGKILL of the harness must not orphan the runtime.
+  architecture is outer observer → inner lifecycle owner → runtime. Only the
+  inner owns the liveness writer; the outer survives inner SIGKILL and proves
+  exact-identity absence without becoming a restart authority.
 - Staging copies emitted runtime and regular lock-matching production
-  dependencies only. Host Node v22.22.1 is pinned for proof but not bundled.
+  dependencies only. Generated inventory+digest bind the clean head and exact
+  executed members without self-reference. Absolute host Node v22.22.1 is
+  hashed and pinned for proof but not bundled.
+- Runtime descendants execute under a positive environment allowlist and a
+  validated sandbox profile: only stage/system reads, work writes, loopback
+  bind/accept, and no outbound network/source/package-manager access.
+- Raw Host/auth validation precedes every application body consumer; the claim
+  deliberately excludes bytes buffered below Node's application boundary.
+- Output pipes always drain into capped rings, and tracked sockets are forced
+  closed after the graceful deadline before SQLite and lease shutdown.
 - Diagnostic inventory says installable/installed/portable closure/authority
   are all false. It is not a release or authorization carrier.
 - A fresh builder writes target source; a different reviewer reviews exact
@@ -34,8 +46,10 @@ converging.
 
 ## open_questions
 
-- Review must validate that the emitted dependency closure cannot fall back to
-  cwd, NODE_PATH, symlinks, the source checkout, or a network install.
+- R2 must verify all nine R1 families: closed commands/environment, one-root
+  topology, application body boundary, generated inventory, zero-timeout
+  lease, outer-observed parent EOF, active-socket deadline, continuous output
+  drain/failure cleanup, and process-scoped sandbox/network proof.
 - Builder may refine file decomposition inside the listed runtime paths but
   may not add install, launchd, status/doctor, or real-path surfaces.
 

@@ -17,10 +17,10 @@ files_to_modify:
   - /Users/zhenye/Desktop/echo-context/CHANGELOG.md # candidate milestone
   - /Users/zhenye/Desktop/echo-context/schemas/candidate-runtime-config.v1.schema.json # NEW closed disposable-root config
   - /Users/zhenye/Desktop/echo-context/schemas/candidate-ready.v1.schema.json # NEW private ready-FD record
+  - /Users/zhenye/Desktop/echo-context/schemas/candidate-stage-inventory.v1.schema.json # NEW generated-stage inventory schema
   - /Users/zhenye/Desktop/echo-context/src/runtime/** # NEW candidate config/auth/composition/fixture/serve entrypoints
   - /Users/zhenye/Desktop/echo-context/src/mcp/server.ts # authorization and capture-off transport seams only
   - /Users/zhenye/Desktop/echo-context/fixtures/synthetic-v1.json # NEW bounded source-bound synthetic fixture
-  - /Users/zhenye/Desktop/echo-context/provenance/candidate-runtime.v1.json # NEW diagnostic, explicitly non-installable stage identity
   - /Users/zhenye/Desktop/echo-context/tools/stage-candidate-runtime.mjs # NEW runtime-only staging and inventory
   - /Users/zhenye/Desktop/echo-context/tools/candidate-smoke.mjs # NEW repo-free parent-owned lifecycle proof
   - /Users/zhenye/Desktop/echo-context/tests/runtime/** # NEW config/auth/composition/fixture/lease tests
@@ -103,24 +103,43 @@ commit and tree above. Rebuild and verify the complete item-136 source tuple
 using its committed verifier. A missing remote object, stale local ref, altered
 tuple, copied artifact, or verification failure blocks the item.
 
-Add candidate version `0.1.0-dev.137a.1` and one closed runtime config. It
-requires a caller-created absolute disposable root that is a current-user 0700
-non-link directory. Every runtime, state, database, lease, token, fixture,
-temporary, and log path resolves beneath that root. The only network values
-are `host:"127.0.0.1"` and `port:0`; the only authority values are
-`authority:false`, `accept_capture:false`, and `capture_workers:[]`.
-Unknown keys, root/sudo, inherited `ECHO_*` configuration, environment or
-home-directory defaults, symlinked path components, traversal, foreign
-ownership, wrong modes/types, fixed ports, labels, GUI domains, plist paths,
-and real-user roots fail before SQLite or listener access.
+Add candidate version `0.1.0-dev.137a.1` and exactly one caller-created
+current-user 0700 absolute non-link `<run-root>`. Its closed topology is:
+`<run-root>/stage` for immutable executed bytes,
+`<run-root>/work/config/candidate.json`,
+`work/secrets/mcp-bearer-token`, `work/state/context.sqlite`,
+`work/state/writer-lease.sqlite`, `work/logs/`, `work/tmp/`,
+`work/home/`, `work/xdg-cache/`, and `work/evidence/`. No second stage
+or state root exists. The stage publisher alone may create a private sibling
+`<run-root>/.stage.<nonce>` and must atomically rename it to `stage` only
+after complete verification. Final stage directories/executables are 0500 and
+data files are 0400; `work` directories are 0700 and files are 0600.
+Cleanup removes this one root only after process/listener/lease absence, and
+refuses any member whose current identity differs from the recorded topology.
+
+The config lives only at the path above, names `run_root`, and contains no
+independently supplied child paths. The resolver derives every member from the
+validated root. The only network values are `host:"127.0.0.1"` and
+`port:0`; the only authority values are `authority:false`,
+`accept_capture:false`, and `capture_workers:[]`. Unknown keys, root/sudo,
+inherited configuration, environment or home-directory defaults, symlinked
+components, traversal, foreign ownership, wrong modes/types, fixed ports,
+labels, GUI domains, plist paths, and real-user roots fail before the lease,
+main SQLite, or listener is opened.
 
 The production composition owns exactly one `SqliteStorage` and the existing
 generic service semantics. It imports no capture pipeline, Project_echo
 onboarding/default paths, task-state Git implementation, coordination code,
 installer, launchd adapter, status/doctor surface, or authority controller.
-A dedicated SQLite lease database is opened first and held in an exclusive
-transaction for process lifetime; a concurrent loser exits before opening the
-main database or binding a socket. Crash/SIGKILL releases the lease.
+A dedicated SQLite lease database is opened first through `better-sqlite3`
+with `timeout:0`; startup executes `PRAGMA busy_timeout=0`,
+`PRAGMA journal_mode=DELETE`, and then exactly `BEGIN EXCLUSIVE` before any
+main-database or socket operation. The connection and transaction remain open
+for process lifetime. `SQLITE_BUSY` is typed contention exit 75, never
+retried; the losing process closes and exits, so it cannot resume after the
+winner releases. Every other lease failure is a contract/internal failure
+under the closed exit map in AC4. Crash/SIGKILL kernel cleanup releases the
+lease.
 
 ### AC2 — Serve exactly eight authenticated tools with capture disabled
 
@@ -137,23 +156,36 @@ that exact disk grammar, decodes exactly 32 bytes, and constant-time compares
 decoded request bytes. Exactly one `Authorization: Bearer <43 characters>`
 header is accepted. Missing, duplicate, malformed, padded, query, cookie,
 wrong, or whitespace-bearing credentials fail together with Host/DNS-rebinding
-checks before any request body is read.
+checks before application code consumes a body byte. The only accepted raw
+Host field is one occurrence whose ASCII value is exactly
+`127.0.0.1:<kernel-selected-port>`; comma-joined, absolute-form authority,
+userinfo, alternate numeric spelling, IPv6, missing-port, whitespace, and
+duplicate raw Host fields fail. Before Host and raw Authorization validation,
+the server attaches no `data`/`readable` listener, invokes no body parser,
+async iterator, pipe, or storage work, and never calls `read()`/resume on the
+request. Kernel/Node buffering below the application boundary is explicitly
+not claimed as body consumption.
 
 Every `/mcp`, `/mcp/recent-calls`, `/ready`, and `/v1/*` data route is
 authenticated. `/live` is unauthenticated and fixed. Authenticated
 `/ready` reports candidate version, PID/start identity, run ID, exact roster,
 storage ready, `capture:false`, and `authority:false`. Authenticated
-`POST /v1/capture` returns typed `403 capture_disabled` before consuming
-the body. Credential bytes never enter Git, argv, environment, stdout/stderr,
+`POST /v1/capture` returns typed `403 capture_disabled` without attaching
+or invoking any application body consumer. Rejections send
+`Connection: close` within the bounded header-response deadline even when a
+raw client withholds the declared body or streams without end; an
+application-consumption counter remains zero. Credential bytes never enter
+Git, argv, environment, stdout/stderr,
 logs, JSON evidence, inventory, process-title state, or errors.
 
 ### AC3 — Seed one synthetic fixture from one verified descriptor buffer
 
-The stopped-candidate seed entrypoint accepts only an absolute
-`--candidate-root` and `--fixture-id synthetic-v1`; callers cannot supply a
-fixture path or digest. A source-bound catalog maps that ID to the staged
-member and SHA-256. The seed path acquires the same exclusive writer lease
-before main-database access.
+The stopped-candidate seed entrypoint accepts only
+`seed --run-root <absolute-root> --fixture-id synthetic-v1`; callers cannot
+supply a config, database, fixture path, or digest. It resolves the one config
+and all paths from the topology in AC1. A source-bound catalog maps that ID to
+`stage/fixtures/synthetic-v1.json` and its SHA-256. The seed path acquires the
+same exclusive writer lease before main-database access.
 
 It validates every root-to-member component as current-user owned and
 non-link, opens the fixture once with `O_RDONLY|O_NOFOLLOW`, requires a
@@ -167,40 +199,128 @@ identity check leaves the database absent or byte-identical.
 
 ### AC4 — Stage and run repo-free with one parent-owned lifecycle
 
-`tools/stage-candidate-runtime.mjs` emits an explicitly non-installable
-directory containing emitted runtime JavaScript, required schemas and SQLite
-migrations, the synthetic fixture, package metadata, and regular non-symlink
-production dependency files copied from the exact lockfile-matching prepared
-workspace. Its diagnostic inventory binds target SHA/tree, version, lock hash,
-Node/npm versions, Node ABI, member paths/modes/hashes, and
-`installable:false`. It is not a release manifest, authorization carrier, or
-portable dependency proof.
+`tools/stage-candidate-runtime.mjs` runs only from an exact clean target
+checkout: `HEAD` must be a full commit, `git status --porcelain` must be
+empty, and the derived tree must match `HEAD^{tree}`. It publishes directly
+through AC1's temporary-to-final rename and never tracks a head-bound inventory
+in source. The final stage contains emitted runtime JavaScript, required
+schemas and SQLite migrations, the synthetic fixture, package metadata, and
+regular non-symlink production dependency files copied from the exact
+lockfile-matching prepared workspace.
+
+Inside the stage, canonical `candidate-runtime.v1.json` lists and hashes every
+other member except itself and `candidate-runtime.v1.sha256`, and binds the
+source SHA/tree, version, package-lock hash, resolved Node executable
+path/hash, Node/npm versions, ABI, member paths/modes/hashes,
+`installable:false`, and every negative authority flag from AC5. The adjacent
+digest file contains exactly the inventory SHA-256 plus LF. Verification first
+checks that digest, then requires the complete directory member set to equal
+the inventory plus those two metadata files. It repeats no-follow type,
+ownership, mode, size, and hash verification immediately before every
+execution. This is a diagnostic inventory, not a release manifest,
+authorization carrier, or portable dependency proof.
 
 The stage excludes `.git`, TypeScript source, tests, dev tools, caches,
-credentials, state, source maps with absolute paths, Project_echo, sibling
-repositories, install/lifecycle/status/doctor/authority code, and symlink
-members. Execution uses exactly host Node `v22.22.1` with the reviewed ABI;
-the smoke rejects another version/ABI or an unloadable native addon. It does
-not bundle or download Node, install packages, acquire the network, consult
-`NODE_PATH`, or fall back to any repository at runtime.
+credentials, writable state, absolute-path source maps, Project_echo, sibling
+repositories, install/lifecycle/status/doctor/authority code, and symlink or
+hardlink members. The caller resolves `process.execPath` to one absolute
+regular executable before staging, hashes it, and rechecks that same path,
+hash, `v22.22.1`, ABI, and native-addon load immediately before each
+shell-free spawn. No PATH lookup, shell, alternate interpreter, bundled or
+downloaded Node, package install, network acquisition, `NODE_OPTIONS`,
+`NODE_PATH`, or repository fallback is permitted.
 
-The smoke copies the stage into a separately created 0700 disposable root and
-runs it with source checkout absent from cwd, argv, module resolution, config,
-and state, and with repository, package-manager, credential, `NODE_PATH`,
-and `ECHO_*` environment removed. It spawns one non-detached child with a
-private ready FD and a separate parent-liveness FD, bounded captured
-stdout/stderr, and no retry loop. The ready FD emits exactly one schema-valid
-`{pid,start_time,port,run_id,version}` record plus LF only after storage and
-loopback bind. Parent-FD EOF, SIGTERM, or SIGINT initiates bounded shutdown of
-HTTP, SQLite, and lease.
+The entire executable surface and arguments are closed:
 
-Normal stop closes the liveness writer and proves the child, listener, main
-database handles, and lease are gone. Killing the harness with SIGKILL must
-close the inherited writer and cause the same absence within the deadline.
-Restart creates a new child, ready pipe, liveness pipe, PID/start identity, and
-run ID; stale ready records are rejected. There is no launchd, supervisor,
-detached process group, persistent lifecycle command, shared ready path, or
-second restart authority.
+1. stage — `<node-abs> <source>/tools/stage-candidate-runtime.mjs --run-root
+   <run-root>`;
+2. seed — `<node-abs> <run-root>/stage/bin/candidate-runtime.mjs seed
+   --run-root <run-root> --fixture-id synthetic-v1`;
+3. smoke controller — `<node-abs>
+   <run-root>/stage/bin/candidate-smoke.mjs --run-root <run-root> --mode
+   full`; and
+4. the inner lifecycle owner alone spawns `<node-abs>
+   <run-root>/stage/bin/candidate-runtime.mjs serve --run-root <run-root>
+   --ready-fd 3 --parent-fd 4`.
+
+No other flag, positional argument, environment override, or executable
+entrypoint is accepted. Exit 0 means completed success/no-op; 64 means
+argument/config/path contract failure; 65 fixture identity/refusal; 66
+stage/inventory/source mismatch; 69 Node/ABI/native-load failure; 70 malformed
+ready/internal protocol; 75 immediate writer contention; 124 bounded shutdown
+or cleanup timeout; all unexpected failures exit 1. Contract, stage, and Node
+checks precede token, lease, main SQLite, or listener mutation as applicable.
+
+Every spawned process receives a positive environment allowlist only:
+`LC_ALL=C`, `LANG=C`, `TZ=UTC`, and `HOME`, `TMPDIR`,
+`XDG_CACHE_HOME` rooted at the AC1 work members. PATH, `NODE_OPTIONS`,
+`NODE_PATH`, npm/yarn/pnpm variables, proxies, `DYLD_*`, `ECHO_*`,
+repository variables, credentials, and every unlisted inherited name are
+absent. Tests poison each excluded variable and prove it neither changes
+pre-entry execution nor survives in the candidate.
+
+The staged smoke controller is the surviving observer, not a restart
+authority. It spawns one inner lifecycle owner with stdout/stderr as
+continuously drained pipes and fd 3 as a bounded write-only control channel
+from inner to observer. The observer never inherits or writes the runtime
+liveness pipe. The inner alone spawns one non-detached runtime: runtime fd 3 is
+the write-only ready pipe (inner holds the read end), runtime fd 4 is the
+read-only liveness pipe (inner holds the sole write end), and all other
+non-stdio descriptors are close-on-exec. Runtime stdout/stderr inherit only the
+inner's corresponding pipe writers, while the outer holds the sole readers and
+keeps draining even if the inner dies. The inner validates exactly one
+`{pid,start_time,port,run_id,version}` record plus LF, captures the runtime's
+Darwin process start identity twice consistently via
+`/bin/ps -p <pid> -o lstart=` under `LC_ALL=C`, then relays both identities
+once over its control fd. Multiple/malformed/stale records are exit 70 and
+identity-bound cleanup. The outer records the tuple before any probe.
+
+Both runtime output pipes are drained until EOF regardless of volume into
+separate 1 MiB capped ring buffers; bytes beyond the cap are discarded while
+draining continues, and evidence records `truncated:true` without including
+credentials. Every pre-ready timeout, malformed/multiple record, failed
+assertion, signal, and normal exit runs exact-identity cleanup: close the
+liveness writer, wait two seconds, TERM the still-matching PID, wait one
+second, KILL the still-matching PID, then prove process/start identity,
+listener, main-database handles, and lease absence within five total seconds.
+The redacted evidence records which escalation occurred and whether every
+absence check passed.
+
+Runtime shutdown tracks every accepted socket. On parent-fd EOF, SIGTERM, or
+SIGINT it stops intake, calls server close, allows at most two seconds for
+requests, destroys every remaining keep-alive/partial-body socket, then closes
+main SQLite and the lease and exits within the five-second total deadline. An
+authenticated partial request cannot retain the process or lease.
+
+Repo-free execution uses a fresh verification clone whose source path is made
+absent after staging. The inner/runtime process boundary is
+`/usr/bin/sandbox-exec`; continuous process-scoped socket observation uses
+`/usr/bin/nettop`, and identity/descriptor snapshots use `/bin/ps` and
+`/usr/sbin/lsof`. Absence of any absolute tool or failure of a same-profile
+direct and grandchild deny-probe blocks the proof with no fallback. A
+generated, evidence-hashed profile permits
+read/execute only for the recorded Node/system runtime/stage closure, writes
+only under `work`, loopback bind/accept only, and denies outbound network,
+DNS, non-loopback, package-manager execution, and source/sibling access for the
+candidate and descendants. The observer remains outside the sandbox so it can
+connect only to the ready-record port. From the spawned identity it starts and
+continuously drains `/usr/bin/nettop -L 0 -n -p <runtime-pid>`, and it
+captures `/usr/sbin/lsof -nP -a -p <runtime-pid> -i` at readiness and
+shutdown. Same-profile probes must fail source/sibling reads, outside-work
+writes, DNS, non-loopback, package-manager execution, unexpected descendant
+exec, and connects to 39478, 38478, and 38479. The runtime evidence may contain
+only its selected 127.0.0.1 listener and outer-observer client flow. The
+sandbox denial is authoritative; continuously drained nettop/lsof records the
+allowed process-scoped flow without attributing unrelated host traffic.
+
+Normal stop closes the inner's liveness writer and proves absence. The orphan
+case has the outer SIGKILL only the identity-matched inner; kernel closure of
+the sole writer triggers runtime EOF, while the surviving outer performs the
+bounded absence checks and cleanup evidence. A restart begins only after
+complete prior absence and creates a new inner, runtime, pipes, PID/start
+identity, and run ID; old control/ready records are rejected. There is no
+launchd, supervisor, detached group, persistent lifecycle command, automatic
+retry, shared ready path, or second restart authority.
 
 ### AC5 — Independently review, land, and record the non-installable handoff
 
@@ -222,12 +342,14 @@ smoke:
 2. start on the kernel-selected port;
 3. authenticate and list exactly eight tools;
 4. retrieve the synthetic event;
-5. prove auth negatives and capture-disabled-before-body;
+5. prove auth negatives and capture-disabled with zero application body consumption;
 6. stop/restart and prove state persists;
-7. kill the harness and prove orphan cleanup;
-8. prove the disposable stage/state roots are the only mutated paths;
-9. prove no connection or mutation involving ports 39478, 38478, or 38479;
-10. remove disposable roots only after all absence checks.
+7. have the surviving outer controller SIGKILL the inner lifecycle owner and
+   prove parent-EOF orphan cleanup;
+8. prove the one disposable run root is the only mutated path;
+9. validate the sandbox and process-scoped socket evidence, including no
+   candidate bind/connect involving 39478, 38478, or 38479;
+10. remove that run root only after every identity and absence check.
 
 The Project_echo evidence binds canonical target SHA/tree, candidate version,
 lock hash, diagnostic stage hash, Node/npm/ABI identity, tests, roster,
@@ -254,16 +376,19 @@ nor context authority.
 ## Risks
 
 - A staged dependency can silently escape to the source tree through a
-  symlink, `NODE_PATH`, cwd, source map, or package fallback. The stage
-  inventory and repo-free syscall/path assertions fail closed on any escape.
+  symlink, pre-entry Node option, cwd, source map, or package fallback. Clean
+  source binding, two-file stage inventory, absolute Node identity, positive
+  environment allowlist, absent source path, and the sandbox fail closed.
 - Authorization can occur after body parsing if the existing server seam is
-  placed too deep. Raw-header and slow/infinite-body tests prove rejection
-  before consumption.
+  placed too deep. Raw-header and withheld/infinite-body tests prove immediate
+  rejection with no application consumer or storage work.
 - Fixture hashing followed by path reopen recreates the R8 TOCTOU. The
   same-descriptor bounded buffer is the only parse/insert input.
-- A liveness descriptor inherited by the child or helper can prevent EOF.
-  Descriptor-inventory and harness-SIGKILL tests prove the runtime is the sole
-  reader and the harness the sole writer.
+- A liveness descriptor inherited by the observer or helper can prevent EOF.
+  The explicit FD map, close-on-exec inventory, sole inner writer, and
+  outer-observer SIGKILL test prove closure.
+- A partial request or full output pipe can deadlock shutdown. Socket
+  destruction deadlines and always-draining capped rings bound both paths.
 - A diagnostic stage can be mistaken for an installable artifact. Schema,
   docs, evidence, filenames, and absence of install/bootstrap surfaces all
   state and enforce the negative capability.
@@ -273,29 +398,44 @@ nor context authority.
 ## Tests
 
 - `tests/runtime/config.test.ts` proves the closed constants, root
-  containment, ownership/mode/type rules, symlink/traversal/default rejection,
-  poisoned-environment rejection, and zero prevalidation mutation.
+  topology, derived member paths, immutable-stage/writable-work ownership and
+  modes, symlink/traversal/default rejection, poisoned-environment rejection,
+  cleanup identity refusal, and zero prevalidation mutation.
 - `tests/runtime/auth.test.ts` proves disk/wire grammar, decoded
-  constant-time comparison, raw duplicate-header handling, Host defense,
-  rejection before body read, capture-off ordering, and secret non-disclosure.
+  constant-time comparison, the exact raw Host grammar, duplicate-header
+  handling, no application body consumer/storage work, withheld and unbounded
+  raw-body immediate rejection, capture-off ordering, and secret
+  non-disclosure.
 - `tests/runtime/composition.test.ts` proves one storage instance, exact
-  roster, exclusive SQLite lease, concurrent-loser ordering, crash release,
-  forbidden-import closure, and bounded shutdown.
+  roster, exact zero-timeout SQLite lease pragmas/BEGIN ordering, immediate
+  typed loser exit with no delayed resume, crash release, forbidden-import
+  closure, tracked-socket graceful/forced shutdown, and partial-body deadline.
 - `tests/runtime/seed-fixture.test.ts` proves ID-only lookup,
   same-descriptor read/hash/parse, transaction ordering, exact replay,
   mismatch/multiplicity refusal, all four path races, and unchanged DB on
   failure.
 - `tests/candidate/stage.test.ts` proves the emitted-JS-only inventory,
+  clean-head/tree binding, inventory-plus-digest non-self-reference, exact
+  member/mode/hash verification immediately before spawn, atomic publication,
   regular copied dependency closure, excluded source/dev/repo/install members,
-  wrong Node/ABI/native-load refusal, and explicit non-installable identity.
+  dirty/mismatched source and wrong Node-path/hash/version/ABI/native-load
+  refusal, and explicit non-installable identity.
 - `tests/candidate/lifecycle.test.ts` proves ready/liveness FD ownership,
-  stale-run rejection, restart identity, normal shutdown, harness-SIGKILL
-  orphan cleanup, early loader failure capture, and no retry.
-- `tests/candidate/repo-free.test.ts` proves scrubbed environment/cwd/argv/
-  module paths and no repository or network access during execution.
+  outer/inner/runtime inheritance map, authoritative start identity, stale-run
+  rejection, restart identity, normal shutdown, outer-observed inner-SIGKILL
+  orphan cleanup, active keep-alive/partial-body forced close, continuously
+  drained over-cap output with truncation evidence, every pre-ready failure
+  cleanup/escalation path, early loader failure capture, and no retry.
+- `tests/candidate/repo-free.test.ts` poisons every excluded environment
+  variable, proves absolute shell-free Node execution and source absence, then
+  validates the `sandbox-exec` direct/grandchild deny probes, descendant
+  profile, process tree, allowed filesystem writes, continuously drained
+  `nettop` plus lsof evidence, selected listener/client flow, and denied
+  outbound/DNS/non-loopback/package-manager/sentinel-port operations.
 - `tests/candidate/smoke.test.ts` proves the complete seed/start/auth/
-  eight-tool/retrieval/capture-off/restart/kill/cleanup slice and fixed-port
-  sentinels.
+  eight-tool/retrieval/capture-off/restart/inner-kill/outer-observe/cleanup
+  slice, exact closed commands/flags/FDs/exit map/stdout-stderr caps, one-root
+  mutation set, and fixed-port sentinels.
 - `tests/security/candidate-scope.test.ts` rejects runtime literals/imports
   for launchd, fixed ports, real paths, install/bootstrap/status/doctor/
   authority and Project-specific coordination code.
