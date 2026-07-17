@@ -1,9 +1,10 @@
 ## current_thesis
 
-Verify the exact item-136 canonical tuple, land a reviewed descendant runtime in echo-context, build one local four-asset installation bundle from the read-back target main SHA, and install those exact bytes as an authenticated capture-off shadow. Project_echo remains authoritative at 38478; hosted release and cutover work stay outside item 137.
+Item 137 is stopped at optimized review R8 with six recurring finding families open. The founder's four-round cap leaves no safe patch-plus-unchanged-SHA-seal path, so R9, promotion, claim, build, target-main mutation, and installation are prohibited absent a new founder instruction. Project_echo remains authoritative at 38478 and echo-context remains unchanged by item 137.
 
 ## locked_decisions
 
+- The optimized protocol-v2 epoch ran R6 full, R7 delta, and R8 delta. R8 returned actionable findings from both reviewers; `r8/combined.md` records `post_r8_decision.action: founder_escalation`. No R9 was dispatched because the one remaining round could verify another patch but could not also supply the required unchanged-SHA seal.
 - The predecessor is echo-context commit `78bf523e87c8b9986d31ba28fdf987cf6ea66c29`, tree `3285a3f147a2de3bd6bd54b0ed2ccdc3f92573ec`, version `0.1.0-dev.136.1`, source-archive SHA-256 `3e7a76c930e7198bbf03b7b13390f5eb2341702d2d3c61ba6d89d00090647bef`, lock hash `13ead528470d91adfc4456d349ae628f03f768ba51d78aee8d0b2c42dc12784b`, and manifest hash `6a5def0ec7ca27f9230c587f5f9e2bb7caedb0253171198a7bde380877a26e01`; rebuild and verify it from a fresh canonical clone before branching.
 - The target remote is `https://github.com/zhenye0616/echo-context.git`; local target refs are not authority.
 - Runtime version is `0.1.0-dev.137.1`; final bytes build once from a fresh detached clone of the independently reviewed, landed, and read-back target SHA.
@@ -27,7 +28,8 @@ Verify the exact item-136 canonical tuple, land a reviewed descendant runtime in
 
 ## open_questions
 
-- Protocol-v2 reviewers must test whether the smaller contract is implementable from the current echo-context tree and whether every required failure mode has a concrete test without reintroducing hosted release or cutover machinery.
+- Any resumed epoch must first resolve the six open families recorded in R8: lifecycle-generation ABA, no-launchd orphan cleanup, fixture read/verify identity, authorization-runner/descriptor trust, pre-Node launchd diagnostics, and closed dependency acquisition.
+- A founder must decide whether to authorize a new optimized epoch, cut scope again, or retire/replace item 137; the current delegation does not silently override the explicit four-round stop.
 - The final target SHA, runtime/SBOM/manifest/bootstrap hashes, and operation nonces are intentionally unknown until independent implementation review and canonical landing.
 
 ## dont_touch
@@ -42,3 +44,4 @@ Verify the exact item-136 canonical tuple, land a reviewed descendant runtime in
 - delegated authority: raw/internal/decisions/2026-07-16-echo-context-sequential-program-delegated-authority.md
 - cross-repo protocol: raw/internal/decisions/2026-07-15-echo-context-successor-repository-execution.md
 - reviews: backlog/reviews/2026-07-15-137-echo-context-installable-shadow-runtime/
+- terminal review state: backlog/reviews/2026-07-15-137-echo-context-installable-shadow-runtime/r8/combined.md
