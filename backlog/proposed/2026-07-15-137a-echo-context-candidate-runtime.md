@@ -9,11 +9,12 @@ blocked_by:
   - 2026-07-15-136-echo-context-canonical-repository-release-substrate
 task_state_ref: 2026-07-15-137a-echo-context-candidate-runtime
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: 6373024e742cdf5dd03546baa2f7ddd77c00d936b31797fb4610091ee7cba9e5
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/package.json # candidate scripts and 0.1.0-dev.137a.1 identity
   - /Users/zhenye/Desktop/echo-context/package-lock.json # synchronized root identity; no unlocked dependency
   - /Users/zhenye/Desktop/echo-context/tsconfig.runtime.json # NEW emitted runtime-only import closure
+  - /Users/zhenye/Desktop/echo-context/tools/check-runtime-inventory.mjs # bind the runtime compiler config into executable-source provenance
+  - /Users/zhenye/Desktop/echo-context/provenance/runtime-inventory.v2.json # regenerate successor closure after package/tool/config changes; v1 stays immutable
   - /Users/zhenye/Desktop/echo-context/README.md # candidate-only operator contract and explicit non-installable posture
   - /Users/zhenye/Desktop/echo-context/CHANGELOG.md # candidate milestone
   - /Users/zhenye/Desktop/echo-context/schemas/candidate-runtime-config.v1.schema.json # NEW closed disposable-root config
@@ -55,10 +56,10 @@ spec_refs:
   - /Users/zhenye/Desktop/echo-context/src/mcp/server.ts # current loopback server and registrations
   - /Users/zhenye/Desktop/echo-context/package-lock.json # exact prepared dependency closure
   - /Users/zhenye/Desktop/echo-context/provenance/runtime-inventory.v2.json # runtime-allowed source inventory
-claimed_by: "codex-137a-builder-20260717-a"
-claimed_at: "2026-07-17T21:54:15Z"
-branch: "agent/echo-context-candidate-runtime"
-worktree: "/private/tmp/echo-137a-builder-project-worktree"
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
 head_sha: ""
 pr_url: ""
 agent_notes: ""
@@ -109,6 +110,7 @@ current-user 0700 absolute non-link `<run-root>`. Its closed topology is:
 `<run-root>/stage` for immutable executed bytes,
 `<run-root>/work/config/candidate.json`,
 `work/secrets/mcp-bearer-token`, `work/state/context.sqlite`,
+`work/state/context.sqlite-wal`, `work/state/context.sqlite-shm`,
 `work/state/writer-lease.sqlite`, `work/logs/`, `work/tmp/`,
 `work/home/`, `work/xdg-cache/`, and `work/evidence/`. No second stage
 or state root exists. The stage publisher alone may create a private sibling
@@ -117,6 +119,20 @@ after complete verification. Final stage directories/executables are 0500 and
 data files are 0400; `work` directories are 0700 and files are 0600.
 Cleanup removes this one root only after process/listener/lease absence, and
 refuses any member whose current identity differs from the recorded topology.
+
+Before launch 1, the caller/proof runner creates the 0700 run root and the
+complete empty writable directory skeleton: `work/config`, `work/secrets`,
+`work/state`, `work/logs`, `work/tmp`, `work/home`, `work/xdg-cache`, and
+`work/evidence`. The stage command starts with cwd exactly `work`, validates
+that skeleton without opening a database or listener, and alone creates
+`.stage.<nonce>` and atomically publishes `stage`. The caller creates the
+config and token later at their fixed derived paths before seed/serve.
+`context.sqlite-wal` and `context.sqlite-shm` are the only
+permitted transient main-database sidecars: when present they are current-user
+0600 regular non-links derived from the one `SqliteStorage`, their identities
+join lifecycle and cleanup evidence, and no other database sidecar is allowed.
+The separate writer-lease database remains `journal_mode=DELETE` and creates
+no WAL/SHM pair.
 
 The config lives only at the path above, names `run_root`, and contains no
 independently supplied child paths. The resolver derives every member from the
@@ -128,10 +144,11 @@ components, traversal, foreign ownership, wrong modes/types, fixed ports,
 labels, GUI domains, plist paths, and real-user roots fail before the lease,
 main SQLite, or listener is opened.
 
-The production composition owns exactly one `SqliteStorage` and the existing
-generic service semantics. It imports no capture pipeline, Project_echo
-onboarding/default paths, task-state Git implementation, coordination code,
-installer, launchd adapter, status/doctor surface, or authority controller.
+The production composition owns exactly one `SqliteStorage` and the exact
+generic read-service semantics enumerated in AC2. It imports no capture
+pipeline, Project_echo onboarding/default paths, task-state Git implementation,
+coordination code, installer, launchd adapter, status/doctor surface, or
+authority controller.
 A dedicated SQLite lease database is opened first through `better-sqlite3`
 with `timeout:0`; startup executes `PRAGMA busy_timeout=0`,
 `PRAGMA journal_mode=DELETE`, and then exactly `BEGIN EXCLUSIVE` before any
@@ -168,8 +185,14 @@ request. Kernel/Node buffering below the application boundary is explicitly
 not claimed as body consumption.
 
 Every `/mcp`, `/mcp/recent-calls`, `/ready`, and `/v1/*` data route is
-authenticated. `/live` is unauthenticated and fixed. Authenticated
-`/ready` reports candidate version, PID/start identity, run ID, exact roster,
+authenticated. The complete `/v1/*` roster is exactly `GET /v1/ping`,
+`POST /v1/search`, `POST /v1/clusters`, `POST /v1/atoms`, `POST /v1/wait`,
+and `POST /v1/capture`; no other `/v1/*` route exists. The first five preserve
+the committed `schemas/service-api.v1.json` request/response limits and
+semantics. Capture is the sole semantic exception and always returns the typed
+`403 capture_disabled` rejection below before body consumption. `/live` is
+unauthenticated and fixed. Authenticated
+`/ready` reports candidate version, PID, run ID, exact roster,
 storage ready, `capture:false`, and `authority:false`. Authenticated
 `POST /v1/capture` returns typed `403 capture_disabled` without attaching
 or invoking any application body consumer. Rejections send
@@ -209,10 +232,22 @@ schemas and SQLite migrations, the synthetic fixture, package metadata, and
 regular non-symlink production dependency files copied from the exact
 lockfile-matching prepared workspace.
 
+Extend the committed v2 source-inventory checker so `tsconfig.runtime.json`
+is an executable-source input alongside the existing compiler/test configs.
+After the final package, lock, tool, and compiler-config bytes are committed,
+regenerate `provenance/runtime-inventory.v2.json` from that commit and require
+`npm run verify:inventory` to pass at the exact reviewed target head. The v2
+inventory must bind both new candidate tools, `tsconfig.runtime.json`, the
+complete package scripts/package JSON hash, and the lock hash.
+`provenance/runtime-inventory.v1.json` remains byte-identical historical
+evidence. This committed source provenance is distinct from the generated
+staged-candidate inventory below.
+
 Inside the stage, canonical `candidate-runtime.v1.json` lists and hashes every
 other member except itself and `candidate-runtime.v1.sha256`, and binds the
 source SHA/tree, version, package-lock hash, resolved Node executable
-path/hash, Node/npm versions, ABI, member paths/modes/hashes,
+path/hash, Node/npm versions, ABI, process/native architecture, translation
+mode and resolved Rosetta runtime closure when present, member paths/modes/hashes,
 `installable:false`, and every negative authority flag from AC5. The adjacent
 digest file contains exactly the inventory SHA-256 plus LF. Verification first
 checks that digest, then requires the complete directory member set to equal
@@ -231,7 +266,22 @@ shell-free spawn. No PATH lookup, shell, alternate interpreter, bundled or
 downloaded Node, package install, network acquisition, `NODE_OPTIONS`,
 `NODE_PATH`, or repository fallback is permitted.
 
-The entire executable surface and arguments are closed:
+This host-bound candidate explicitly permits the pinned x86_64 Node to run
+under Rosetta on Apple Silicon. Staging records `process.arch`, the native
+architecture capability, and `/usr/sbin/sysctl -in sysctl.proc_translated`;
+every spawn rechecks the same translation mode and exits 69 on change. When
+translated, the inventory and profile bind the resolved Node/dylib/Rosetta
+filesystem closure. The profile may allow the `sysctl-read` and `mach-lookup`
+operation classes required for that pinned interpreter bootstrap. Evidence
+records them as class-wide grants, and this candidate makes no finer-grained
+sandbox claim over those operations. Filesystem access outside the
+recorded runtime/stage closure and every outbound network operation remain
+denied and tested. No other Node architecture, translation mode, or fallback
+is accepted.
+
+The entire candidate-owned top-level executable surface and arguments are
+closed; the separately enumerated fixed system observers are not additional
+candidate entrypoints:
 
 1. stage — `<node-abs> <source>/tools/stage-candidate-runtime.mjs --run-root
    <run-root>`;
@@ -241,7 +291,7 @@ The entire executable surface and arguments are closed:
    --fixture-id synthetic-v1`;
 3. smoke outer controller — `<node-abs>
    <run-root>/stage/bin/candidate-smoke.mjs --run-root <run-root> --mode
-   full --observer-fd 3`;
+   full --observer-fd 3 --proof-control-fd 4`;
 4. the outer alone spawns its inner lifecycle owner — `<node-abs>
    <run-root>/stage/bin/candidate-smoke.mjs --inner-owner --run-root
    <run-root> --control-fd 3 --outer-liveness-fd 4`; and
@@ -256,13 +306,41 @@ shell-free with cwd exactly `<run-root>/work`, umask 077, the positive
 environment below, and only these FD maps: stage and seed receive fd 0 from
 `/dev/null` and separate fd 1/2 pipes continuously drained by the proof
 runner; the outer receives the same fd 0/1/2 map plus record-writer fd 3; the
-inner receives fd 0 from `/dev/null`, separate fd 1/2 writers drained by the
-outer, control-writer fd 3, and outer-liveness-reader fd 4; the runtime
+outer also receives proof-control-reader fd 4 whose sole writer belongs to the
+third runner. The inner receives fd 0 from `/dev/null`, separate fd 1/2 writers
+drained by the outer, control-writer fd 3, and outer-control/liveness-reader fd
+4; the runtime
 receives fd 0 from `/dev/null`, inherits only those inner fd 1/2 writers, and
-receives ready-writer fd 3 plus runtime-liveness-reader fd 4. Every other
+receives ready-writer fd 3 plus runtime-start/liveness-reader fd 4. Every other
 descriptor is close-on-exec at each boundary. The generated sandbox profile
 is written and fsynced 0600 under the named evidence path, its hash is bound
 before seed/serve, and `sandbox-exec` itself receives no other option.
+
+Outer, inner, and runtime each keep their own fd 3 record writer open for their
+full lifetime, and no child or sibling inherits it: the third runner owns the
+outer reader, the outer owns the inner reader, and the inner owns the runtime
+reader. After bounded records are drained, nonblocking `EAGAIN` means the
+writer is open while EOF plus the creating parent's `ChildProcess` close event
+proves that process instance exited.
+
+No actor sends TERM/KILL to a recorded PID and no `ChildProcess.kill` call is
+permitted. Abrupt proof faults are self-directed SIGKILLs selected only through
+private fixed-byte control pipes. Third-runner→outer accepts exactly: `0x01`
+RUN as the first byte, `0x02` OUTER_SELF_KILL only after ready in a RUN
+lifecycle, or `0x03` ARM_INNER_PRE_READY_FAULT as the first byte. Outer→inner
+accepts exactly `0x11` RUN or `0x12` ARM_PRE_READY_FAULT as its first byte.
+Inner→runtime accepts exactly `0x21` START; EOF before START exits without
+token/lease/main-DB/listener mutation, while EOF after START begins shutdown.
+Every duplicate, unknown, or out-of-phase byte is exit 70.
+
+The outer waits for its first proof-control byte before spawning. RUN causes
+the inner to spawn the runtime and send START. ARM causes the inner to spawn
+the runtime but withhold START, emit `runtime_spawned`, then call
+`process.kill(process.pid, "SIGKILL")`; because the caller is the live process
+itself, PID reuse is impossible. OUTER_SELF_KILL likewise calls self-SIGKILL
+only after ready. PID, `/bin/ps`, start-time strings, and relayed records are
+diagnostic only and never signal authority.
+
 Exit 0 means completed success/no-op; 64 means
 argument/config/path contract failure; 65 fixture identity/refusal; 66
 stage/inventory/source mismatch; 69 Node/ABI/native-load failure; 70 malformed
@@ -282,35 +360,48 @@ The staged smoke outer is the lifecycle observer, not a restart authority. A
 third proof runner owns the read end of outer fd 3 and receives bounded
 `inner_spawned`, `runtime_spawned`, `ready`, and `exited` records so it
 can test outer death; it never owns either liveness writer. The outer spawns
-one inner: inner fd 3 is the write-only control pipe whose sole reader is the
-outer, and inner fd 4 is the read-only outer-liveness pipe whose sole writer is
-the outer. The outer continuously drains inherited stdout/stderr and relays
-each identity record to the third runner before any readiness wait.
+one inner: inner fd 3 is the write-only lifecycle-record pipe whose sole reader
+is the outer, and inner fd 4 is the read-only outer-control/liveness pipe whose
+sole writer is the outer. The outer continuously drains inherited stdout/stderr
+and relays each lifecycle record to the third runner before any readiness wait.
 
 The inner alone spawns one non-detached runtime through exact command 5:
 runtime fd 3 is the write-only ready pipe whose sole reader is the inner, and
-runtime fd 4 is the read-only runtime-liveness pipe whose sole writer is the
+runtime fd 4 is the read-only runtime-start/liveness pipe whose sole writer is the
 inner. Runtime stdout/stderr inherit only the inner's corresponding pipe
 writers while the outer holds the sole readers; all other descriptors at both
 boundaries are close-on-exec. Immediately after spawn, before waiting for
-readiness, the inner captures PID plus Darwin start identity twice consistently
-through `/bin/ps -p <pid> -o lstart=` under `LC_ALL=C` and sends one
-`runtime_spawned` record; the outer durably relays it to the third runner.
-The inner then validates exactly one
-`{pid,start_time,port,run_id,version}` ready record plus LF, requires its PID
-and start identity to match the spawned record, and relays it. Multiple,
-malformed, stale, or mismatched records are exit 70 and identity-bound cleanup.
+readiness, the inner sends one `runtime_spawned` record containing the PID from
+its direct `ChildProcess` handle; the outer durably relays it to the third
+runner. The runtime may complete only contract/stage/Node checks before reading
+fd 4; it opens no token, lease, main database, or listener and emits no ready
+record until it reads exactly one START byte. EOF-before-START exits without
+those mutations. After START, the runtime writes exactly one
+`{pid,port,run_id,version}` ready record plus LF and keeps its fd 3 writer open
+until process exit. The inner
+requires the ready PID to equal the handle PID and relays it. Multiple,
+malformed, stale, or mismatched records are exit 70 and instance-capability
+cleanup. PID and run ID remain evidence and request-correlation fields, not
+signal authority.
 
-Both runtime output pipes are drained until EOF regardless of volume into
-separate 1 MiB capped ring buffers; bytes beyond the cap are discarded while
-draining continues, and evidence records `truncated:true` without including
-credentials. Every pre-ready timeout, malformed/multiple record, failed
-assertion, signal, and normal exit runs exact-identity cleanup: close the
-liveness writer, wait two seconds, TERM the still-matching PID, wait one
-second, KILL the still-matching PID, then prove process/start identity,
-listener, main-database handles, and lease absence within five total seconds.
-The redacted evidence records which escalation occurred and whether every
-absence check passed.
+While the outer is alive, all inner/runtime output pipes are drained until EOF
+regardless of volume into separate 1 MiB capped ring buffers; bytes beyond the
+cap are discarded while draining continues, and evidence records
+`truncated:true` without credentials. Before OUTER_SELF_KILL, the outer relays
+the current capped rings and marks that the sole drain owner is about to die.
+Its death closes the read ends, so inner/runtime install EPIPE-safe output
+handlers and make no post-outer-death output-capture claim; closed readers
+cannot block shutdown. Evidence records `drain_owner_lost:true` and
+`post_owner_output_unavailable:true`, while the surviving third runner proves
+resource absence without treating missing post-death bytes as success or
+failure. Every pre-ready timeout, malformed/multiple record, failed
+assertion, signal, and normal exit runs instance-capability cleanup: close the
+control/liveness writer, then wait up to five total seconds for record-pipe EOF,
+the child close event, listener, main-database-handle, and lease absence. There
+is no external TERM/KILL escalation. Timeout is exit 124, records the unresolved
+instance/resources, preserves the run root, and makes the proof fail; it never
+guesses at a PID or claims cleanup. Redacted evidence records the shutdown or
+self-fault path and every absence result.
 
 Runtime shutdown tracks every accepted socket. On parent-fd EOF, SIGTERM, or
 SIGINT it stops intake, calls server close, allows at most two seconds for
@@ -328,9 +419,11 @@ generated, evidence-hashed profile permits read/execute only for the recorded
 Node/system runtime/stage closure, read/write only under `work`, loopback
 bind/accept only, and denies outbound network,
 DNS, non-loopback, package-manager execution, and source/sibling access for the
-candidate and descendants. The observer remains outside the sandbox so it can
-connect only to the ready-record port. From the spawned identity it starts and
-continuously drains `/usr/bin/nettop -L 0 -n -p <runtime-pid>`, and it
+candidate and descendants. The sandboxed runtime executes no descendant
+program; `/bin/ps`, `nettop`, and `lsof` are observer-only diagnostics outside
+the sandbox and never authorize a signal. The observer connects only to the
+ready-record port. From the relayed runtime PID it starts and continuously
+drains `/usr/bin/nettop -L 0 -n -p <runtime-pid>`, and it
 captures `/usr/sbin/lsof -nP -a -p <runtime-pid> -i` at readiness and
 shutdown. Same-profile probes must fail source/sibling reads, outside-work
 writes, DNS, non-loopback, package-manager execution, unexpected descendant
@@ -339,25 +432,30 @@ only its selected 127.0.0.1 listener and outer-observer client flow. The
 sandbox denial is authoritative; continuously drained nettop/lsof records the
 allowed process-scoped flow without attributing unrelated host traffic.
 
-Normal stop closes the inner's liveness writer and proves absence. The orphan
-case has the outer SIGKILL only the identity-matched inner; kernel closure of
-the sole writer triggers runtime EOF, while the surviving outer performs the
-bounded absence checks and cleanup evidence. Only the third proof runner may
+Normal stop closes the inner's runtime control/liveness writer and proves
+absence. In the armed pre-ready fault, the inner self-SIGKILL closes that sole
+writer, the runtime receives EOF before START, and the surviving outer performs
+the bounded absence checks and cleanup evidence. Only the third proof runner may
 start another exact command-3 outer after complete prior absence; that fresh
-outer creates a new inner, runtime, pipes, PID/start identity, and run ID, and
+outer creates a new inner, runtime, pipes, PID, and run ID, and
 old control/ready records are rejected. There is no
 launchd, supervisor, detached group, persistent lifecycle command, automatic
 retry, shared ready path, or second restart authority.
 
 Outer death is a second EOF chain, not a second owner: EOF on inner fd 4 makes
 the inner immediately close the runtime-liveness writer and run the same
-bounded exact-identity cleanup before exiting. Third-runner tests wait for the
-relayed identities, then (a) SIGKILL the outer after ready and prove inner,
-runtime, listener, database handles, and lease disappear, and (b) SIGKILL the
-inner after `runtime_spawned` but before ready and prove the outer observes
-the same absence. If an inner dies before a spawn record exists, runtime
-liveness EOF plus descendant/lease/listener absence is required and no unknown
-PID is signaled. Neither path retries or restarts.
+bounded instance-capability cleanup before exiting. Third-runner tests wait for
+the relayed lifecycle records, then (a) send OUTER_SELF_KILL after ready so the
+outer self-SIGKILLs and prove candidate inner/runtime commands, listener,
+database handles, and lease disappear; and (b) on a fresh outer send
+ARM_INNER_PRE_READY_FAULT as its first byte, require relayed
+`runtime_spawned` with no possible START/ready, observe the inner's self-SIGKILL
+through record-pipe EOF/child close, and prove the same absence. The outer
+relays `inner_fault_armed` before spawn and `inner_fault_observed` only after
+inner EOF/close plus runtime-command/listener/database-handle/lease absence.
+No actor signals a PID. If an inner dies before a spawn record
+exists, runtime EOF-before-START plus descendant/lease/listener absence is
+required. Neither path retries or restarts.
 
 ### AC5 — Independently review, land, and record the non-installable handoff
 
@@ -384,22 +482,25 @@ smoke:
    exact command-3 outer lifecycle, and prove state persists;
 7. through the third proof runner, exercise both AC4 EOF chains without retry
    or restart:
-   a. after relayed `ready`, SIGKILL the outer and prove the inner and runtime
-      identities, listener, main-database handles, and writer lease disappear
-      within AC4's bound;
-   b. only after complete absence, launch a fresh exact command-3 outer, wait
-      for relayed `runtime_spawned` and no relayed `ready`, SIGKILL that inner,
-      and prove the surviving outer observes the inner/runtime identities,
-      listener, main-database handles, and writer lease disappear within the
-      same bound;
+   a. after initial RUN and relayed `ready`, send OUTER_SELF_KILL, observe the
+      outer's self-SIGKILL through record-pipe EOF/child close, and prove the
+      candidate inner/runtime command instances, listener, main-database
+      handles, and writer lease disappear within AC4's bound;
+   b. only after complete absence, launch a fresh exact command-3 outer and
+      send ARM_INNER_PRE_READY_FAULT as its first control byte, then require
+      relayed `runtime_spawned` with no START/ready, observe the inner's
+      self-SIGKILL, require the surviving outer's `inner_fault_observed`, and
+      prove inner/runtime command, listener,
+      main-database-handle, and writer-lease absence within the same bound;
 8. prove the one disposable run root is the only mutated path;
 9. validate the sandbox and process-scoped socket evidence, including no
    candidate bind/connect involving 39478, 38478, or 38479;
-10. remove that run root only after every identity and absence check.
+10. remove that run root only after every instance-capability and absence check.
 
 The Project_echo evidence binds canonical target SHA/tree, candidate version,
-lock hash, diagnostic stage hash, Node/npm/ABI identity, tests, roster, both
-post-landing liveness-case absence/no-retry results, capture/authority values,
+lock hash, diagnostic stage hash, Node/npm/ABI/translation identity, tests,
+roster, both post-landing liveness-case absence/no-retry results,
+capture/authority values,
 and states exactly:
 `installable:false`, `installed:false`, `launchd_exercised:false`,
 `portable_dependency_closure:false`, `runtime_authority:false`, and
@@ -422,6 +523,12 @@ nor context authority.
 
 ## Risks
 
+- Package/tool/config changes can leave committed source provenance stale.
+  The extended checker binds every new executable input, v2 is regenerated,
+  and verification runs at the reviewed head while v1 remains immutable.
+- `SqliteStorage` can create WAL/SHM files that a falsely closed topology would
+  reject or ignore. Exactly those two transient members are derived,
+  identity-tracked, and proved absent after close; the lease stays DELETE mode.
 - A staged dependency can silently escape to the source tree through a
   symlink, pre-entry Node option, cwd, source map, or package fallback. Clean
   source binding, two-file stage inventory, absolute Node identity, positive
@@ -432,11 +539,22 @@ nor context authority.
 - Fixture hashing followed by path reopen recreates the R8 TOCTOU. The
   same-descriptor bounded buffer is the only parse/insert input.
 - A liveness descriptor inherited by the observer or helper can prevent EOF.
-  The explicit two-level FD map, close-on-exec inventory, sole outer-to-inner
-  and inner-to-runtime writers, pre-ready identity relay, and third-runner
-  outer/inner SIGKILL tests prove closure without signaling an unknown PID.
+  The explicit FD map, close-on-exec inventory, one lifetime record writer per
+  outer/inner/runtime process, sole parent-liveness writers, and private
+  self-fault tests prove
+  closure without signaling an unknown PID.
+- A PID/start-time string can alias a reused process. It is never authority:
+  no actor signals a recorded PID or calls `ChildProcess.kill`; only the live
+  process may self-SIGKILL after a phase-checked private control byte.
+- A genuinely wedged child may not honor EOF. The proof exits 124, preserves
+  the disposable root, and reports unresolved resources instead of sending an
+  unsafe external signal or claiming cleanup.
+- Rosetta can add hidden bootstrap access. Translation mode and runtime files
+  are bound and rechecked, while the evidence explicitly disclaims
+  service-level restriction inside allowed `sysctl-read`/`mach-lookup` classes.
 - A partial request or full output pipe can deadlock shutdown. Socket
-  destruction deadlines and always-draining capped rings bound both paths.
+  destruction deadlines and live-outer capped drains bound normal/inner-fault
+  paths; outer death closes readers and EPIPE-safe writers cannot block.
 - A diagnostic stage can be mistaken for an installable artifact. Schema,
   docs, evidence, filenames, and absence of install/bootstrap surfaces all
   state and enforce the negative capability.
@@ -447,15 +565,19 @@ nor context authority.
 
 - `tests/runtime/config.test.ts` proves the closed constants, root
   topology, derived member paths, immutable-stage/writable-work ownership and
-  modes, symlink/traversal/default rejection, poisoned-environment rejection,
-  cleanup identity refusal, and zero prevalidation mutation.
+  modes, the caller-created empty work skeleton, exact WAL/SHM transient
+  sidecars with DELETE-mode lease isolation, symlink/traversal/default
+  rejection, poisoned-environment rejection, cleanup identity refusal, and
+  zero prevalidation mutation.
 - `tests/runtime/auth.test.ts` proves disk/wire grammar, decoded
   constant-time comparison, the exact raw Host grammar, duplicate-header
   handling, no application body consumer/storage work, withheld and unbounded
   raw-body immediate rejection, capture-off ordering, and secret
   non-disclosure.
 - `tests/runtime/composition.test.ts` proves one storage instance, exact
-  roster, exact zero-timeout SQLite lease pragmas/BEGIN ordering, immediate
+  eight-tool and six-route `/v1/*` rosters with the five committed read-route
+  semantics plus capture-disabled exception, exact zero-timeout SQLite lease
+  pragmas/BEGIN ordering, immediate
   typed loser exit with no delayed resume, crash release, forbidden-import
   closure, tracked-socket graceful/forced shutdown, and partial-body deadline.
 - `tests/runtime/seed-fixture.test.ts` proves ID-only lookup,
@@ -467,28 +589,39 @@ nor context authority.
   member/mode/hash verification immediately before spawn, atomic publication,
   regular copied dependency closure, excluded source/dev/repo/install members,
   dirty/mismatched source and wrong Node-path/hash/version/ABI/native-load
-  refusal, and explicit non-installable identity.
+  refusal, architecture/translation-mode recheck plus bound Rosetta runtime
+  closure, explicit non-installable identity, and the distinct regenerated
+  source `runtime-inventory.v2.json` binding of both new candidate tools,
+  `tsconfig.runtime.json`, package JSON/scripts, and lock hash while v1 remains
+  byte-identical.
 - `tests/candidate/lifecycle.test.ts` proves ready/liveness FD ownership,
   outer/inner/runtime inheritance map, the outer-to-inner and
-  inner-to-runtime EOF chain, `runtime_spawned` identity relay before ready,
-  authoritative start identity, stale-run rejection, restart identity, normal
-  shutdown, third-runner outer-SIGKILL after ready, inner-SIGKILL before
-  ready, no unknown-PID signal before the spawn record, active
-  keep-alive/partial-body forced close, continuously drained over-cap output
-  with truncation evidence, every pre-ready failure cleanup/escalation path,
+  inner-to-runtime EOF chain, one non-inherited lifetime record writer per
+  process, drained-pipe `EAGAIN`/EOF proof, the closed three-pipe byte
+  protocol, and total absence of PID-directed or `ChildProcess.kill` calls. It
+  also proves START-before-mutation, deterministic ARM-before-spawn with START
+  withheld, `runtime_spawned` relay before the inner self-SIGKILL, stale-run
+  rejection, restart identity, normal shutdown, outer self-SIGKILL after
+  ready, no unknown-PID signal, active keep-alive/partial-body forced close,
+  continuously drained over-cap output while outer lives, pre-self-kill ring
+  relay plus `drain_owner_lost`/post-death-unavailable evidence, EPIPE-safe
+  child shutdown, every pre-ready failure cleanup path,
   early loader failure capture, and no retry.
 - `tests/candidate/repo-free.test.ts` poisons every excluded environment
   variable, proves absolute shell-free Node execution and source absence, then
   validates the `sandbox-exec` direct/grandchild deny probes, descendant
   profile, process tree, allowed filesystem writes, continuously drained
-  `nettop` plus lsof evidence, selected listener/client flow, and denied
-  outbound/DNS/non-loopback/package-manager/sentinel-port operations.
+  `nettop` plus lsof evidence, selected listener/client flow, translated-Node
+  bootstrap with its explicit `sysctl-read`/`mach-lookup` disclaimer, zero
+  runtime descendant exec, and denied outbound/DNS/non-loopback/
+  package-manager/sentinel-port operations.
 - `tests/candidate/smoke.test.ts` proves the complete seed/start/auth/
   eight-tool/retrieval/capture-off/restart/inner-kill/outer-observe/cleanup
   slice, the exact five shell-free commands and role discriminators, cwd,
   positive environment, flags, FD maps, observed argv, rejection of every
   extra mode, exit map/stdout-stderr caps, one-root mutation set, and
-  fixed-port sentinels. Its `--mode full` path executes both AC5 7(a) and 7(b),
+  exact authenticated six-route `/v1/*` roster and fixed-port sentinels. Its
+  `--mode full` path executes both AC5 7(a) and 7(b),
   proves bounded absence, and proves no later `inner_spawned` or
   `runtime_spawned` retry record appears.
 - `tests/security/candidate-scope.test.ts` rejects runtime literals/imports

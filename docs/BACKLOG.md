@@ -7,6 +7,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
+| PROPOSED | HIGH | 2026-07-15 | [2026-07-15-137a-echo-context-candidate-runtime](../backlog/proposed/2026-07-15-137a-echo-context-candidate-runtime.md) | Repository-free disposable echo-context candidate runtime | 3d | 2026-07-15-136-echo-context-canonical-repository-release-substrate |
 | PROPOSED | HIGH | 2026-07-15 | [2026-07-15-137b-echo-context-real-shadow-install](../backlog/proposed/2026-07-15-137b-echo-context-real-shadow-install.md) | Exact-artifact per-user echo-context real shadow install | 4d | 2026-07-15-137a-echo-context-candidate-runtime |
 | PROPOSED | HIGH | 2026-07-15 | [2026-07-15-138-echo-context-cutover-substrate-rehearsal](../backlog/proposed/2026-07-15-138-echo-context-cutover-substrate-rehearsal.md) | Deterministic echo-context cutover substrate and full-cycle rehearsal | 6d | 2026-07-15-137b-echo-context-real-shadow-install |
 | PROPOSED | HIGH | 2026-07-15 | [2026-07-15-139-echo-context-founder-mac-authority-activation](../backlog/proposed/2026-07-15-139-echo-context-founder-mac-authority-activation.md) | Exact-artifact founder-Mac context authority activation and reversible acceptance | 2d operator work + 7 calendar-day acceptance | 2026-07-15-138-echo-context-cutover-substrate-rehearsal |
@@ -15,7 +16,7 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| READY | HIGH | 2026-07-15 | [2026-07-15-137a-echo-context-candidate-runtime](../backlog/ready/2026-07-15-137a-echo-context-candidate-runtime.md) | Repository-free disposable echo-context candidate runtime | 3d | 2026-07-15-136-echo-context-canonical-repository-release-substrate |
+| - | - | - | _(empty)_ | - | - | - |
 
 ## Claimed
 
