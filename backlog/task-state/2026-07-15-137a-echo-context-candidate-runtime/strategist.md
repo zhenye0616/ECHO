@@ -55,9 +55,12 @@ converging.
 
 ## open_questions
 
-- R4 must delta-verify that the fresh detached-clone `--mode full` proof runs
-  both third-observer kill cases, that only the third runner launches a fresh
-  outer after complete absence, and that all other families remain closed.
+- R4 closed all nine finding families with both reviewers at `proceed` against
+  spec SHA `7bf19a111d9719165f98a0f85569f8b978e117c4`.
+- The artifact is still proposed and unclaimable because R4 was a delta, not
+  the required unchanged-SHA seal. The founder-directed four-round cap pauses
+  before R5; no builder claim or target operation is authorized unless the
+  founder explicitly resumes the exact-SHA seal.
 - Builder may refine file decomposition inside the listed runtime paths but
   may not add install, launchd, status/doctor, or real-path surfaces.
 
