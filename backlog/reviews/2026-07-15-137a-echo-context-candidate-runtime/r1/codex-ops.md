@@ -1,0 +1,36 @@
+---
+item_id: "2026-07-15-137a-echo-context-candidate-runtime"
+round: 1
+reviewer: "codex-ops"
+artifact_sha: "de3c249f8a586b2723616f010d6aab2586629744"
+completed_at: '2026-07-17T20:56:15Z'
+review_protocol: 2
+review_mode: "full"
+verdict: "proceed_after_patches"
+findings:
+  - severity: "high"
+    mechanism: "candidate entrypoint and execution environment closure"
+    origin: "original"
+    where: "AC4 — Stage and run repo-free with one parent-owned lifecycle"
+    finding: "The child launch contract scrubs selected variables but does not prevent pre-entry Node injection or PATH substitution. Inherited NODE_OPTIONS can preload real-path code, open an inspector, or redirect diagnostic writes before candidate validation, and a PATH-resolved node can differ between probe and spawn. Require shell-free spawn through an already-resolved absolute Node executable whose identity/version/ABI are rechecked, plus a positive environment allowlist with NODE_OPTIONS, NODE_PATH, package-manager, repository, and credential variables absent and HOME/TMPDIR/XDG paths rooted inside the candidate root; poison these variables in repo-free tests."
+  - severity: "high"
+    mechanism: "parent-liveness orphan cleanup and external observation"
+    origin: "original"
+    where: "AC4 parent-liveness proof and AC5 smoke steps 7–10"
+    finding: "The smoke is described as the lifecycle-owning harness, but AC5 then kills that harness and expects it to prove orphan cleanup, continue absence checks, remove roots, and emit evidence. A SIGKILLed process cannot perform those observations. Define a surviving outer controller and a single inner lifecycle owner: the inner process alone owns the liveness writer, relays PID/start/port/run identity over a separate bounded control FD, and may be SIGKILLed while the controller verifies child, listener, database handles, and lease absence without becoming a restart authority."
+  - severity: "medium"
+    mechanism: "bounded shutdown with active HTTP connections"
+    origin: "original"
+    where: "AC4 bounded shutdown and tests/candidate/lifecycle.test.ts"
+    finding: "Bounded HTTP shutdown is not specified against an authenticated active request or partial body. A close operation that waits for active sockets can keep the candidate and lease alive after parent-FD EOF. Require explicit connection tracking, a fixed graceful deadline followed by forced socket destruction, and a lifecycle test that closes liveness while an authenticated keep-alive or partial-body request is active and still proves timely HTTP, SQLite, and lease closure."
+  - severity: "medium"
+    mechanism: "continuously drained bounded diagnostic capture and failure cleanup"
+    origin: "original"
+    where: "AC4 bounded captured stdout/stderr and lifecycle failure handling"
+    finding: "The capture contract does not say that pipes remain continuously drained; stopping reads at the size cap can backpressure the child and deadlock readiness or shutdown. Require capped ring/spool capture that always drains and records truncation, and add an over-cap output test. Also require identity-bound cleanup on every pre-ready timeout, malformed/multiple ready record, assertion failure, and signal path, with durable redacted failure evidence recording whether TERM/KILL escalation and absence checks succeeded."
+  - severity: "medium"
+    mechanism: "process-tree-scoped repository and network denial"
+    origin: "original"
+    where: "tests/candidate/repo-free.test.ts and AC5 fixed-port/network proof"
+    finding: "The test requires no network access during execution even though the candidate must bind an ephemeral loopback listener and the smoke must connect to it. Replace the impossible whole-network statement with a process-scoped rule that explicitly permits only the selected 127.0.0.1 listener/client flow and forbids DNS, non-loopback, and the three sentinel ports for the candidate and its descendants."
+---
