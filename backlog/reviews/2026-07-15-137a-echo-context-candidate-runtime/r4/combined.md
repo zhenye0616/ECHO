@@ -7,7 +7,7 @@ codex-ops_response: codex-ops.md
 codex_response: codex.md
 cursor_response: null
 patch_commit_sha: null
-next_round: null
+next_round: 5
 combined_verdict: proceed
 escalated_to_founder: false
 review_protocol: 2
@@ -104,7 +104,10 @@ health_decision:
   outcome: seal
   root_cause: healthy
   family_ids: []
-  rationale: "Both R4 reviewers proceeded and all nine families are closed. The founder explicitly lifted the prior four-round pause on 2026-07-17 and authorized continuation, so dispatch the required unchanged-SHA R5 seal before any builder claim or target operation."
+  rationale: Both R4 reviewers proceeded and all nine families are closed. The founder
+    explicitly lifted the prior four-round pause on 2026-07-17 and authorized continuation,
+    so dispatch the required unchanged-SHA R5 seal before any builder claim or target
+    operation.
 sealed_spec_sha: null
 ---
 
