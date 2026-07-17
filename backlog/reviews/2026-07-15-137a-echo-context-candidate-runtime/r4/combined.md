@@ -101,10 +101,10 @@ round_diagnostics:
   - fam-68977d8ba2d0dabb
   root_cause: healthy
 health_decision:
-  outcome: founder_escalation
+  outcome: seal
   root_cause: healthy
   family_ids: []
-  rationale: "Both R4 reviewers proceeded and all nine families are closed, but R4 was the required delta verification after an R3 content patch. The founder-directed four-round cap forbids autonomously dispatching the unchanged-SHA R5 seal, so no builder claim or target operation is authorized."
+  rationale: "Both R4 reviewers proceeded and all nine families are closed. The founder explicitly lifted the prior four-round pause on 2026-07-17 and authorized continuation, so dispatch the required unchanged-SHA R5 seal before any builder claim or target operation."
 sealed_spec_sha: null
 ---
 
@@ -145,4 +145,4 @@ sealed_spec_sha: null
 
 ## Convergence call
 
-needs R5 — exact-SHA seal of `7bf19a111d9719165f98a0f85569f8b978e117c4`; paused at the founder-directed four-round cap with every family closed and no builder claim authorized.
+needs R5 — exact-SHA seal of `7bf19a111d9719165f98a0f85569f8b978e117c4`; the founder lifted the prior cap and authorized continuation, while every family remains closed and no builder claim is authorized before the seal.
