@@ -1,11 +1,10 @@
 ## current_thesis
 
-Prove the smallest real runtime slice before attempting installation: a
-capture-off, authenticated eight-tool echo-context process that stages and runs
-without repository access in one disposable 0700 root at port 0. This pass is
-explicitly non-installable and must structurally cut every launchd, real-path,
-portable-release, and authority mechanism that prevented the parent from
-converging.
+The candidate-only runtime spec sealed at R5 and is ready for a fresh builder.
+It proves a capture-off, authenticated eight-tool echo-context process that
+stages and runs without repository access in one disposable 0700 root at port
+0, while cutting every launchd, real-path, portable-release, and authority
+mechanism that prevented the parent from converging.
 
 ## locked_decisions
 
@@ -52,15 +51,15 @@ converging.
 - A fresh builder writes target source; a different reviewer reviews exact
   target and Project_echo heads; coordinator separately authorizes target-main
   landing.
+- Protocol-v2 R5 sealed the unchanged spec at
+  `6c0b6772730bcde9165a6f1a8dac53a2b085b60e`; watcher promotion stamped
+  `ready_content_sha`
+  `6373024e742cdf5dd03546baa2f7ddd77c00d936b31797fb4610091ee7cba9e5`.
 
 ## open_questions
 
-- R4 closed all nine finding families with both reviewers at `proceed` against
-  spec SHA `7bf19a111d9719165f98a0f85569f8b978e117c4`.
-- The founder explicitly lifted the prior four-round pause on 2026-07-17.
-  Dispatch the unchanged-SHA R5 seal next; the artifact remains proposed and
-  no builder claim or target operation is authorized until that seal promotes
-  it to ready.
+- None blocking for claim. A fresh implementation builder must start from the
+  authenticated remote item-136 tuple and hand off to a different reviewer.
 - Builder may refine file decomposition inside the listed runtime paths but
   may not add install, launchd, status/doctor, or real-path surfaces.
 
@@ -75,4 +74,5 @@ converging.
 
 ## canonical_anchors
 
-- spec: backlog/proposed/2026-07-15-137a-echo-context-candidate-runtime.md
+- spec: backlog/ready/2026-07-15-137a-echo-context-candidate-runtime.md
+- reviews: backlog/reviews/2026-07-15-137a-echo-context-candidate-runtime/

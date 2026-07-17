@@ -9,6 +9,7 @@ blocked_by:
   - 2026-07-15-136-echo-context-canonical-repository-release-substrate
 task_state_ref: 2026-07-15-137a-echo-context-candidate-runtime
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 6373024e742cdf5dd03546baa2f7ddd77c00d936b31797fb4610091ee7cba9e5
 files_to_modify:
   - /Users/zhenye/Desktop/echo-context/package.json # candidate scripts and 0.1.0-dev.137a.1 identity
   - /Users/zhenye/Desktop/echo-context/package-lock.json # synchronized root identity; no unlocked dependency
