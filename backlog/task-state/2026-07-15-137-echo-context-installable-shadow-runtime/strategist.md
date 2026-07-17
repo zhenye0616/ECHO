@@ -8,18 +8,20 @@ Verify the exact item-136 canonical tuple, land a reviewed descendant runtime in
 - The target remote is `https://github.com/zhenye0616/echo-context.git`; local target refs are not authority.
 - Runtime version is `0.1.0-dev.137.1`; final bytes build once from a fresh detached clone of the independently reviewed, landed, and read-back target SHA.
 - The local installation bundle has exactly four typed assets: runtime tgz, canonical manifest, SBOM, and POSIX bootstrap. The manifest binds all other assets; a separate delegated installation record binds the manifest hash and every asset hash.
-- Tags, GitHub Releases, hosted/private prereleases, uploads, downloads, publication/cache reconciliation, release-set manifests, release FSMs, and approval-file challenges are excluded and remain item 140 work.
+- Tags, GitHub Releases, hosted/private prereleases, uploads, hosted artifact downloads, publication/cache reconciliation, release-set manifests, release FSMs, and approval-file challenges are excluded and remain item 140 work. The only network build input is the official Node 22.22.1 Darwin x64 archive at its fixed nodejs.org URL and SHA-256.
 - Production uses a new closed composition root with one SQLite instance, the existing generic service API, exactly eight MCP tools, and one process-lifetime `flock(2)` writer lock.
 - Shadow identity is `com.echo.context` at `127.0.0.1:39478` with `/Users/zhenye/.echo-context-shadow`, `authority:false`, `accept_capture:false`, and `capture_workers:[]`.
 - The authority projection contains only state/generation, exact runtime identities, and capture-worker/secret references. Item 137 creates no authority record and cannot activate one.
-- Every data-bearing route requires one bearer credential stored only as a current-user 0600 file beneath a current-user 0700 resolver-selected secret root. Token bytes never enter process state, artifacts, Git, output, logs, or evidence.
-- Candidate proof uses a disposable root, port `0`, one foreground process group, and `--no-launchd`; it leaves no persistent candidate job or real-user-path mutation.
+- Every data-bearing route requires one bearer credential encoded as exactly 43 unpadded base64url characters plus LF in a current-user 0600 file beneath a current-user 0700 resolver-selected secret root. Token bytes never enter process state, artifacts, Git, output, logs, or evidence.
+- Capture-off fixture data enters only through an idempotent manifest-bound offline seed command while the service is stopped and both lifecycle/writer locks are held; online capture remains typed 403 before body read.
+- Candidate proof uses a disposable root, port `0`, one foreground process group, a private ready FD, and `--no-launchd`; it leaves no persistent candidate job or real-user-path mutation.
 - Real launchd owns the runtime directly. There is no supervisor, stable shim, purge, `prepare-final`, last-exit record, owner sidecar, refusal record, or competing restart authority.
-- One lifecycle lock serializes install/start/stop/restart/disable/uninstall. A durable intent and ownership receipt make installation recoverable and constrain removal to owned paths.
-- Plist stdout/stderr are `/dev/null`; one bounded application logger owns the runtime logs.
-- Status and doctor have named closed schemas, canonical JSON plus one LF, bounded probes, redacted stderr, and exit precedence 2 usage, 3 not installed, 5 internal, 4 timeout, 1 unhealthy, 0 healthy. Doctor never repairs.
+- One exclusive lifecycle lock serializes install/start/stop/restart/uninstall/offline-seed; status and doctor take its shared form across complete observations. A durable intent and ownership receipt make installation recoverable and constrain removal to owned paths.
+- No `disable` command or launchctl persistent-override mutation exists; a pre-existing disabled label is a collision refusal.
+- Plist stdout/stderr are `/dev/null`; the runtime opens its bounded startup/application sink before other fallible startup work. Logger-open failure suppresses restart and remains independently doctor-visible.
+- Status and doctor have named closed schemas, canonical JSON plus one LF, bounded probes, shared-lock busy truth, redacted stderr, and exit precedence 2 usage, 3 not installed, 5 internal, 4 timeout, 1 unhealthy, 0 healthy. Doctor never repairs.
 - No Project-specific consumer graph or speculative coordination/residual operation is sealed here. Item 138 must consume actual landed runtime outputs.
-- Before target-main mutation and real installation, the persistent coordinator commits, pushes, and reads back a fresh exact-operation authorization. Builders never inherit that authority.
+- Before target-main mutation and real installation, the persistent coordinator commits, pushes, and reads back a fresh exact-operation authorization. The coordinator verifies bootstrap+manifest against that external record before execution and passes the authorized manifest digest into the bootstrap. Builders never inherit that authority.
 - The real shadow receives only synthetic fixture state, changes no client configuration, and remains healthy, capture-off, and non-authoritative after proof while Project_echo stays healthy at 38478.
 
 ## open_questions
