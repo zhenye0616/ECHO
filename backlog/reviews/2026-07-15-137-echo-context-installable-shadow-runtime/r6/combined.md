@@ -7,7 +7,7 @@ codex-ops_response: codex-ops.md
 codex_response: codex.md
 cursor_response: null
 patch_commit_sha: null
-next_round: null
+next_round: 7
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 review_protocol: 2
