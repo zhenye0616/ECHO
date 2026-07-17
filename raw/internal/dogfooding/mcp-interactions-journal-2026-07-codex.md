@@ -2124,3 +2124,11 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r24/request.md`; artifact `backlog/proposed/2026-07-15-136-echo-context-canonical-repository-release-substrate.md@f80003a7fbd08755dbff669951ed07bf43b390d0`; response `backlog/reviews/2026-07-15-136-echo-context-canonical-repository-release-substrate/r24/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-B5100856-68E7-4119-B3A8-0464598AAFB8/raw/internal/review-queue/1152a9df-21c5-490b-9734-1b4e37966cc3/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-B5100856-68E7-4119-B3A8-0464598AAFB8/raw/internal/review-queue/1152a9df-21c5-490b-9734-1b4e37966cc3/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-07-17 15:36 PDT - active R6 reviewer dispatch for 137a epoch 2
+
+- **Trigger:** The persistent Codex coordinator reopened 137a after a clean pre-build contradiction audit, published the repaired proposal, and dispatched Protocol-v2 R6 as epoch 2/full.
+- **Tool and query inputs:** Two `coord_invoke` calls to `http://127.0.0.1:38478/mcp` with `X-Echo-Role: claude`, request `backlog/reviews/2026-07-15-137a-echo-context-candidate-runtime/r6/request.md`, correlation `a57cbf68-8440-4c20-9b93-011f10348697`, and roles `codex` then `codex-ops`.
+- **Returned:** Both calls returned HTTP 200 with `schema_version:1` / `tool:coord_invoke`. Reviewer invocation IDs were `1df95b1e-246a-4498-b5cf-f15c4f156b90` (codex; `run-codex-reviewer.sh`) and `96a501a3-a538-48cf-943a-65247332eb4a` (codex-ops; `run-codex-ops-reviewer.sh`).
+- **Verdict:** right - the coordination surface accepted the pinned R6 request for both requested headless reviewers immediately after origin/main publication.
+- **Note:** The response was compact and operationally useful: exact invocation IDs and wrapper paths, with no unrelated memory payload.
