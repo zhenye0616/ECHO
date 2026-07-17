@@ -55,10 +55,10 @@ spec_refs:
   - /Users/zhenye/Desktop/echo-context/src/mcp/server.ts # current loopback server and registrations
   - /Users/zhenye/Desktop/echo-context/package-lock.json # exact prepared dependency closure
   - /Users/zhenye/Desktop/echo-context/provenance/runtime-inventory.v2.json # runtime-allowed source inventory
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "codex-137a-builder-20260717-a"
+claimed_at: "2026-07-17T21:54:15Z"
+branch: "agent/echo-context-candidate-runtime"
+worktree: "/private/tmp/echo-137a-builder-project-worktree"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
