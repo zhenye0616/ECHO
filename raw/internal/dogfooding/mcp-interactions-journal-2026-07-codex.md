@@ -2141,3 +2141,11 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-07-15-137a-echo-context-candidate-runtime/r6/request.md`; artifact `backlog/proposed/2026-07-15-137a-echo-context-candidate-runtime.md@f067fe199a686727f51048003ec19161baf39cad`; response `backlog/reviews/2026-07-15-137a-echo-context-candidate-runtime/r6/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-6EE077A7-9FFB-43FD-87AE-A3073BDC956D/raw/internal/review-queue/0fb7d488-fcbb-48a6-8b22-a5562e971370/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-6EE077A7-9FFB-43FD-87AE-A3073BDC956D/raw/internal/review-queue/0fb7d488-fcbb-48a6-8b22-a5562e971370/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-07-17 15:52 PDT - recover stuck codex-ops R6 invocation
+
+- **Trigger:** The first codex-ops R6 child remained live for 14 minutes but emitted seven consecutive empty collaboration waits after reading the packet, while codex completed normally. The coordinator validated and terminated only that wrapper/child pair, confirmed no response or capture-failure marker reached `origin/main`, and retriggered the same immutable request.
+- **Tool and query inputs:** One `coord_invoke` call to `http://127.0.0.1:38478/mcp` with `X-Echo-Role: claude`, role `codex-ops`, request `backlog/reviews/2026-07-15-137a-echo-context-candidate-runtime/r6/request.md`, and correlation `a57cbf68-8440-4c20-9b93-011f10348697`.
+- **Returned:** HTTP 200 with `schema_version:1` / `tool:coord_invoke`; replacement reviewer invocation ID `93f594d8-1bc1-4b23-b72d-1e8a90dc9eb1` and wrapper `run-codex-ops-reviewer.sh`.
+- **Verdict:** partial - ECHO accepted the recovery invocation, but publication remains pending and must be verified from canonical `origin/main`.
+- **Note:** The active-trigger API made a precise same-request retry possible without altering R6 lineage or fabricating a reviewer response.
