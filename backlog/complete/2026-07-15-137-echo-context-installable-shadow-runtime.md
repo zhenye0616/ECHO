@@ -64,7 +64,7 @@ worktree: ""
 head_sha: ""
 pr_url: ""
 agent_notes: ""
-review_notes: ""
+review_notes: "cancelled — spec review terminated at optimized R8 with six recurring families; superseded by 137a and 137b under raw/internal/decisions/2026-07-17-echo-context-137-two-pass-scope-reset.md"
 target_repo: "/Users/zhenye/Desktop/echo-context"
 target_remote: "https://github.com/zhenye0616/echo-context.git"
 target_branch: ""
@@ -76,6 +76,11 @@ project_landed_sha: ""
 ---
 
 # Versioned per-user echo-context shadow runtime and exact-artifact founder-Mac proof
+
+> **Cancelled 2026-07-17.** Optimized review stopped at R8 without
+> convergence. This proposal is preserved as historical risk evidence and is
+> replaced by the sequential 137a candidate-runtime and 137b real-shadow
+> install items. No implementation, target mutation, or installation occurred.
 
 ## Why this spec exists
 
