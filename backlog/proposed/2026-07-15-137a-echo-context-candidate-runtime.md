@@ -136,8 +136,10 @@ the exact form above and is at most 256 bytes. Before any mkdir, write, spawn,
 or network access, validate raw CLI cardinality/bytes, derive and validate all
 siblings and fixed members, and require proof parent, custody, and quarantine
 all absent by no-follow lstat. The custody directory and proof parent are then
-created exclusively as 0700 and descriptor-bound; the wrapper repeats the
-grammar/topology/identity checks before producer mutation. Every absolute
+created exclusively as 0700 and descriptor-bound; their caller fsyncs the
+already identity-checked literal `/private/tmp` directory descriptor before
+the wrapper starts. The wrapper repeats the grammar/topology/identity checks
+before producer mutation. Every absolute
 Node/npm/Git/sysctl/runtime/system path interpolated into SBPL or used in exact
 process evidence must also satisfy `SAFE_ABSPATH`; an unsafe discovered path
 is unsupported and fails rather than entering an escape branch.
@@ -405,11 +407,15 @@ descriptor-validates and retains the fsynced summary, and proves command 2
 absent. The summary is canonical single-line secret-free JSON plus LF, at most
 1 MiB. The driver writes those exact bytes as internal stdout record 1 and then
 waits up to 30 seconds for `ACK1`. Before acknowledging, the custody parent
-writes the exact bytes to `.proof-summary.v1.json.tmp`, fsyncs, atomically
-renames to `proof-summary.v1.json`, fsyncs the custody directory, reopens the
-final file with `O_RDONLY|O_NOFOLLOW`, verifies identity/length/hash, mirrors
-the exact record to external stdout, and waits for drain. Only then may it send
-matching `ACK1`. Reader loss or any missing receipt before valid `ACK1`
+writes the exact bytes to exclusively created 0600 regular non-link
+`.proof-summary.v1.json.tmp`, completely writes and file-fsyncs it, atomically
+renames to `proof-summary.v1.json`, and fsyncs the custody directory. It reopens
+the final file with `O_RDONLY|O_NOFOLLOW`, verifies identity/length/hash, then
+opens literal `/private/tmp` as a no-follow directory descriptor, verifies the
+same root-owned sticky-01777 identity plus the exact custody entry, and fsyncs
+that parent descriptor. Only after this second parent-entry durability gate
+does it mirror the exact record to external stdout and wait for drain; only
+then may it send matching `ACK1`. Reader loss or any missing receipt before valid `ACK1`
 preserves the complete proof parent and forbids the cleanup commit. The driver
 also reads, hashes, and compiles the staged driver-result schema into memory
 before cleanup; no schema path reopen occurs afterward.
@@ -457,12 +463,23 @@ exits 0 only after valid `ACK2`; loss after bundle commit leaves both exact
 records durably recoverable. Driver stderr is a separately drained 64 KiB ring;
 every producer/proof child output remains in its own bounded ring and never
 contaminates the result carrier. The custody parent requires direct driver close
-0 and internal stdout/stderr EOF, then atomically publishes and directory-fsyncs
-canonical single-line `custody-ack.v1.json` (at most 4,096 bytes). That receipt
+0 and internal stdout/stderr EOF, then constructs canonical single-line
+`custody-ack.v1.json` plus LF (at most 4,096 bytes). With both final and fixed
+`.custody-ack.v1.json.tmp` absent, it opens the temp exclusively as a current-
+user 0600 regular non-link, completely writes the retained canonical bytes,
+file-fsyncs that descriptor, atomically renames temp to final, and fsyncs the
+custody directory. It then reopens the final file with
+`O_RDONLY|O_NOFOLLOW`, requires the recorded identity/owner/mode, reads one
+bounded buffer, rejects any byte after the sole required LF, reparses canonical
+form, and
+requires byte-for-byte equality plus its independently recomputed length and
+SHA-256 before success. That receipt
 binds record identity `candidate-proof-custody-ack.v1`, attempt ID, source
 SHA/tree, record-1 and record-2 relative paths/lengths/SHA-256 values, the exact
 `ACK1`/`ACK2` 41-byte values sent, both external drain completions, direct driver
-exit 0, and internal stdout/stderr EOF. Only then may the parent exit 0.
+exit 0, internal stdout/stderr EOF, and the successful pre-`ACK1` literal-
+`/private/tmp` parent-entry fsync. Only after the final descriptor readback may
+the parent exit 0.
 
 If valid `ACK2` is followed by a missing driver close, internal stream EOF, or
 receipt-publication/parent-stream settlement before that final 30-second
@@ -475,7 +492,10 @@ literal oracle for this path.
 
 The role-typed caller accepts only parent close 0 + external stdout/stderr EOF +
 exactly two schema-valid records equal to the no-follow custody files, with its
-own length/hash checks and this exact recursive roster: top-level regular
+own length/hash checks. It independently parses the canonical receipt, verifies
+every bound record path/length/hash and ACK value against the two records,
+requires the parent-entry-fsync and close/EOF/drain fields true, and requires
+this exact recursive roster: top-level regular
 `proof-summary.v1.json`, directory `driver-result.bundle` containing only regular
 `candidate-proof-driver-result.v1.json`, and regular `custody-ack.v1.json`.
 It owns no proof-parent or quarantine cleanup authority. After the applicable
@@ -1597,12 +1617,21 @@ nor context authority.
   stdout/stderr caps, post-baseline write set, the exact two-record external
   stdout grammar and schema/hash binding, private parent/driver close/EOF gates,
   exact 41-byte ACK order, reader/receipt loss at every boundary, durable
-  record-1-before-cleanup custody, 0500-directory descriptor `fchmod`, atomic
+  record-1-before-cleanup custody, caller and custody-parent literal-
+  `/private/tmp` directory fsync ordering, 0500-directory descriptor `fchmod`, atomic
   cleanup-quarantine-to-result-bundle commit, canonical custody receipt and
   exact recursive roster, success proof/quarantine absence with custody retained,
   precommit preservation, postcommit partial-failure reporting, and an
   ACK2-consuming driver that never closes causing signal-free detach, exit 124,
-  custody retention, and no parent success, and
+  custody retention, and no parent success. It fault-injects the custody-parent
+  `/private/tmp` descriptor open, identity/custody-entry verification, and parent-
+  directory fsync before `ACK1`; each failure sends no `ACK1`, forbids the
+  cleanup commit, makes the parent non-success, preserves the proof parent, and
+  retains the strongest truthful custody state. It then fault-injects exclusive receipt-
+  temp creation, partial/full write, receipt-file fsync, rename, custody-directory
+  fsync, no-follow reopen, canonical-field/length/hash readback, and a crash
+  after `ACK1` but before bundle commit; every failed gate forbids parent success
+  and retains the strongest truthful recoverable custody state. It also proves
   exact authenticated six-route `/v1/*` roster and fixed-port sentinels. Its
   `--mode full` path executes both AC5 8(a) and 8(b),
   proves bounded absence, and proves no later `inner_spawned` or

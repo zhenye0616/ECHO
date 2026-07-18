@@ -1,7 +1,7 @@
 ## current_thesis
 
-The candidate remains `proposed/`. Epoch-3 R7 opened four repair families: canonical target-`H` acquisition, safe path encoding, explicit terminal control, and durable evidence custody.
-R8 reviews only those repairs; an unchanged R9 seal is required before promotion. No target bytes exist.
+The candidate remains `proposed/`. R8 closed target-`H` acquisition, safe path encoding, and terminal control, but the custody family recurred at two filesystem durability layers.
+R9 is the final permitted proof round: it must close parent-entry durability before ACK1 and receipt-file durability/readback before parent success. No target bytes exist.
 
 ## locked_decisions
 
@@ -20,7 +20,7 @@ R8 reviews only those repairs; an unchanged R9 seal is required before promotion
 - `sandbox-exec -p` consumes one verified profile buffer. Descendants inherit stage/system reads, work writes, loopback bind/accept, exact Node/sysctl exec, and no outbound/source/package-manager access; the runner owns HTTP/observers. Pinned x86_64 Node may use bound Rosetta files with explicit class-wide `sysctl-read`/`mach-lookup` disclaimers.
 - Records, observers, output, and 4/7/10/14/60/600-second phases are capped. The final 30 seconds bounds ACK2, driver close/EOF, receipt fsync, and parent settlement; timeout signal-freely detaches and fails within the 5,100-second aggregate.
 - Authoritative absence is direct EOF/close → ps → per-path lsof → lease reacquire when created → exact-port rebind; finite nettop/lsof are diagnostics only.
-- Record 1 is durably held and ACKed before destructive cleanup; record 2 is atomically bundled into custody before emission; the final receipt binds both ACKs and direct driver close/EOF. Builder custody survives through `R`; post-landing custody survives through `P`.
+- Before ACK1, both record 1 and the new custody-directory entry are fsynced and descriptor-read back. Record 2 is atomically bundled before emission; the final receipt is exclusively written, file/directory-fsynced, canonically read back, and binds both ACKs plus direct driver close/EOF. Builder custody survives through `R`; post-landing custody survives through `P`.
 - If command 2 ignores liveness EOF, the driver closes only owned pipes, detaches/unrefs without signaling, retains the proof parent, reports failure, and exits 124 within the aggregate.
 - Diagnostic inventory states installable/installed/portable closure/runtime authority/state authority false; this is neither release nor authorization carrier.
 - Fresh builder and reviewer own exact target/Project heads. Create-only target feature `F=H` is closure-manifested as `K`, scanned before publication, independently fetched/scanned twice afterward, retained through completion, and is the target-main actor's sole canonical source of `H`.
@@ -29,7 +29,7 @@ R8 reviews only those repairs; an unchanged R9 seal is required before promotion
 
 ## open_questions
 
-- R8 family reviewers must falsify the four repaired mechanisms and cross-contract consistency; if clean, R9 must seal the identical spec SHA.
+- R9 proof reviewers must falsify every parent-entry/receipt-file durability step and injected failure. Any remaining finding exhausts the four-round cap and stops the loop.
 - After a new seal, a fresh builder may refine listed runtime paths but may not add install, launchd, status/doctor, or real-path scope.
 
 ## dont_touch
