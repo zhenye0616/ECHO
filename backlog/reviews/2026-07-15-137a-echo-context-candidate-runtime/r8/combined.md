@@ -6,8 +6,8 @@ claude_response: null
 codex-ops_response: codex-ops.md
 codex_response: codex.md
 cursor_response: null
-patch_commit_sha: null
-next_round: null
+patch_commit_sha: de8d534cf73d72575dc1e54d194c0ef9e6b28e14
+next_round: 9
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 review_protocol: 2
@@ -22,7 +22,7 @@ finding_families:
   origin: unknown
   first_seen_round: 7
   latest_round: 8
-  state: open
+  state: patched
   reviewers:
   - codex
   - codex-ops
@@ -138,6 +138,15 @@ round_diagnostics:
   - fam-f26c7c780ca4a891
   root_cause: review_contract_static
 sealed_spec_sha: null
+post_r8_decision:
+  action: continue
+  root_cause: review_contract_static
+  family_ids:
+  - fam-09bc94d7d11e3d10
+  rationale: Both R8 reviewers converged on two bounded filesystem-durability omissions
+    in the existing custody family; one final targeted proof is more valuable than
+    stopping before verifying the exact repair, and any remaining finding exhausts
+    the user-set four-round cap.
 ---
 
 # Combined findings
@@ -147,7 +156,7 @@ sealed_spec_sha: null
 
 | # | Severity | Source | Where (primary) | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | HIGH | both (convergent on `backlog/proposed/2026-07-15-137a-echo-context-candidate-runtime.md:407`) | backlog/proposed/2026-07-15-137a-echo-context-candidate-runtime.md:407 | Accepted; close both missing durability layers in the recurring custody family. | Patch SHA pending; final permitted R9 proof will target parent-entry fsync before ACK1 and receipt-file fsync/readback before parent success. |
+| 1 | HIGH | both (convergent on `backlog/proposed/2026-07-15-137a-echo-context-candidate-runtime.md:407`) | backlog/proposed/2026-07-15-137a-echo-context-candidate-runtime.md:407 | Accepted; close both missing durability layers in the recurring custody family. | Patched at `de8d534cf73d72575dc1e54d194c0ef9e6b28e14`; final permitted R9 proof targets parent-entry fsync before ACK1 and receipt-file fsync/readback before parent success. |
 
 ## Divergent findings (single-reviewer or non-overlapping primary `where`)
 
@@ -174,7 +183,7 @@ must cover every ordered step and the crash interval after `ACK1`.
 
 | Family | State | Origin | Mechanism |
 |---|---|---|---|
-| `fam-09bc94d7d11e3d10` | open | unknown | Acknowledged durable custody before destructive cleanup |
+| `fam-09bc94d7d11e3d10` | patched | unknown | Acknowledged durable custody before destructive cleanup |
 | `fam-23d135eeb416e265` | closed | original | continuously drained bounded diagnostic capture and failure cleanup |
 | `fam-58138afe52e773f2` | closed | original | candidate entrypoint and execution environment closure |
 | `fam-6760319bb44add40` | closed | unknown | proof-control EOF overload conflates intentional shutdown with control-owner loss |
