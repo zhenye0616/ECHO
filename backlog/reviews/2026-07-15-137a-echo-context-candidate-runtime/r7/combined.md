@@ -6,8 +6,8 @@ claude_response: null
 codex-ops_response: codex-ops.md
 codex_response: codex.md
 cursor_response: null
-patch_commit_sha: null
-next_round: null
+patch_commit_sha: c91f69dca1d5ecef2cf6ee03a9ec2bce8b1916f1
+next_round: 8
 combined_verdict: divergent
 escalated_to_founder: true
 review_protocol: 2
@@ -159,10 +159,10 @@ required, waive none, patch the exact mechanisms, and request a targeted R8.
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | HIGH | codex | AC5 — builder handoff and the sole target-main mutation | Accepted; bind the sole scanned target feature ref and fresh acquisition before CAS. | R8 patch SHA pending. |
-| 2 | MEDIUM | codex | AC1 run-root validation; AC4 candidate.sb generation and ps/argv evidence | Accepted; close the path grammar before any mutation. | R8 patch SHA pending. |
-| 3 | HIGH | codex-ops | AC4 — proof-runner-to-outer byte protocol, proof-control EOF handling, and post-baseline writable roster | Accepted; add phase-gated STOP/ABORT and reserve EOF for owner loss. | R8 patch SHA pending. |
-| 4 | HIGH | codex-ops | AC4 — exact-summary streaming and cleanup commit; AC5 — post-landing evidence capture | Accepted; require durable custody receipt before cleanup and a durable result carrier outside the deletion boundary. | R8 patch SHA pending. |
+| 1 | HIGH | codex | AC5 — builder handoff and the sole target-main mutation | Accepted; bind the sole scanned target feature ref and fresh acquisition before CAS. | Patched at `c91f69dca1d5ecef2cf6ee03a9ec2bce8b1916f1`; targeted by R8. |
+| 2 | MEDIUM | codex | AC1 run-root validation; AC4 candidate.sb generation and ps/argv evidence | Accepted; close the path grammar before any mutation. | Patched at `c91f69dca1d5ecef2cf6ee03a9ec2bce8b1916f1`; targeted by R8. |
+| 3 | HIGH | codex-ops | AC4 — proof-runner-to-outer byte protocol, proof-control EOF handling, and post-baseline writable roster | Accepted; add phase-gated STOP/ABORT and reserve EOF for owner loss. | Patched at `c91f69dca1d5ecef2cf6ee03a9ec2bce8b1916f1`; targeted by R8. |
+| 4 | HIGH | codex-ops | AC4 — exact-summary streaming and cleanup commit; AC5 — post-landing evidence capture | Accepted; require durable custody receipt before cleanup and a durable result carrier outside the deletion boundary. | Patched at `c91f69dca1d5ecef2cf6ee03a9ec2bce8b1916f1`; targeted by R8. |
 
 ## Round diagnosis
 
