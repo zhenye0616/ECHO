@@ -1,7 +1,7 @@
 ## current_thesis
 
-The candidate remains `proposed/`. R8 closed target-`H` acquisition, safe path encoding, and terminal control, but the custody family recurred at two filesystem durability layers.
-R9 is the final permitted proof round: it must close parent-entry durability before ACK1 and receipt-file durability/readback before parent success. No target bytes exist.
+The candidate remains `proposed/`. R9 was the fourth and final allowed loop round and failed the recurring custody proof because semantic receipt identities are not compared to independent parent/caller truth.
+The loop is stopped: no R10, promotion, build, target write, or 137b refinement has started. No target bytes exist.
 
 ## locked_decisions
 
@@ -29,7 +29,7 @@ R9 is the final permitted proof round: it must close parent-entry durability bef
 
 ## open_questions
 
-- R9 proof reviewers must falsify every parent-entry/receipt-file durability step and injected failure. Any remaining finding exhausts the four-round cap and stops the loop.
+- The four-round cap is exhausted. Resumption requires an explicit founder choice to extend the cap for semantic receipt cross-field repair, proof, and a later exact-SHA seal; do not dispatch autonomously.
 - After a new seal, a fresh builder may refine listed runtime paths but may not add install, launchd, status/doctor, or real-path scope.
 
 ## dont_touch
