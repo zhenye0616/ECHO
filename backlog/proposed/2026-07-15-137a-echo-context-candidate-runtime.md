@@ -116,7 +116,33 @@ using its committed verifier. A missing remote object, stale local ref, altered
 tuple, copied artifact, or verification failure blocks the item.
 
 Add candidate version `0.1.0-dev.137a.1` and exactly one candidate-owned,
-caller-created current-user 0700 absolute non-link `<run-root>`. The proof
+caller-created current-user 0700 absolute non-link `<run-root>`. Its proof and
+custody containers remain caller-owned. The caller
+selects only one 32-lowercase-hex attempt ID; the topology is derived exactly:
+`<proof-parent>=/private/tmp/echo-137a-proof-<attempt-id>`,
+`<run-root>=<proof-parent>/run`, custody sibling
+`<proof-parent>.custody`, and cleanup sibling
+`<proof-parent>.cleanup-quarantine`. None of these derived paths is a
+caller argument. Literal physical `/private/tmp` must be a root-owned non-link
+sticky 01777 directory; `/tmp`, normalization, `realpath` substitution, and
+any other base are rejected.
+
+All caller, wrapper, stage, sandbox-policy, and evidence path validation is
+byte-oriented. `SAFE_COMPONENT` is 1–128 ASCII bytes from
+`[A-Za-z0-9._@+-]`, excluding exact `.` and `..`; `SAFE_ABSPATH` is one leading
+slash plus nonempty `SAFE_COMPONENT`s separated by single slashes, with no
+trailing slash and at most 768 bytes. The proof-parent additionally matches
+the exact form above and is at most 256 bytes. Before any mkdir, write, spawn,
+or network access, validate raw CLI cardinality/bytes, derive and validate all
+siblings and fixed members, and require proof parent, custody, and quarantine
+all absent by no-follow lstat. The custody directory and proof parent are then
+created exclusively as 0700 and descriptor-bound; the wrapper repeats the
+grammar/topology/identity checks before producer mutation. Every absolute
+Node/npm/Git/sysctl/runtime/system path interpolated into SBPL or used in exact
+process evidence must also satisfy `SAFE_ABSPATH`; an unsafe discovered path
+is unsupported and fails rather than entering an escape branch.
+
+The proof
 harness parent and quarantined clone in AC4 are caller setup, never candidate
 state or an alternate runtime root. The run root's closed topology is:
 `<run-root>/stage` for immutable executed bytes,
@@ -132,14 +158,17 @@ data files are 0400; `work` directories are 0700 and files are 0600.
 The staged proof runner never removes the root that contains its own executable,
 cwd, or evidence. After command 2 has written its final summary and directly
 closed, the reviewed outer driver opens that summary once with
-`O_RDONLY|O_NOFOLLOW`, verifies
-its schema/hash and recorded topology, proves command 2 itself absent, and only
-then removes the one root through the reviewed outer driver's identity-bound
-cleanup. A failed or
-unproven run before the cleanup commit preserves the root. After the atomic
-cleanup-quarantine rename, failure retains and reports whatever quarantined
-remainder exists; cleanup never claims transactional restoration. Preflight
-refuses any member whose current identity differs from the recorded topology.
+`O_RDONLY|O_NOFOLLOW`, verifies its schema/hash and recorded topology, proves
+command 2 itself absent, emits the exact first internal record, and receives
+`ACK1` only after the custody parent has durably published and externally
+drained that preimage. Only then may the driver enter its identity-bound cleanup.
+A failed or unproven run before the cleanup commit preserves the proof parent.
+After the atomic cleanup-quarantine rename, failure retains and reports whatever
+quarantined remainder exists while record 1 remains in custody; cleanup never
+claims transactional restoration. Success atomically moves the result-only
+quarantine into custody and leaves both proof-parent paths absent. Preflight
+refuses any member whose current identity differs from the recorded topology,
+and proof cleanup never removes the separate custody directory.
 
 Before command 1, the caller creates the 0700 run root and the
 complete empty writable directory skeleton: `work/config`, `work/secrets`,
@@ -279,18 +308,37 @@ verification only: its hard-coded `0.1.0-dev.136.1` source-artifact plan is
 never invoked at the candidate head. Add one candidate-specific producer,
 `tools/candidate-stage-acceptance.sh` plus its fixed sibling orchestrator. The
 wrapper inherits item 136's canonical absolute wrapper/cwd/tool authentication
-and `env -i` discipline, but accepts only the closed common Node/npm/Git
-identity prefix followed by `--mode=candidate-stage --source-sha
-<candidate-head> --run-root <run-root>`. Its `--sandbox-home` is the fixed
-caller-created 0700 `<proof-parent>/setup-home` with a precreated 0700 `tmp`;
+and `env -i` discipline, but its public grammar omits item 136's
+`--sandbox-home` path and accepts only the closed Node/npm/Git identity prefix
+followed by `--mode=candidate-stage --source-sha
+<candidate-head> --attempt-id <32-lowercase-hex>`. It derives and revalidates
+the complete AC1 topology; no proof/run/custody/quarantine/setup path is
+accepted from argv. Its sandbox home is the fixed caller-created 0700
+`<proof-parent>/setup-home` with a precreated 0700 `tmp`;
 it is setup-only, outside the run root, inaccessible to the sandboxed
 candidate, and identity-safely removed by the orchestrator immediately after
 its final producer readback and before source quarantine or command 2. The
 role-typed outer caller invokes only this canonical wrapper from physical cwd
 `source`; it never invokes the `.mjs` sibling or commands 1/2 directly.
 
-The candidate orchestrator is both the sole dependency/stage producer and the
-reviewed long-lived outer proof driver. In the same private clone it first
+The shell wrapper execs the orchestrator's fixed public custody-parent role.
+That parent validates AC1's proof/custody topology, creates one private receipt
+pipe, and directly spawns the same authenticated orchestrator in its one
+wrapper-private driver role; direct external selection of that role is
+rejected. The private spawn inherits the already-authenticated common identity
+vector and has this exact suffix:
+`--private-role=driver --source-sha <candidate-head> --attempt-id
+<32-lowercase-hex> --receipt-fd 3`. Its cwd is physical `source`; fd 0 is
+`/dev/null`; fd 1 and fd 2 are distinct custody-parent-drained pipes; fd 3 is
+the sole receipt read end; and every other descriptor is close-on-exec. The
+custody parent alone drains the driver records, publishes durable
+custody, sends the fixed acknowledgments below, mirrors the exact records to
+its own stdout, and waits for direct driver close/EOF. The driver alone is the
+dependency/stage producer and long-lived proof driver. No producer child,
+command 1, command 2, or sandbox actor inherits the receipt pipe, and this
+fixed wrapper-private parent→driver spawn is outside commands 1–9.
+
+In the same private clone the driver first
 executes one fixed serialized child
 plan: exact Node/npm/Git version probes; clean-status/full-HEAD boundary;
 exact `npm ci`; a second clean/HEAD
@@ -312,18 +360,22 @@ check and command 1, and 4,000 seconds aggregate with the final 120 seconds
 reserved for the last clean/HEAD boundary and terminal child/stream settlement.
 No child starts if its class deadline would consume that reserve. After the
 producer boundary, setup-home removal gets 60 seconds; command 2/full proof gets
-600 seconds; exact-summary streaming and cleanup preflight get 30 seconds; and
-cleanup-quarantine deletion gets 300 seconds. The complete wrapper/driver
-aggregate is 5,000 seconds. Every late phase is failure, never success by
-eventual completion.
+600 seconds; record-1 custody/mirroring/ACK plus cleanup preflight get 30
+seconds; cleanup-quarantine reduction and bundle commit get 300 seconds; and
+record-2 custody/mirroring/ACK, direct driver close/internal EOF, custody-receipt
+publication, and final parent stream settlement share a separate nonborrowable
+30 seconds. The
+complete wrapper-parent/driver aggregate is 5,100 seconds. Every late phase is
+failure, never success by eventual completion.
 
 `scan:secrets` is deliberately not a producer child: its item-136 contract
 requires an exhaustive advertised-ref snapshot and a digest-pinned gitleaks
-binary that do not belong in the candidate proof root. Before implementation
-approval, the independent reviewer runs that existing config-isolated
-prefetch/gitleaks protocol against exact `H`; the implementation-review payload
-binds its advertised-ref manifest hash, scanner path/version/hash, exact argv,
-zero-finding result, and cleanup. A missing or stale scan blocks `A_r`.
+binary that do not belong in the candidate proof root. AC5 requires the builder
+prepublication local-`H`-inclusive scan and the builder/reviewer independent
+postpublication config-isolated prefetch/gitleaks scans. The implementation-
+review payload binds each applicable advertised-ref manifest, `K`, scanner
+path/version/hash, exact argv, zero-finding result, and cleanup. A missing or
+stale scan blocks `A_r`.
 
 The item-136-class TERM/KILL process-group settlement is a producer-phase-only
 exception: it may address only the currently owned direct producer child group
@@ -332,6 +384,14 @@ driver requires no live producer child/PGID or stream, disposes those signal
 handlers, irreversibly enters `driver_phase=proof`, and from then through exit
 may not invoke any signal or `ChildProcess.kill` path. Command 2 and every
 sandboxed actor are created only in that signal-free phase.
+
+The driver owns the read end of the wrapper-private custody-receipt pipe; the
+custody parent owns its sole writer. Each acknowledgment is exactly 41 bytes:
+one tag byte, one unsigned 64-bit big-endian record length including LF, and
+the raw 32-byte SHA-256. Tags are `0xA1` for record 1 and `0xA2` for record 2.
+Malformed, mismatched, duplicate, out-of-order, late, or EOF receipts fail
+closed. The driver creates a distinct liveness pipe for command 2 and maps only
+that read end to command 2 fd 3; receipt descriptors never cross that spawn.
 
 After that final boundary, the driver removes `setup-home`, changes cwd to
 `run/work`, atomically renames its own `source` directory to
@@ -343,11 +403,16 @@ launches staged command 2 with the exact cwd/env/FD map below, including the
 driver-liveness pipe, drains its stdio, waits for direct-child close,
 descriptor-validates and retains the fsynced summary, and proves command 2
 absent. The summary is canonical single-line secret-free JSON plus LF, at most
-1 MiB; the driver writes those exact bytes as stdout record 1 and waits for
-backpressure/drain completion so the coordinator retains the independently
-verifiable preimage before any cleanup mutation. It also reads, hashes, and
-compiles the staged driver-result schema into memory before cleanup; no schema
-path reopen occurs afterward.
+1 MiB. The driver writes those exact bytes as internal stdout record 1 and then
+waits up to 30 seconds for `ACK1`. Before acknowledging, the custody parent
+writes the exact bytes to `.proof-summary.v1.json.tmp`, fsyncs, atomically
+renames to `proof-summary.v1.json`, fsyncs the custody directory, reopens the
+final file with `O_RDONLY|O_NOFOLLOW`, verifies identity/length/hash, mirrors
+the exact record to external stdout, and waits for drain. Only then may it send
+matching `ACK1`. Reader loss or any missing receipt before valid `ACK1`
+preserves the complete proof parent and forbids the cleanup commit. The driver
+also reads, hashes, and compiles the staged driver-result schema into memory
+before cleanup; no schema path reopen occurs afterward.
 
 The driver then performs a complete no-follow identity/member preflight,
 changes cwd to the validated parent of `<proof-parent>`, and atomically renames
@@ -357,26 +422,65 @@ Before it, every final-cleanup failure preserves the then-current proof-parent
 tree byte-for-byte.
 After it, no-follow metadata/enumeration beneath the quarantined source and run
 root is allowed only for cleanup: descriptor-bound stage directories transition
-from recorded 0500 to 0700 with `fchmod`, then exact recorded members are
-unlinked bottom-up without following links. A post-commit identity/I/O failure
-leaves and reports the remaining partial cleanup-quarantine path, emits no
-success record, and makes no preservation claim. Success requires both the
-original and cleanup-quarantine paths `ENOENT`.
+from recorded 0500 to 0700 with `fchmod`, then exact recorded payload members
+are unlinked bottom-up without following links. A post-commit identity/I/O
+failure leaves and reports the remaining partial cleanup-quarantine path,
+retains durable record 1, emits no success record, and makes no preservation
+claim.
 
-Only after successful cleanup, the still-live driver emits stdout record 2:
-exactly one LF-terminated, secret-free JSON record of at most 4,096 bytes
-validated against staged
-`schemas/candidate-proof-driver-result.v1.schema.json`, then exits 0. It binds
-schema identity `candidate-proof-driver-result.v1`, source SHA/tree, version,
-producer Node/npm/Git paths/hashes/versions and four boundary results,
-stage-inventory digest, proof-summary SHA-256 and redacted result fields,
+After the proof payload is gone, the driver retains the quarantine root only,
+atomically publishes the exact record-2 bytes as its sole 0600 regular member
+`candidate-proof-driver-result.v1.json`, and fsyncs that file and directory. It
+then atomically renames the entire quarantine root to the previously absent
+`<proof-parent>.custody/driver-result.bundle` on the same device and fsyncs
+literal `/private/tmp` plus the custody directory. This atomic bundle commit
+makes both original proof-parent and cleanup-quarantine paths absent while
+placing record 2 outside the deletion boundary. The bundle must contain exactly
+that one no-follow member; any other source/destination state is failure and no
+failure path deletes custody.
+
+Only after the durable bundle commit does the still-live driver emit internal
+stdout record 2: exactly the same LF-terminated, secret-free JSON record of at
+most 4,096 bytes validated against staged
+`schemas/candidate-proof-driver-result.v1.schema.json`. It binds schema
+identity `candidate-proof-driver-result.v1`, source SHA/tree, version, producer
+Node/npm/Git paths/hashes/versions and four boundary results, stage-inventory
+digest, proof-summary SHA-256 and redacted result fields,
 `command_2_absent:true`, `run_root_removed:true`,
-`proof_parent_removed:true`, `cleanup_quarantine_absent:true`, and all negative authority flags. Driver stderr is
-a separately drained 64 KiB ring; every producer/proof child output remains in
-its own bounded ring and never contaminates the result carrier. The
-coordinator treats only direct driver close + stdout EOF + exactly those two
-schema-valid records, with its own summary hash matching record 2, as
-post-landing proof; it owns no filesystem cleanup authority.
+`summary_acknowledged:true`, `proof_payload_removed:true`,
+`proof_parent_path_absent:true`, `cleanup_quarantine_path_absent:true`,
+`custody_bundle_committed:true`, and all negative authority flags.
+
+The custody parent verifies record 2 byte-for-byte against the bundle member,
+mirrors it to external stdout and drains, then sends matching `ACK2`. The driver
+exits 0 only after valid `ACK2`; loss after bundle commit leaves both exact
+records durably recoverable. Driver stderr is a separately drained 64 KiB ring;
+every producer/proof child output remains in its own bounded ring and never
+contaminates the result carrier. The custody parent requires direct driver close
+0 and internal stdout/stderr EOF, then atomically publishes and directory-fsyncs
+canonical single-line `custody-ack.v1.json` (at most 4,096 bytes). That receipt
+binds record identity `candidate-proof-custody-ack.v1`, attempt ID, source
+SHA/tree, record-1 and record-2 relative paths/lengths/SHA-256 values, the exact
+`ACK1`/`ACK2` 41-byte values sent, both external drain completions, direct driver
+exit 0, and internal stdout/stderr EOF. Only then may the parent exit 0.
+
+If valid `ACK2` is followed by a missing driver close, internal stream EOF, or
+receipt-publication/parent-stream settlement before that final 30-second
+deadline, the custody parent closes only its owned pipe ends, detaches and
+`unref()`s the unresolved direct-driver handle without a signal, emits one
+capped redacted stderr failure naming the unresolved handle/streams, exits 124
+within the aggregate, retains all custody/bundle bytes, and emits no parent
+success. A clock-injected driver that consumes `ACK2` and never closes is the
+literal oracle for this path.
+
+The role-typed caller accepts only parent close 0 + external stdout/stderr EOF +
+exactly two schema-valid records equal to the no-follow custody files, with its
+own length/hash checks and this exact recursive roster: top-level regular
+`proof-summary.v1.json`, directory `driver-result.bundle` containing only regular
+`candidate-proof-driver-result.v1.json`, and regular `custody-ack.v1.json`.
+It owns no proof-parent or quarantine cleanup authority. After the applicable
+repository durability/readback gate, it alone may no-follow identity-check and
+remove that exact custody roster and directory.
 
 Immediately before publishing, command 1 independently reauthenticates its
 `process.execPath` as Node `v22.22.1` plus the exact npm path/hash supplied in
@@ -475,11 +579,15 @@ The proof harness uses one caller-owned 0700 `<proof-parent>` with fixed
 siblings `source`, `run` (the one `<run-root>`), `source.quarantined`, transient
 `setup-home`, a regular 0600 `outside-sentinel`, and an always-absent
 `outside-write-probe`; the fixed sibling `<proof-parent>.cleanup-quarantine`
-must also be absent. The authorized outer caller creates and records that empty setup,
+must also be absent. The separately created 0700
+`<proof-parent>.custody` starts empty, is on the same device, is outside the
+candidate watched set and sandbox allowlist, and is never renamed or deleted by
+proof cleanup. The authorized outer caller creates and records that empty setup,
 clones the exact reviewed head at `source`, then invokes only the canonical
 candidate-stage wrapper. Its long-lived driver runs command 1, removes
 `setup-home`, changes cwd, quarantines its own source path, directly owns
-command 2, captures evidence, and performs successful cleanup exactly as
+command 2, and performs proof cleanup; its custody parent durably captures and
+acknowledges the two records exactly as
 defined above; no ad hoc or inline coordinator executable performs any of
 those transitions.
 
@@ -493,9 +601,9 @@ paths, creates config/token, and owns probes, seed, lifecycle scenarios, HTTP,
 system observers, evidence, and final absence checks. It executes no source or
 quarantined byte.
 
-The canonical wrapper plus the orchestrator's serialized producer phase and
-long-lived proof-driver phase are closed above. Apart from the producer
-children and the fixed pre-spawn
+The canonical wrapper plus its fixed wrapper-private custody-parent→driver
+spawn, serialized producer phase, and long-lived proof-driver phase are closed
+above. Apart from that wrapper-private spawn, producer children, and the fixed pre-spawn
 `/usr/sbin/sysctl -in sysctl.proc_translated` identity helper above, the
 complete candidate/proof executable/argv surface is the nine commands below.
 The fixed system observers in the later evidence paragraph are diagnostics,
@@ -551,9 +659,12 @@ close-on-exec at each boundary.
 The outer driver keeps the sole command-2 fd 3 writer open without writing a
 byte until command 2 directly closes. EOF on that reader—whether from driver
 death or an explicit driver failure transition—prevents every new scenario,
-closes the proof runner's current outer-control writer exactly once, runs the
-same reserved resource/absence cleanup, writes `driver_lost:true` and
-`cleanup_proven` truthfully in durable evidence, and exits nonzero. Driver-loss
+fsyncs its phase record, sends the phase-valid `ABORT` byte to any live
+nonterminal outer while retaining the sole control writer until outer record
+EOF/direct close/stdout-stderr EOF, runs the same reserved resource/absence
+cleanup, writes `driver_lost:true` and `cleanup_proven` truthfully in durable
+evidence, and exits nonzero. If a terminal byte was already sent, it sends no
+duplicate and completes that transition. Driver-loss
 tests cover before probes, before ready, and after ready. Stdout/stderr reader
 loss is never treated as liveness authority.
 
@@ -564,7 +675,7 @@ stream EOF is still missing, the driver does not signal, wait indefinitely,
 read a summary, or enter cleanup preflight: it closes only its own pipe ends,
 detaches and `unref()`s the unresolved child handle, emits one capped redacted
 stderr failure record naming the exact unresolved handle/streams and retained
-proof-parent path, and exits 124 before the 5,000-second aggregate deadline.
+proof-parent path, and exits 124 before the 5,100-second aggregate deadline.
 The run root and proof parent remain in place and no success stdout record is
 emitted. A clock-injected fake command 2 that ignores liveness EOF is the
 literal oracle for this signal-free bounded-detach path.
@@ -573,6 +684,11 @@ The stage publisher generates the bounded profile at
 `stage/policy/candidate.sb`, before the stage becomes immutable, from the one
 canonical run root and the inventory-bound runtime/system closure. It is a
 regular 0400 inventory member no larger than 16 KiB and contains no secret.
+It uses one fixed single-line ASCII template with no CR/LF/NUL. Its only
+literal emitter is `"` + path + `"` after `SAFE_ABSPATH`; quotes, backslashes,
+whitespace, parentheses, controls, Unicode, normalization, or a general escape
+branch are impossible. Every inventory-bound interpolation is revalidated
+before profile publication.
 Before each sandbox launch the proof runner opens it once with
 `O_RDONLY|O_NOFOLLOW`, reads one bounded buffer from that descriptor, verifies
 that same buffer against the stage inventory, and supplies the exact bytes as
@@ -602,28 +718,42 @@ smoke, and probe sources requires exactly those calls and rejects every other
 `.kill`, `process.kill`, numeric-PID signal path, or signal utility execution.
 PID, `/bin/ps`, start strings, and relayed records are diagnostic only.
 
-Proof-runner→outer accepts exactly: `0x01` RUN as the first byte, `0x02`
-OUTER_SELF_KILL only after ready in a RUN lifecycle, or `0x03`
-ARM_INNER_PRE_READY_FAULT as the first byte. Outer→inner accepts exactly `0x11`
-RUN or `0x12` ARM_PRE_READY_FAULT as its first byte. Inner→runtime accepts
-exactly `0x21` START; EOF before START exits without token/lease/main-DB/listener
+Proof-runner→outer is a closed five-byte state machine: `0x01` RUN, `0x02`
+OUTER_SELF_KILL, `0x03` ARM_INNER_PRE_READY_FAULT, `0x04` STOP, and `0x05`
+ABORT. The first byte is RUN, ARM, or ABORT. STOP is accepted exactly once
+after relayed `ready` in RUN or relayed `inner_fault_observed` in ARM;
+OUTER_SELF_KILL is accepted once after RUN ready; ABORT is accepted once as the
+first byte or in any live nonterminal RUN/ARM phase. STOP, ABORT, and
+OUTER_SELF_KILL are terminal. Outer→inner still accepts exactly `0x11` RUN or
+`0x12` ARM_PRE_READY_FAULT as its first byte. Inner→runtime accepts exactly
+`0x21` START; EOF before START exits without token/lease/main-DB/listener
 mutation, while EOF after START begins shutdown. Every duplicate, unknown, or
 out-of-phase byte is exit 70.
 
 The outer waits at most 3,000 ms for its first proof-control byte before
-spawning. RUN causes
-the inner to spawn the runtime and send START. ARM causes the inner to spawn
-the runtime but withhold START, emit `runtime_spawned`, then call
-`process.kill(process.pid, "SIGKILL")`; because the caller is the live process
-itself, PID reuse is impossible. OUTER_SELF_KILL likewise calls self-SIGKILL
-only after ready. Proof-control EOF before the first byte exits 70 without an
-inner/token/database/listener mutation. EOF after RUN makes the outer close its
-sole inner-control writer and enter its bounded cleanup. Because the proof
-runner may no longer exist to persist the outcome, the outer atomically writes,
-fsyncs, renames, and directory-fsyncs a redacted
-`work/evidence/outer-orphan.v1.json` before exiting; timeout records unresolved
-resources and exits 124. Tests kill the runner before RUN, before ready, and
-after ready and require these phase-safe results with no retry.
+spawning. RUN causes the inner to spawn the runtime and send START. ARM causes
+the inner to spawn the runtime but withhold START, emit `runtime_spawned`, then
+call `process.kill(process.pid, "SIGKILL")`; because the caller is the live
+process itself, PID reuse is impossible. OUTER_SELF_KILL likewise calls
+self-SIGKILL only after ready. On accepted STOP or ABORT, the outer stops
+reading and closes its proof-control reader, closes its sole inner-control
+writer once if an inner exists, performs bounded cleanup, emits respectively
+`stopped` or `aborted`, and exits 0 after successful child/stream settlement;
+ABORT makes command 2's overall result nonzero. Neither explicit terminal path
+creates outer-orphan evidence.
+
+Proof-control EOF is not a shutdown command. EOF before an accepted terminal
+byte means the sole proof-runner control owner was lost; only that path may
+atomically write/fsync/rename/directory-fsync redacted
+`work/evidence/outer-orphan.v1.json`, then close inner control and clean up.
+Resolved owner-loss cleanup exits 1 and unresolved cleanup exits 124. Once a
+terminal byte is accepted, ownership intentionally transfers to the outer, so
+later writer EOF has no meaning and never creates orphan evidence. A live
+proof runner therefore never closes fd 4 to request shutdown: it fsyncs the
+phase record, sends STOP or ABORT, and retains the sole writer until outer fd 3
+EOF, direct close, and stdout/stderr EOF. Tests kill the runner before RUN,
+before ready, and after ready and require only those EOF paths to produce
+phase-safe orphan evidence with no retry.
 
 Exit 0 means completed success/no-op; 64 means
 argument/config/path contract failure; 65 fixture identity/refusal; 66
@@ -687,15 +817,16 @@ failure.
 Deadlines are monotonic, fixed, and strictly nested. Runtime shutdown gets four
 seconds total: two seconds for graceful intake close, then socket destruction,
 main-DB close, and lease close by second four. Inner cleanup gets seven seconds
-from closing runtime fd 4; outer cleanup gets ten seconds from closing inner fd
-4; and proof-runner cleanup plus authoritative absence probes gets fourteen
-seconds from closing outer fd 4. Each HTTP exchange gets five seconds, each
+from outer close of inner fd 4; outer cleanup gets ten seconds from accepting
+STOP/ABORT or observing owner-loss EOF; and proof-runner cleanup plus
+authoritative absence probes gets fourteen seconds from sending its terminal
+byte or detecting driver-liveness EOF. Each HTTP exchange gets five seconds, each
 fixed observer gets five seconds, seed gets 30 seconds, each complete
 direct/grandchild probe command gets 30 seconds with a two-second operation
 subdeadline, one lifecycle scenario gets 60 seconds, and the complete full
 proof gets 600 seconds with the final fourteen seconds
 reserved and nonborrowable; no new phase starts once it would consume that
-reserve. Stage/seed completion, first control, `inner_spawned`,
+reserve, and no terminal byte is sent unless it remains. Stage/seed completion, first control, `inner_spawned`,
 `runtime_spawned`, ready, observer close, and every API phase have explicit
 deadlines in the implementation constants and clock-injected tests. A silent
 child, late record, hung finite observer, or missing EOF is exit 124; no parent
@@ -707,8 +838,8 @@ claims absence.
 Before every irreversible control byte the proof runner appends and fsyncs a
 bounded redacted JSONL phase record under `work/evidence`. Every handled
 success or failure appends `{phase,reason,deadline,unresolved_resources,
-observer_state,cleanup_proven}`, closes its owned control writer exactly once,
-runs the reserved cleanup, then writes the closed
+observer_state,cleanup_proven}`, sends the phase-valid terminal byte and retains
+its writer through outer close, runs the reserved cleanup, then writes the closed
 `candidate-proof-evidence.v1` summary through temp-file fsync, atomic rename,
 and evidence-directory fsync. The schema caps arrays/strings and excludes
 credentials. No fresh outer starts until prior outer fd 3 EOF and its direct
@@ -727,9 +858,10 @@ schema, requires exit 0, `cleanup_proven:true`, and an empty
 exact summary SHA-256 and redacted bound fields for Project evidence. Only
 then may that driver prove command 2 absent, stream the exact summary, and enter
 the atomic cleanup-quarantine protocol. Missing, malformed, oversized, changed, unresolved, or
-non-success evidence preserves the root. Durable means fsync-safe through
-driver/coordinator consumption and Project evidence capture, not survival of successful
-disposable-root cleanup.
+non-success evidence preserves the root. Durable means both exact result
+preimages plus the final custody receipt survive successful disposable-root
+cleanup and remain no-follow readable until their bound Project `R` or `P`
+readback permits custody removal.
 
 Runtime shutdown tracks every accepted socket. On parent-fd EOF, SIGTERM, or
 SIGINT it stops intake, calls server close, allows at most two seconds for
@@ -791,11 +923,29 @@ Sandbox
 denial is authoritative; these PID-selected snapshots are corroborating only
 and may show only the selected loopback listener and proof-runner client flow.
 
+The ps parser consumes only the leading decimal PID and PPID fields and retains
+the remaining one-line command tail as opaque bytes; it never unescapes, shell-
+parses, or splits that tail into argv. Evidence encodes each tail as canonical
+unpadded base64url plus byte length/SHA-256, while every spawn records its argv
+separately as an ordered vector of canonical base64url tokens (the policy token
+is represented by its verified length/hash). Command 2's safe-token argv may be
+byte-compared to one-ASCII-space join. Commands 3–9 are detected only by exact
+staged script-path anchors in the opaque tail whose preceding byte is
+start-of-tail or one ASCII space and whose following byte is end-of-tail or one
+ASCII space. Quote, backslash, tab, and every other byte are not delimiters;
+after first excluding the exact command-2 tail, zero anchors means an unrelated
+row, exactly one identifies that command class, and more than one is ambiguous.
+A zero-anchor non-command-2 row containing the standalone exact run-root token
+is a malformed candidate row and fails. Detection never uses a run-root
+substring or policy-text match. Malformed numeric prefixes,
+CR/NUL/missing-LF, oversized rows, ambiguous anchors, noncanonical encoding, or
+profile-text false positives fail closed.
+
 After each lifecycle close, authoritative absence is checked in this order:
 (1) outer fd 3 EOF plus its direct child close event; (2) the diagnostic ps
 snapshot contains exactly one command-2 row for this run root whose PID equals
-the live proof runner's `process.pid` and whose argv equals exact command 2,
-while no command 3–9 row for this run root exists; the expected command-2 row
+the live proof runner's `process.pid` and whose opaque tail equals exact safe
+command 2, while no delimiter-bound command 3–9 script anchor exists; the expected command-2 row
 is excluded from the candidate-subtree absence predicate; (3) no-follow lstat
 each of context DB, WAL, SHM, and lease against its expected identity/state.
 For each existing regular path separately, run exact non-network-filtered
@@ -853,7 +1003,8 @@ dependency, stage setup, source quarantine/final deletion, kernel socket state, 
 OS observer metadata remain outside this bounded watched set. This is not a
 host-global “only mutation” claim.
 
-Normal stop closes the inner's runtime control/liveness writer and proves
+For normal RUN shutdown the proof runner fsyncs its phase record and sends
+STOP; the outer closes the inner's runtime control/liveness writer and proves
 absence. In the armed pre-ready fault, the inner self-SIGKILL closes that sole
 writer and the runtime receives EOF before START. Inner and runtime fd 1/2 are
 exact process-lifetime capabilities: neither process may close, duplicate,
@@ -862,7 +1013,9 @@ their sole readers until EOF. The outer first requires inner fd 3 EOF plus its
 direct `ChildProcess` close event, then requires EOF on both shared stdout and
 stderr readers. With the inner closed and no other inheritor, those EOFs prove
 the exact spawned runtime relinquished its only outer-visible lifetime
-capabilities. Only then may the outer relay `inner_fault_observed`. This is
+capabilities. Only then may the outer relay `inner_fault_observed`; the proof
+runner immediately sends STOP so the surviving ARM outer exits without orphan
+evidence, then runs authoritative absence. This is
 descendant-close evidence, not process/resource absence; only the proof
 runner's ordered ps/path-lsof/lease/listener sequence is authoritative and may
 permit another exact command-7 outer. That fresh
@@ -894,6 +1047,62 @@ The builder runs the complete candidate proof from its exact target head and
 hands off both repository heads without merging either. A different reviewer
 reviews the exact target and Project_echo heads, all changed paths, full tests,
 the stage inventory, and secret/real-path fences.
+
+Let target feature ref
+`F=refs/heads/agent/echo-context-candidate-runtime`. Its one builder
+publication is the feature-handoff write required by the locked two-repository
+protocol, not a target-main write and never retroactively authorized by `A_t`.
+Require a clean local target branch at exact `H/H^{tree}`, canonical target main
+still `B/B^{tree}`, and a linear merge-free `B..H`.
+
+Before each local target commit, the builder runs the bound staged-byte
+secret/private-path scan and refuses the commit on any finding. After `H` is
+final but before any target remote write, freeze outside target history a
+canonical closure manifest `K`: exact `B/H` and trees; ordered `B..H` commits
+and parents; sorted unique `reach(H)` commit/tree/blob objects with type/size;
+the separate `reach(H)-reach(B)` set; and every path/mode/blob row in every
+`B..H` tree, including intermediate, deleted, and transient blobs. `K` is
+canonical UTF-8/LF with exact length/SHA-256 and never enters `H`. In a
+disposable config-isolated repository whose only non-scanner source refs are
+local heads main=`B` and `F=H`, configure `origin` to the exact canonical target
+URL and require the item-136 prefetch/scanner/contract bytes unchanged from
+`B`. Run the unchanged prefetch helper; it may create only its Git-directory
+manifest and exact `refs/echo-scan/**` snapshot matching the complete canonical
+advertisement. Then run the unchanged digest-pinned scanner, whose `--all`
+scope covers local `F=H` plus that exhaustive snapshot, and the private-path
+policy over `K`. Bind helper/wrapper/contract/binary path/version/hashes,
+literal argv, manifest/snapshot, the `K`-enumerated paths/blobs, and zero
+findings.
+
+Authenticated preflight requires the fixed repository identity, main=`B`, and
+`F` absent. The builder then performs the first and only target-feature write
+with one direct literal vector:
+`[<git-abs>,"-c","core.hooksPath=/dev/null","-c",
+"http.followRedirects=false","-c","credential.helper=","-c",
+"credential.helper=!/usr/local/bin/gh auth git-credential","push",
+"--porcelain","--no-verify","--no-follow-tags",
+"--force-with-lease=refs/heads/agent/echo-context-candidate-runtime:",
+"https://github.com/zhenye0616/echo-context.git",
+"<H>:refs/heads/agent/echo-context-candidate-runtime"]`.
+Exactly one parsed successful creation row for `F` and no other row is allowed.
+Authenticated readback requires main=`B`, `F=H`, and no other remote ref change.
+A fresh no-local/no-alternates config-isolated acquisition fetches only main and
+`F` as its non-scanner source refs, requires exact `B/H`, `cat-file -t
+H=commit`, exact `H^{tree}`, ancestry, full-strict fsck, and byte-identical
+recomputation of `K`, then configures exact canonical `origin` and repeats the
+unchanged prefetch/scanner contract over the complete now-`F`-inclusive
+advertisement with zero findings.
+
+A different reviewer repeats API/ref, fresh acquisition, `cat-file`, ancestry,
+closure-manifest, prefetch/scanner, and fsck checks without using the builder
+object database. `V` binds `F`, `B/H` and trees, `K` bytes/length/hash, the
+builder prepublication scan plus builder and reviewer postpublication
+acquisition/scan transcripts, scanner identities/results, literal
+publication argv/row, readbacks, and the truth that no intermediate target ref
+or tag was published. Any pre-existing `F`, scan/closure drift, malformed or
+ambiguous write, or readback disagreement stops without retry, adoption,
+update, deletion, or cleanup. `F` remains immutable at `H` through review,
+target landing, evidence, and completion; 137a performs no feature-ref cleanup.
 
 Every record-only `A_r`, `A_p`, `A_t`, `A_e`, and `A_c` is an immutable
 single-use superset of both the delegated-authorization decision at
@@ -935,10 +1144,13 @@ operation-specific paragraph below narrows this mandatory set.
 Let `Q_r/Q_r^{tree}` be current canonical Project main. Freeze independent
 implementation-review payload `V`: its exact path, bytes,
 length, SHA-256, and Git blob bind unequal builder/reviewer identities, exact
-`H/H^{tree}`, reviewed Project feature head `J/J^{tree}`, its reviewed linear
+`F=H/H^{tree}`, target manifest `K` and both independent acquisition/closure
+scans, reviewed Project feature head `J/J^{tree}`, its reviewed linear
 builder base `J0/J0^{tree}`, every changed path, full
-tests, stage/proof-driver records, and the item-136 exhaustive advertised-ref
-secret scan at `H`, plus a Project terminal-blob secret/path-policy scan over
+tests, exact durable proof-summary/driver-result/custody-ack preimages and
+wrapper-parent/driver close evidence, the prepublication local-`H`-inclusive
+scan and both independent postpublication item-136 exhaustive advertised-ref
+secret scans at `H`, plus a Project terminal-blob secret/path-policy scan over
 the exact `J0..J` changed set and deterministic `Q_r` plus terminal-patch
 candidate tree. Later record-only authorization paths are outside that builder
 tree and each receive their own exact-path secret/policy scan in the record's
@@ -980,7 +1192,17 @@ path, fixed coordinator metadata, and no implementation, proof, evidence, or
 completion byte. A commit cannot name itself, so the record binds `Q_t`, both
 reviewed heads/trees, `B/H`, repository and tool identities, literal fully
 substituted argv, retry/adopt/rewrite/cleanup false, and defines `A_t` as its
-containing commit. The standing sequential delegation directly authorizes only
+containing commit. It additionally binds exact published `V`, `F=H`, `K`, both
+independent acquisition/scan results, the target-feature publication/readback
+transcript, `feature_ref_retained:true`, `feature_ref_cleanup:false`, and the
+post-authorization fresh-acquisition/target-CAS plan. `R` readback is the sole
+gate permitting removal of the builder proof's exact custody directory; `A_t`
+also binds that no-follow removal transcript and
+`prelanding_custody_removed:true`. Before constructing `A_t`, select one fresh
+32-lowercase-hex acquisition ID and bind the derived
+`/private/tmp/echo-137a-target-acquire-<id>` root while requiring it absent;
+create it exclusively only after `A_t` readback. The standing sequential
+delegation directly authorizes only
 this create-only record publication. A one-attempt Project CAS and authenticated
 readback must prove main=`A_t`, sole parent `Q_t`, and exact record
 path/blob/tree before any target write.
@@ -990,8 +1212,23 @@ path/hash/version bound; `GIT_CONFIG_NOSYSTEM=1`,
 `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_TERMINAL_PROMPT=0`; proxy/rewrite and all
 other inherited Git variables absent; a fresh config-isolated clone; hooks
 disabled; and Git spawned directly without caller shell/eval (the one fixed
-`gh auth git-credential` helper string is separately bound). Immediately before the target write, Project main
-must still equal `A_t` and target main `B/B^{tree}`. The sole target mutation is
+`gh auth git-credential` helper string is separately bound).
+
+After `A_t` readback, discard every builder/reviewer repository as an operation
+input. Initialize the bound absent acquisition leaf with no alternates, remote,
+tags, or pre-existing objects, then fetch through the literal canonical URL and
+bound Git/environment/credential prefix only
+`refs/heads/main:refs/remotes/canonical/main` and
+`refs/heads/agent/echo-context-candidate-runtime:refs/remotes/canonical/candidate`.
+Require those refs exact `B/H`, `cat-file -t H=commit`, exact `H^{tree}`, `B`
+ancestor of `H`, full-strict fsck, and byte-identical `K` recomputation and
+separately revalidate that both `V`-bound postpublication scan transcripts name
+the same `B/H/F/K` identities and record zero findings. This third remote-free
+acquisition does not rerun the origin-dependent scanner.
+Immediately before the target write, authenticated reads
+must still prove Project main=`A_t`, target main=`B/B^{tree}`, and `F=H`.
+Thus the push source acquires `H` only from canonical `F`, never retained
+builder/reviewer bytes. The sole target-main mutation is
 one direct argv vector with literal 40-hex values:
 `[<git-abs>,"-c","core.hooksPath=/dev/null","-c",
 "http.followRedirects=false","-c","credential.helper=","-c",
@@ -1000,9 +1237,9 @@ one direct argv vector with literal 40-hex values:
 "--force-with-lease=refs/heads/main:<B>",
 "https://github.com/zhenye0616/echo-context.git",
 "<H>:refs/heads/main"]`. Exactly one structurally parsed fast-forward row for
-main must succeed. Authenticated API plus isolated fetch/readback then require
-main=`H`, tree=`H^{tree}`, unchanged repository identity/visibility/default
-branch, and no other ref change. Only that readback defines canonical target
+main must succeed. Authenticated API plus a second isolated fetch/readback then
+require main=`H`, `F=H`, tree=`H^{tree}`, unchanged repository
+identity/visibility/default branch, and no other ref change. Only that readback defines canonical target
 `T=H`. A missing, extra, malformed, redirected, non-fast-forward, ambiguous,
 or failed result consumes `A_t` and permits read-only reconciliation only—no
 rebase, merge, autostash, amend, cherry-pick, retry, adoption, cleanup, or
@@ -1063,12 +1300,17 @@ across `backlog/{proposed,ready,claimed,pending_review,complete}/`, and it is
 the reviewed copy under `pending_review/`.
 
 After the post-landing proof, freeze and independently audit exact evidence
-payload `E`: path, bytes, length, SHA-256, and Git blob. `E` binds `T/tree`,
-`A_t/A_p/M`, review identities, and embeds the exact schema-valid stdout-record-1
-proof-summary preimage plus its length/SHA-256 and exact stdout-record-2 driver
-result plus its length/SHA-256. It also binds direct driver close/stdout EOF,
-toolchain/results, cleanup booleans, and the false authority flags below, but
-never its own Project publication SHA. Let `Q_e` be
+payload `E`: path, bytes, length, SHA-256, and Git blob. While the post-landing
+custody directory still exists, the coordinator and independent auditor each
+open its exact recursive roster with no-follow identity checks and compare it
+to the externally captured records. `E` binds `T/tree`, `A_t/A_p/M`, review
+identities, proof attempt/topology, and embeds the exact schema-valid record-1
+proof-summary preimage plus its length/SHA-256, exact record-2 driver result plus
+its length/SHA-256, and exact custody receipt plus its length/SHA-256. It also
+binds wrapper-parent close/stdout/stderr EOF, the receipt-bound direct driver
+close/internal EOF, toolchain/results, cleanup and custody booleans, the exact
+three-member custody roster, `postlanding_custody_retained:true`, and the false
+authority flags below, but never its own Project publication SHA. Let `Q_e` be
 exact current Project main and require `Q_e=M`; any intervening Project
 movement requires fresh reconciliation/review rather than incorporation. Create
 record-only authorization `A_e`, sole parent
@@ -1085,8 +1327,12 @@ argv and canonical `https://github.com/zhenye0616/ECHO.git`, exact lease, and
 one parsed fast-forward row. Readback must prove exact `P/tree/E` while target
 remains `T/tree`.
 
-Completion is a separate two-commit authorization pair. Freeze and
-independently audit payload bytes rooted at exact `P`; they move only this item
+Only exact `P/tree/E` readback permits the coordinator to no-follow
+identity-check and remove the post-landing custody roster and directory. Freeze
+that bounded removal transcript and require the custody path absent before
+completion. Completion is a separate two-commit authorization pair. Freeze and
+independently audit payload bytes rooted at exact `P`; they bind that removal
+transcript and `postlanding_custody_removed:true`, move only this item
 from pending review to complete, finalize its pointer/run log/index, preserve
 `V/A_r/R/A_t/A_p/M/A_e/E`, and set `target_landed_sha:T` plus the deliberately
 non-self-referential `project_landed_sha:P`. Create record-only `A_c`, sole
@@ -1103,12 +1349,14 @@ and is never named inside itself. No `A_r/R/A_t/A_p/M/A_e/P/A_c/C` push may be
 combined, retried, rebased, or performed through mutable `origin` or
 `push-with-retry`.
 
-After target readback, the coordinator creates the fixed proof-parent topology,
-fresh-clones canonical target main at `source`, and invokes the canonical
-candidate-stage wrapper once with its exact common prefix and candidate-stage
-arguments. The wrapper execs the reviewed long-lived driver; that driver alone
+After target readback, the coordinator creates the fixed proof-parent/custody
+topology, fresh-clones canonical target main at `source`, and invokes the
+canonical candidate-stage wrapper once with its exact common prefix and
+candidate-stage arguments. The wrapper execs the reviewed custody-parent role,
+which directly spawns the private long-lived driver role. That driver alone
 produces dependencies, runs command 1, removes `setup-home`, quarantines source,
-directly owns command 2, captures its evidence, and performs successful cleanup.
+directly owns command 2, captures its evidence, and performs successful cleanup;
+the parent alone durably publishes, drains, and acknowledges the result records.
 The coordinator never invokes either `.mjs` entrypoint or item 136's source mode
 at the candidate head. The staged
 runner executes:
@@ -1121,7 +1369,7 @@ runner executes:
 4. authenticate and list exactly eight tools;
 5. retrieve the synthetic event;
 6. prove auth negatives and capture-disabled with zero application body consumption;
-7. stop, prove complete absence, launch a fresh exact command-7 outer lifecycle,
+7. send STOP, prove complete absence, launch a fresh exact command-7 outer lifecycle,
    and prove state persists;
 8. exercise both AC4 EOF chains without retry
    or restart:
@@ -1132,7 +1380,8 @@ runner executes:
    b. only after complete absence, launch a fresh exact command-7 outer and
       send ARM_INNER_PRE_READY_FAULT as its first control byte, then require
       relayed `runtime_spawned` with no START/ready, observe the inner's
-      self-SIGKILL, require the surviving outer's `inner_fault_observed`, and
+      self-SIGKILL, require the surviving outer's `inner_fault_observed`, send
+      STOP to that outer, and
       prove inner/runtime command, listener,
       main-database-handle, and writer-lease absence within the same bound;
 9. prove the exact post-baseline watched-set and proof-owned write boundary;
@@ -1140,17 +1389,20 @@ runner executes:
     evidence, including no
    candidate bind/connect involving 39478, 38478, or 38479;
 11. fsync the final summary and exit without deleting the run root; after
-    command 2's direct close and stdio EOF, the outer driver descriptor-verifies
-    and captures that summary, proves command 2 absent, removes only the
-    identity-bound run/quarantine/setup parent on a successful closed result,
-    and emits the driver-result carrier after the already-streamed exact summary.
-    The coordinator accepts only those two bound records plus direct driver
-    close/stdout EOF.
+    command 2's direct close and stdio EOF, the driver descriptor-verifies and
+    captures that summary, proves command 2 absent, emits record 1 and waits for
+    durable custody `ACK1`, removes only the identity-bound proof payload,
+    atomically commits record 2's result-only bundle into custody, emits record
+    2, and waits for `ACK2`. The custody parent writes its receipt only after
+    direct driver close/internal EOF. The coordinator accepts only parent close
+    0/external EOF, both bound records, and the exact no-follow custody roster.
 
 The Project_echo evidence binds canonical target SHA/tree, candidate version,
 lock hash, diagnostic stage hash, Node/npm/ABI/translation identity, tests,
-roster, the exact proof-summary and driver-result preimages/lengths/hashes,
-direct driver close/stdout EOF, command-2 and cleanup-quarantine absence, both
+roster, the exact proof-summary, driver-result, and custody-receipt
+preimages/lengths/hashes, parent and driver close/EOF evidence, receipt values,
+command-2/proof-parent/cleanup-quarantine absence, the retained exact custody
+roster, both
 post-landing liveness-case absence/no-retry results,
 capture/authority values,
 and states exactly:
@@ -1164,7 +1416,8 @@ nor context authority.
 - Application Support, LaunchAgents, Library Logs, home dot-directories, or any
   other persistent user path.
 - `com.echo.context`, port 39478, launchctl, plists, KeepAlive, status,
-  doctor, install/start/stop/restart/uninstall CLI, lifecycle locks, receipts,
+  doctor, install/start/stop/restart/uninstall CLI, lifecycle locks, persistent
+  installation/lifecycle receipts,
   intents, or recovery FSMs.
 - Bundled Node, SBOM, portable/native dependency-closure hardening,
   deterministic release assets, bootstrap, descriptor-protected execution,
@@ -1201,12 +1454,14 @@ nor context authority.
   self-fault tests prove
   closure without signaling an unknown PID.
 - The proof runner can disappear while its outer still owns a live subtree.
-  Phase-defined proof-control EOF, nested budgets, outer-orphan fsynced evidence,
-  and runner-loss tests before RUN/before ready/after ready make this fail closed.
+  Explicit STOP/ABORT own intentional termination; only owner-loss EOF may
+  create fsynced outer-orphan evidence. Nested budgets and runner-loss tests
+  before RUN/before ready/after ready make the distinction fail closed.
 - The long-lived driver can disappear or cleanup can fail after deletion begins.
-  Driver-liveness fd EOF forces command-2 cleanup; exact summary bytes stream
-  before the atomic cleanup commit; and postcommit failure reports the remaining
-  cleanup-quarantine without claiming restoration or successful evidence.
+  Driver-liveness fd EOF forces command-2 ABORT cleanup; record 1 is durably
+  held and acknowledged outside the deletion boundary before cleanup; record 2
+  moves atomically into that custody; and postcommit failure reports the
+  remaining quarantine without claiming restoration or successful evidence.
 - A PID/start-time string can alias a reused process. It is never authority:
   no actor signals a recorded PID or calls `ChildProcess.kill`; only the live
   process may self-SIGKILL after a phase-checked private control byte.
@@ -1231,6 +1486,14 @@ nor context authority.
 - Either remote main can advance after review. Exact expected-old/new refs,
   one explicit-lease compare-and-swap attempt, and canonical SHA/tree readback
   consume the authorization on any movement; no rebase or push retry is allowed.
+- A reviewed target `H` can exist only in a builder object database and be
+  unavailable to the landing actor. The single immutable target feature ref,
+  full closure manifest, two independent fresh acquisitions/scans, and the
+  post-authorization fetch from that ref make canonical reachability explicit.
+- Unsafe path bytes can change SBPL parsing or make process evidence ambiguous.
+  The ASCII component grammar, fixed proof-parent topology, assertion-only
+  profile emitter, opaque ps tails, and base64url length/hash evidence reject
+  those inputs before mutation or spawn.
 
 ## Tests
 
@@ -1240,7 +1503,11 @@ nor context authority.
   sidecars with DELETE-mode lease isolation, symlink/traversal/default
   rejection, canonical config-schema validation at proof-runner production and
   seed/serve descriptor-buffer consumption, poisoned-environment rejection,
-  cleanup identity refusal, and zero prevalidation mutation.
+  cleanup identity refusal, and zero prevalidation mutation. Its table includes
+  `/tmp`, repeated/trailing slashes, dot components, quotes, backslashes,
+  whitespace, controls, Unicode, overlength components/paths, invalid attempt
+  IDs, and pre-existing proof/custody/quarantine siblings, and proves every
+  refusal precedes mkdir, write, spawn, or network access.
 - `tests/runtime/auth.test.ts` proves disk/wire grammar, decoded
   constant-time comparison, the exact raw Host grammar, duplicate-header
   handling, no application body consumer/storage work, withheld and unbounded
@@ -1257,7 +1524,9 @@ nor context authority.
   mismatch/multiplicity refusal, all four path races, and unchanged DB on
   failure.
 - `tests/candidate/stage.test.ts` proves the emitted-JS-only inventory,
-  exact candidate-stage wrapper/orchestrator and serialized child plan,
+  exact candidate-stage wrapper/custody-parent/private-driver roles, receipt-FD
+  noninheritance, literal private argv/cwd/fd0-null/fd1-2-pipes/fd3-reader map,
+  close-on-exec remainder, acknowledgments, and serialized child plan,
   four clean/HEAD boundaries, producer-only process-group settlement followed
   by irreversible signal-free proof phase, setup-home removal, hidden-lock equality,
   extraneous-file refusal, explicit
@@ -1276,7 +1545,9 @@ nor context authority.
   and rejects digest-valid/schema-invalid inventories. It also swaps,
   replaces, and rewrites the profile after its
   descriptor read and proves `sandbox-exec -p` consumes only the verified
-  inventory-bound buffer.
+  inventory-bound buffer. It also proves the fixed single-line ASCII SBPL
+  emitter has no escape branch and refuses every unsafe discovered path before
+  profile publication or sandbox spawn.
 - `tests/candidate/lifecycle.test.ts` proves ready/liveness FD ownership,
   outer/inner/runtime inheritance map, the outer-to-inner and
   inner-to-runtime EOF chain, one non-inherited lifetime record writer per
@@ -1284,7 +1555,8 @@ nor context authority.
   acceptance/relay boundary, fd 1/2 as non-closeable/non-rebindable lifetime capabilities with no
   other inheritor, armed-inner relay only after direct inner close plus both
   shared-output EOFs, drained-pipe `EAGAIN`/EOF proof, 4,096-byte record caps/deadlines,
-  the closed three-pipe byte protocol, exactly two self-PID SIGKILL lexical
+  the closed three-pipe/five-byte outer-control state machine, phase-valid
+  STOP/ABORT, EOF reserved for owner loss, exactly two self-PID SIGKILL lexical
   sites, and absence of every other PID signal/`ChildProcess.kill` path. It
   also proves START-before-mutation, deterministic ARM-before-spawn with START
   withheld, `runtime_spawned` relay before the inner self-SIGKILL, stale-run
@@ -1292,9 +1564,10 @@ nor context authority.
   ready, no unknown-PID signal, active keep-alive/partial-body forced close,
   continuously drained over-cap output while outer lives, pre-self-kill ring
   relay plus `drain_owner_lost`/post-death-unavailable evidence, EPIPE-safe
-  child shutdown, runner loss before RUN/before ready/after ready, fsynced
-  outer-orphan and proof summaries, driver-liveness EOF before probes/before
-  ready/after ready with outer-control closure and no retry, a fake command 2
+  child shutdown, runner loss before RUN/before ready/after ready as the only
+  outer-orphan producer, normal STOP and live-failure ABORT with no orphan,
+  fsynced proof summaries, driver-liveness EOF before probes/before
+  ready/after ready with phase-valid ABORT and no retry, a fake command 2
   that ignores liveness EOF and proves capped failure reporting, signal-free
   pipe/handle detach, exit 124, and root retention, every pre-ready failure cleanup path,
   the 4/7/10/14/60/600-second nested budgets with silent/hung children and
@@ -1308,7 +1581,12 @@ nor context authority.
   reread/lease-reacquire/port-rebind absence, translated-Node
   bootstrap with its explicit `sysctl-read`/`mach-lookup` disclaimer, zero
   runtime descendant exec, and denied outbound/DNS/non-loopback/
-  package-manager/sentinel-port operations.
+  package-manager/sentinel-port operations. It exercises malformed and
+  ambiguous ps rows, treats command tails as opaque bytes, verifies canonical
+  base64url token/tail length+hash evidence, and proves command 3–9 recognition
+  uses only delimiter-bound staged-script anchors rather than run-root/profile
+  substrings. It also proves sandboxed actors cannot read or mutate the custody
+  sibling.
 - `tests/candidate/smoke.test.ts` proves the complete seed/start/auth/
   eight-tool/retrieval/capture-off/restart/inner-kill/outer-observe/cleanup
   slice, the exact nine shell-free command forms and role discriminators, cwd,
@@ -1316,10 +1594,15 @@ nor context authority.
   grandchild probe acceptance before the first seed command with DB/lease/
   listener absence on either failure, rejection of every
   extra mode, proof-parent source quarantine, durable evidence, observer and
-  stdout/stderr caps, post-baseline write set, the exact two-record driver
-  stdout grammar and schema/hash binding, direct close/EOF gate, pre-cleanup
-  summary custody, 0500-directory descriptor `fchmod`, atomic cleanup-quarantine
-  commit, success absence, precommit preservation, and postcommit partial-failure reporting, and
+  stdout/stderr caps, post-baseline write set, the exact two-record external
+  stdout grammar and schema/hash binding, private parent/driver close/EOF gates,
+  exact 41-byte ACK order, reader/receipt loss at every boundary, durable
+  record-1-before-cleanup custody, 0500-directory descriptor `fchmod`, atomic
+  cleanup-quarantine-to-result-bundle commit, canonical custody receipt and
+  exact recursive roster, success proof/quarantine absence with custody retained,
+  precommit preservation, postcommit partial-failure reporting, and an
+  ACK2-consuming driver that never closes causing signal-free detach, exit 124,
+  custody retention, and no parent success, and
   exact authenticated six-route `/v1/*` roster and fixed-port sentinels. Its
   `--mode full` path executes both AC5 8(a) and 8(b),
   proves bounded absence, and proves no later `inner_spawned` or
@@ -1330,6 +1613,12 @@ nor context authority.
 - Existing source-artifact verification, source inventory, roster/service
   parity, typecheck, lint, full CI, secret scan, and `git diff --check` remain
   green.
+- The independent handoff evidence in `V` proves the exact create-only target
+  feature publication, canonical closure manifest `K`, two no-local/no-alternates
+  fresh acquisitions and full-ref scans, immutable `F=H`, and exact main=`B`;
+  `A_t` proves a third fresh fetch from only main and `F` before the one target
+  main CAS. Repository-operation evidence is validated directly and is not
+  simulated by a target-repository unit test.
 
 ## After Completion (Strategist Notes)
 
