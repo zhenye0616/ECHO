@@ -313,7 +313,8 @@ wrapper inherits item 136's canonical absolute wrapper/cwd/tool authentication
 and `env -i` discipline, but its public grammar omits item 136's
 `--sandbox-home` path and accepts only the closed Node/npm/Git identity prefix
 followed by `--mode=candidate-stage --source-sha
-<candidate-head> --attempt-id <32-lowercase-hex>`. It derives and revalidates
+<candidate-head> --source-tree <candidate-tree> --attempt-id
+<32-lowercase-hex>`. It derives and revalidates
 the complete AC1 topology; no proof/run/custody/quarantine/setup path is
 accepted from argv. Its sandbox home is the fixed caller-created 0700
 `<proof-parent>/setup-home` with a precreated 0700 `tmp`;
@@ -327,10 +328,20 @@ The shell wrapper execs the orchestrator's fixed public custody-parent role.
 That parent validates AC1's proof/custody topology, creates one private receipt
 pipe, and directly spawns the same authenticated orchestrator in its one
 wrapper-private driver role; direct external selection of that role is
-rejected. The private spawn inherits the already-authenticated common identity
-vector and has this exact suffix:
-`--private-role=driver --source-sha <candidate-head> --attempt-id
-<32-lowercase-hex> --receipt-fd 3`. Its cwd is physical `source`; fd 0 is
+rejected. Before that spawn, the custody parent grammar-validates and freezes
+the caller-supplied source SHA/tree in an immutable expected receipt-identity
+tuple consisting of literal
+`candidate-proof-custody-ack.v1`, the caller-selected attempt ID, and that exact
+source SHA/tree. The public tuple must be the outer caller's already-reviewed
+`H/H^{tree}` or `T/T^{tree}`: the caller authenticates it at its clone/HEAD
+boundary and the driver independently reauthenticates it at the later producer
+boundaries. No expected value may be learned from a driver record, custody
+file, or receipt.
+The private spawn inherits the already-authenticated common identity vector and
+has this exact suffix:
+`--private-role=driver --source-sha <candidate-head> --source-tree
+<candidate-tree> --attempt-id <32-lowercase-hex> --receipt-fd 3`. Its cwd is
+physical `source`; fd 0 is
 `/dev/null`; fd 1 and fd 2 are distinct custody-parent-drained pipes; fd 3 is
 the sole receipt read end; and every other descriptor is close-on-exec. The
 custody parent alone drains the driver records, publishes durable
@@ -471,10 +482,22 @@ file-fsyncs that descriptor, atomically renames temp to final, and fsyncs the
 custody directory. It then reopens the final file with
 `O_RDONLY|O_NOFOLLOW`, requires the recorded identity/owner/mode, reads one
 bounded buffer, rejects any byte after the sole required LF, reparses canonical
-form, and
-requires byte-for-byte equality plus its independently recomputed length and
-SHA-256 before success. That receipt
-binds record identity `candidate-proof-custody-ack.v1`, attempt ID, source
+form, and requires byte-for-byte equality plus its independently recomputed
+length and SHA-256 before success. Independently of that self-consistency
+check, it requires the parsed receipt identity, attempt ID, source SHA, and
+source tree to equal the immutable pre-spawn expected tuple; requires each
+record path/length/SHA-256 field to equal the parent-derived path and the
+independently retained bytes/length/hash for that exact captured record; and
+requires each ACK field to equal the ACK constructed from that retained record.
+Each captured record's schema identity must equal its fixed literal, and every
+attempt/source field present in either record must equal the same immutable
+expected attempt/source tuple. It also compares every parsed drain, direct-
+driver exit status/close, internal-EOF, and parent-entry-fsync field to the
+result the parent directly observed before serialization. No equality may use
+another field from the receipt as its expected value. Any mismatch is parent
+non-success: it does not rewrite or retry the receipt and retains the strongest
+truthful custody state. That receipt
+binds receipt identity `candidate-proof-custody-ack.v1`, attempt ID, source
 SHA/tree, record-1 and record-2 relative paths/lengths/SHA-256 values, the exact
 `ACK1`/`ACK2` 41-byte values sent, both external drain completions, direct driver
 exit 0, internal stdout/stderr EOF, and the successful pre-`ACK1` literal-
@@ -490,17 +513,27 @@ within the aggregate, retains all custody/bundle bytes, and emits no parent
 success. A clock-injected driver that consumes `ACK2` and never closes is the
 literal oracle for this path.
 
-The role-typed caller accepts only parent close 0 + external stdout/stderr EOF +
-exactly two schema-valid records equal to the no-follow custody files, with its
-own length/hash checks. It independently parses the canonical receipt, verifies
-every bound record path/length/hash and ACK value against the two records,
-requires the parent-entry-fsync and close/EOF/drain fields true, and requires
-this exact recursive roster: top-level regular
+Before wrapper invocation, the role-typed caller retains its own expected
+receipt-identity tuple: the literal receipt identity, its selected attempt ID,
+and the exact candidate SHA/tree independently authenticated at the clone/HEAD
+boundary. It accepts only parent close 0 + external stdout/stderr EOF + exactly
+two schema-valid records equal to the no-follow custody files, with its own
+length/hash checks. It independently parses the canonical receipt and requires
+every receipt-identity-tuple field to equal that caller-retained tuple; every
+bound record path/length/hash and ACK value to equal the caller-derived path and
+its independently captured record bytes; each captured record's schema identity
+to equal its fixed literal; every attempt/source field present in either record
+to equal the caller-retained attempt/source tuple; and the parent-entry-fsync
+and close/EOF/drain fields true. Receipt self-consistency or agreement with the
+parent's retained preimage is never an acceptance oracle. It also requires this
+exact recursive roster: top-level regular
 `proof-summary.v1.json`, directory `driver-result.bundle` containing only regular
 `candidate-proof-driver-result.v1.json`, and regular `custody-ack.v1.json`.
-It owns no proof-parent or quarantine cleanup authority. After the applicable
-repository durability/readback gate, it alone may no-follow identity-check and
-remove that exact custody roster and directory.
+Any single mismatch makes the caller non-success, emits no success evidence,
+retains the exact custody roster, and withholds the custody-removal gate for
+that attempt. It owns no proof-parent or quarantine cleanup authority. After
+the applicable repository durability/readback gate, it alone may no-follow
+identity-check and remove that exact custody roster and directory.
 
 Immediately before publishing, command 1 independently reauthenticates its
 `process.execPath` as Node `v22.22.1` plus the exact npm path/hash supplied in
@@ -612,8 +645,9 @@ defined above; no ad hoc or inline coordinator executable performs any of
 those transitions.
 
 “Outer caller” is role-typed: the builder creates the same disposable setup and
-invokes the same wrapper for pre-landing proof at `H`; after review, only the
-coordinator may create the post-landing setup and invoke it at canonical `T`.
+invokes the same wrapper for pre-landing proof with exact `H/H^{tree}`; after
+review, only the coordinator may create the post-landing setup and invoke it
+with canonical `T/T^{tree}`.
 Neither role may replace, bypass, or extend the reviewed wrapper/driver, and
 builder proof conveys no landing authority.
 The staged proof runner accepts only the run root, derives those fixed sibling
@@ -1631,7 +1665,18 @@ nor context authority.
   temp creation, partial/full write, receipt-file fsync, rename, custody-directory
   fsync, no-follow reopen, canonical-field/length/hash readback, and a crash
   after `ACK1` but before bundle commit; every failed gate forbids parent success
-  and retains the strongest truthful recoverable custody state. It also proves
+  and retains the strongest truthful recoverable custody state. For the parent
+  descriptor-readback and outer caller acceptance gates separately, it then
+  mutates exactly one of receipt identity, attempt ID, source SHA, or source tree
+  in an otherwise canonical receipt and recomputes all applicable byte-level
+  length/hash evidence so self-consistency checks pass. Each parent case mutates
+  both the retained serialized preimage and written receipt file while leaving
+  the immutable expected tuple and captured records unchanged; each caller case
+  presents the correspondingly valid receipt file while leaving the caller's
+  expected tuple and captured records unchanged. Each of those eight cases must
+  fail at independent semantic-tuple comparison, produce parent/caller
+  non-success, perform no receipt rewrite/retry or caller custody cleanup, and
+  retain the exact custody roster. It also proves
   exact authenticated six-route `/v1/*` roster and fixed-port sentinels. Its
   `--mode full` path executes both AC5 8(a) and 8(b),
   proves bounded absence, and proves no later `inner_spawned` or

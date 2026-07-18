@@ -1,7 +1,7 @@
 ## current_thesis
 
-The candidate remains `proposed/`. R9 was the fourth and final allowed loop round and failed the recurring custody proof because semantic receipt identities are not compared to independent parent/caller truth.
-The loop is stopped: no R10, promotion, build, target write, or 137b refinement has started. No target bytes exist.
+The candidate remains `proposed/`. After the capped R9 stop, the founder authorized exactly one surgical spec repair: both custody parent and caller now compare every receipt identity field against pre-receipt independent truth, with one-field mismatch oracles.
+No R10, promotion, build, target write, or 137b refinement has started. No target bytes exist; the amended spec awaits explicit founder approval before any next action.
 
 ## locked_decisions
 
@@ -21,6 +21,7 @@ The loop is stopped: no R10, promotion, build, target write, or 137b refinement 
 - Records, observers, output, and 4/7/10/14/60/600-second phases are capped. The final 30 seconds bounds ACK2, driver close/EOF, receipt fsync, and parent settlement; timeout signal-freely detaches and fails within the 5,100-second aggregate.
 - Authoritative absence is direct EOF/close → ps → per-path lsof → lease reacquire when created → exact-port rebind; finite nettop/lsof are diagnostics only.
 - Before ACK1, both record 1 and the new custody-directory entry are fsynced and descriptor-read back. Record 2 is atomically bundled before emission; the final receipt is exclusively written, file/directory-fsynced, canonically read back, and binds both ACKs plus direct driver close/EOF. Builder custody survives through `R`; post-landing custody survives through `P`.
+- Receipt self-consistency is insufficient: the public wrapper receives the caller-reviewed source SHA/tree, and the parent retains it with literal receipt identity and caller-selected attempt before its private spawn; parent and caller separately compare those values plus each record's fixed identity, attempt/source fields, path/length/hash, and ACK against their own retained inputs. One-field canonical mismatches retain custody and cannot emit success.
 - If command 2 ignores liveness EOF, the driver closes only owned pipes, detaches/unrefs without signaling, retains the proof parent, reports failure, and exits 124 within the aggregate.
 - Diagnostic inventory states installable/installed/portable closure/runtime authority/state authority false; this is neither release nor authorization carrier.
 - Fresh builder and reviewer own exact target/Project heads. Create-only target feature `F=H` is closure-manifested as `K`, scanned before publication, independently fetched/scanned twice afterward, retained through completion, and is the target-main actor's sole canonical source of `H`.
@@ -29,7 +30,7 @@ The loop is stopped: no R10, promotion, build, target write, or 137b refinement 
 
 ## open_questions
 
-- The four-round cap is exhausted. Resumption requires an explicit founder choice to extend the cap for semantic receipt cross-field repair, proof, and a later exact-SHA seal; do not dispatch autonomously.
+- The authorized semantic receipt repair is the stopping point. Await explicit founder approval before any review request, proof round, seal, promotion, build, target write, or 137b work; do not dispatch autonomously.
 - After a new seal, a fresh builder may refine listed runtime paths but may not add install, launchd, status/doctor, or real-path scope.
 
 ## dont_touch
