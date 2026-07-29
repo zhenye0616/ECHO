@@ -1,53 +1,73 @@
 ---
 name: using-echo-mcp
-description: Use ECHO MCP to recover prior work, decisions, source context, and live cross-tool activity with disciplined trigger, fallback, and interpretation patterns.
+description: Use the ECHO MCP server (mcp__echo__* tools, runtime 0.1.0-beta.5) to recover prior work, decisions, and live cross-tool activity via grouped retrieval, disciplined cursor continuation, and trust-signal interpretation.
 type: skill
 audience: customer
 ---
 
-# Using ECHO MCP
+<!-- synced-copies: ~/.echo/skills/using-echo-mcp.md (source) | ~/.codex/skills/using-echo-mcp/SKILL.md | ~/.claude/commands/using-echo-mcp.md — edit source, copy to all; updated 2026-07-28 for runtime 0.1.0-beta.5 -->
 
-ECHO is useful when the user expects you to remember work that happened in other AI clients, repos, commits, or sessions on this machine. Prefer a small retrieval chain, inspect the returned sources, then answer from evidence.
+# Using ECHO MCP (`mcp__echo__*`)
 
-## Trigger Patterns
+## Which server
 
-Use `find_clusters` first for open-ended recall:
-- "Where did I leave off?", "what was I doing?", "catch me up", or a project reopened after a gap: call `find_clusters({})`. If you need bodies, call `get_atoms({atom_ids: cluster.atom_ids.slice(0, 50), prefer: "newest_first", format: "minimal"})`.
-- "What did I do on Tuesday / today / last week?": call `find_clusters({since, until})` with explicit timezone in both timestamps (`Z` or `+HH:MM`). Then fetch only the relevant cluster's atom IDs.
-- "What has been happening in this repo?": call `find_clusters({repo_path: "/absolute/repo/root", since, until})` only when the user asks for repo-scoped context. Otherwise ECHO is machine-scoped.
+ECHO retrieval tools live on the `echo` MCP server and appear as `mcp__echo__*`:
+`echo_ping`, `echo_resolve_mru`, `find_clusters`, `get_atom`, `get_atoms`, `search_memories`, `wait_for_new_turns`.
 
-Use `search_memories` first for exact tokens:
-- File paths, commit SHAs, issue IDs, branch names, error strings, exact phrases the user quotes.
-- Good shape: `search_memories({query: "abc1234", repo_path: "/absolute/repo/root", limit: 10})`.
-- `search_memories.query` is literal substring search, not semantic search. Paraphrases like "the auth decision" may return 0 even when the memory exists.
+WARNING: `echo-memory` / `mcp__echo-memory__*` (`memory_search`, `memory_ingest`, ...) is a DIFFERENT product (EchoChat). It is write-capable and out of scope here — never use it as a substitute for the tools above.
 
-Use source/session helpers for tails and live work:
-- `echo_resolve_mru({sources: ["cursor" | "claude_code" | "codex" | "git"], repo_path?})` returns a `search_memories`-ready `{source, filter}` descriptor. Spread the descriptor filter into `search_memories`.
-- `wait_for_new_turns({sources, source_prefix?, since, timeout?, repo_path?})` blocks for new atoms and returns `turn_ids`; fetch bodies with `get_atoms`.
-- `echo_ping({message?})` is only a connectivity check.
+## Rule 0 — timestamps
 
-## Fallbacks On Empty Or Thin Results
+Every timestamp you send carries an explicit offset (`Z`). Copy timestamps from responses verbatim — never strip the `Z`. Before reusing a returned `next_since`, sanity-check that it is not in the future.
 
-1. Relax overly exact filters. If `source`, `source_prefix`, `metadata_match`, `repo_path`, or legacy `artifact_hint` made the call too narrow, remove the least important one and retry. `artifact_hint` applies only to `get_recent_work_context({artifact_hint: {provider, type, id}})`.
-2. Widen the time window. No-arg `find_clusters` auto-expands from 4h to 24h, but if the user has been away longer, pass an explicit `since` such as the start of the relevant day or week.
-3. If literal `search_memories` returns 0, reduce the query to exact tokens: path basename, SHA prefix, error code, role name, or quoted phrase. If the question is conceptual, switch to `find_clusters`.
-4. If `find_clusters` returns a large generic cluster, narrow by date or `repo_path`, then fetch a small newest-first atom sample. Do not hydrate every atom by default.
-5. If the split flow is not enough for an older client, use `get_recent_work_context({since, until, format: "skeleton" | "minimal", window_hours?, repo_path?})` as the all-in-one fallback. Prefer `find_clusters` + `get_atoms` for new work.
+## Rule 1 — continuation
 
-## Interpretation Discipline
+Every opaque continuation value goes back in the `cursor` parameter, ALONE — never as a `membership_cursor` or `next_cursor` named parameter. Those are response-field names; as inputs they are silently ignored today. Cursor-only continuation preserves the frozen query. On `get_atoms` continuations, repeat the original `atom_ids`, `fields`, `prefer`, and `view` verbatim alongside the cursor — projection cannot change mid-run.
 
-Read the source fields before answering:
-- `find_clusters.clusters[].source_breakdown` tells which tools contributed. Missing sources are signal.
-- `rank_reason` explains why a cluster ranked highly; it is not proof that the cluster is the answer.
-- Cross-project clusters are valid ECHO signal. Do not discard them unless the user explicitly asked for a repo-scoped answer.
-- Cluster labels are generated summaries, not document titles. If the user asks about a label like "discussion about X", explain that it is ECHO metadata and inspect the cluster rather than searching for the label text.
-- `warnings`, `result_caps.truncated`, `atom_ids_truncated`, `atoms_dropped`, and per-atom `truncations` are trust signals. Mention them when they affect confidence.
+## Resume a repo
 
-Use the right body-fetch:
-- `get_atoms({atom_ids, fields?, format: "minimal", prefer?, view?})` fetches up to 50 IDs and may drop older or missing IDs under the response budget.
-- Use `prefer: "newest_first"` for resume-style answers.
-- `get_atom({id})` is the high-cost escape hatch for one atom when prior results show truncation. If it returns `atom_too_large_for_wire`, use the returned `source` path as the recovery pointer.
+`find_clusters({group_by: "project", repo_path: "/absolute/repo/root"})`, then hydrate the returned `representative_atom_ids` with `get_atoms({atom_ids, view: "compact"})`. Skip the legacy ungrouped flow — measured 4x more bytes for a worse answer.
 
-## Answering Rule
+## Thread landscape
 
-Do not present ECHO output as omniscient memory. Say what you found, from which sources, and whether retrieval was partial. If the first chain is thin, perform one disciplined fallback before asking the user for more clues.
+`find_clusters({group_by: "thread"})` returns provider-scoped root-thread headers. When you need thread topology (`thread_kind`, `parent_thread_id`, etc.), hydrate with `view: "rich"` or `fields: ["metadata"]` — compact strips topology fields.
+
+## Full membership of one group
+
+1. Hydrate the group's representatives FIRST.
+2. Pass that group's `membership_cursor` VALUE via `cursor`, alone; repeat with each returned `next_cursor` until it is null.
+3. Completeness = representatives ∪ membership pages (zero overlap expected).
+
+`atoms_total` counts the whole group INCLUDING representatives, so `atoms_returned < atoms_total` on the final page is normal — not loss.
+
+## Hydration truth (`get_atoms`)
+
+- `atoms_missing`: the ID does not exist. Terminal.
+- `atoms_deferred`: the atom exists but did not fit the response budget. Recoverable — continue with `next_cursor`. A `[GET_ATOMS_RESPONSE_CAP]` warning names this case.
+- `atoms_dropped`: legacy compatibility field = missing + deferred. Never treat it as terminal loss.
+- Expect ~7 rich atoms per call despite the 50-ID input cap; loop until `next_cursor` is null.
+- Check per-atom `truncations` separately: content can be elided even when `next_cursor` is null and nothing is deferred.
+
+## Cost levers
+
+- `view: "compact"` (~-51%) and `fields` (up to -83%) are the real levers; `representative_limit` barely moves payload size.
+- Do not send `format:"minimal"` — compatibility-only, no effect worth having.
+- Wire cost is ~2x the JSON budget (MCP dual-encoding): a "25KB" response costs ~50KB of context.
+
+## Search (`search_memories`)
+
+Use for exact tokens — SHAs, paths, error strings, quoted phrases. Matching is case-insensitive literal substring, not semantic. Trust that a positive match EXISTS, but check its per-match `truncations` before trusting the content. A zero-match page carrying `[SEARCH_SCAN_BUDGET]` means "not found within the scan budget", not "not captured" — continue the cursor if the answer matters.
+
+## Freshness (`wait_for_new_turns`)
+
+Call with a Z-suffixed `since`, non-empty `sources` or `source_prefix`, and a short `timeout`. This tool does NOT warn on offset-less timestamps (its siblings do) — Rule 0 is your only protection. Feed the returned `next_since` into the next call; fetch bodies with `get_atoms`.
+
+## Escape hatches
+
+- `get_atom` (singular): only to recover a single atom whose content came back truncated or flagged `atom_too_large_for_wire` — routine hydration belongs in `get_atoms`. On `atom_too_large_for_wire`, the returned bounded `source` pointer is the recovery path.
+- `echo_resolve_mru`: resolves apps or exact sources to per-source MRU filter descriptors — pass each descriptor's `source` and spread its `filter` into `search_memories`.
+- `echo_ping`: connectivity check only.
+
+## Answering rule
+
+Do not present ECHO output as omniscient memory. Say what you found, from which sources, and whether retrieval was partial (warnings, cursors still open, truncations). If the first chain is thin, perform one disciplined fallback — widen the time window or relax the narrowest filter — before asking the user for more clues.
