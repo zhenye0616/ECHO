@@ -35,6 +35,7 @@ describe('command spawn security boundary', () => {
     );
     expect(probe).toContain("crossSpawn('codex', args");
     expect(probe).toContain("crossSpawn('claude', args");
+    expect(probe).toContain('cwd: opts.cwd');
   });
 
   it('keeps the superseded command resolver unreachable from production code', () => {

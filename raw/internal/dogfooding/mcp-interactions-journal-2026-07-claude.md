@@ -878,3 +878,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** all `fs:~/.codex/sessions/2026/07/16/*.jsonl` (codex capture); reviewer-tick atoms from /var/folders ephemeral worktrees with git_state sidecars at 065f765b/a49171be; coordinator atoms at repo HEAD 0b47979a.
 - **Verdict:** ✅ right — the atoms supplied exactly what the repo artifacts can't: the coordinator's *intent* (another patch round) at the moment the founder paused it, and reviewer model/effort metadata (gpt-5.6-sol, reasoning_effort ultra, read-only sandbox) that grounds the strictness analysis.
 - **Note:** Post-mortem synthesis (analysis, not a fix design): r15–r18 reframe gate FIRED every round and the investigator said `structural_cut` 3× — but every recorded "cut" was cut-and-replace introducing a bigger mechanism (r17's cut *created* the operation host r19 attacks). Removal proof matrix verifies removal happened, not that net mechanism decreased (spec words grew monotonically r1→r19). Second gap: escalation triggers key on reviewer *disagreement*; unanimous `proceed_after_patches`/`pushback` never escalates, so 5 non-converging rounds ran without a founder touch until the founder intervened out-of-band.
+
+### 2026-07-28 22:13 PDT — connectivity ping on direct user request (permission-test worktree)
+
+- **Trigger:** User explicitly requested `echo_ping` with no arguments, result to be returned verbatim; session cwd is the permission-test worktree `/private/tmp/project-echo-claude-permission.Lty3uP/wt`.
+- **Query inputs:** `echo_ping({})` — no message argument.
+- **Returned:** `{"pong":true,"ts":"2026-07-29T05:13:47.395Z"}` — pong true, server ts = 2026-07-28 22:13 PDT.
+- **Sources:** n/a (connectivity tool, not retrieval) — target = `echo` MCP at http://127.0.0.1:39478/mcp per global CLAUDE.md wiring.
+- **Verdict:** ✅ right — transport alive; server timestamp matches local clock to the minute.
+- **Note:** Ping-only turn, no retrieval. Journaled from the temp worktree checkout since it is this session's repo root.

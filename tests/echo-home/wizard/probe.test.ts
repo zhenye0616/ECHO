@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { probeAgents, type SpawnResult } from '../../../src/echo-home/wizard/probe.js';
 
@@ -80,17 +81,17 @@ describe('probeAgents', () => {
     expect(out[0]).toMatchObject({ probed: false, reason: 'timeout' });
   });
 
-  it('passes the 30s default timeout to injected spawn', async () => {
-    const timeouts: number[] = [];
+  it('passes the 30s default timeout and neutral home cwd to injected spawn', async () => {
+    const options: Array<{ timeoutMs: number; cwd: string }> = [];
     const out = await probeAgents(['codex'], {
       spawn: async (_cmd, _args, opts) => {
-        timeouts.push(opts?.timeoutMs ?? 0);
+        options.push(opts);
         return ok('{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}');
       },
     });
 
     expect(out[0]!.probed).toBe(true);
-    expect(timeouts).toEqual([30_000]);
+    expect(options).toEqual([{ timeoutMs: 30_000, cwd: homedir() }]);
   });
 
   it('passes the codex trust-bypass flag so probes work outside git repos', async () => {
@@ -123,13 +124,27 @@ describe('probeAgents', () => {
     const out = await probeAgents(['codex'], {
       timeoutMs: 5_000,
       spawn: async (_cmd, _args, opts) => {
-        timeouts.push(opts?.timeoutMs ?? 0);
+        timeouts.push(opts.timeoutMs);
         return ok('{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}');
       },
     });
 
     expect(out[0]!.probed).toBe(true);
     expect(timeouts).toEqual([5_000]);
+  });
+
+  it('passes an explicit probe cwd through to the spawned client', async () => {
+    const cwds: string[] = [];
+    const out = await probeAgents(['codex', 'claude-code'], {
+      probeCwd: '/tmp/echo-neutral-probe',
+      spawn: async (_cmd, _args, opts) => {
+        cwds.push(opts.cwd);
+        return ok('{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}');
+      },
+    });
+
+    expect(out.every((result) => result.probed)).toBe(true);
+    expect(cwds).toEqual(['/tmp/echo-neutral-probe', '/tmp/echo-neutral-probe']);
   });
 
   it('probes claude-code successfully with the same echo_ping payload contract', async () => {

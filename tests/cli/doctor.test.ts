@@ -276,7 +276,7 @@ describe('runDoctor', () => {
     },
   );
 
-  it('prints exact claude-code MCP remediation and local-shadow escape hatch', async () => {
+  it('prints exact user-scope claude-code MCP remediation', async () => {
     writeState('mcp-not-configured');
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, 'daemon.pid'), '123');
@@ -304,7 +304,8 @@ describe('runDoctor', () => {
     expect(text).toContain(
       'claude mcp add --transport http --scope user echo http://127.0.0.1:41234/mcp',
     );
-    expect(text).toContain('claude mcp remove echo -s local');
+    expect(text).toContain('user-scope ECHO MCP registration');
+    expect(text).not.toContain('claude mcp remove echo -s local');
     expect(text).toContain('echoctl doctor');
   });
 

@@ -779,7 +779,8 @@ describe('runInit', () => {
     expect(text).toContain(
       'claude mcp add --transport http --scope user echo http://127.0.0.1:41234/mcp',
     );
-    expect(text).toContain('claude mcp remove echo -s local');
+    expect(text).toContain('user-scope ECHO MCP registration');
+    expect(text).not.toContain('claude mcp remove echo -s local');
   });
 
   it('continues init when claude-code MCP registration times out', async () => {
