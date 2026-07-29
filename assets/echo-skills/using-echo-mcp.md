@@ -24,27 +24,41 @@ instrumentation, not a customer requirement.
 
 Before the first ECHO call in each user turn:
 
-1. Read `bound_port` from `~/.echo/state/onboarding.json`.
-2. Fetch `http://127.0.0.1:<bound_port>/healthz`. Detect the live version from
+1. Read the registry. If it exists but is unreadable, malformed, or lacks a
+   usable absolute `journal_root`, report that failure and do not call ECHO.
+   Resolve paths without following a symlink outside `journal_root`.
+2. Read `bound_port` from `~/.echo/state/onboarding.json`.
+3. Fetch `http://127.0.0.1:<bound_port>/healthz`. Detect the live version from
    `components.runtime.details.version`, falling back only to the response's
    top-level `version`. Do not infer it from `echoctl --version`, this skill,
    package metadata, or the onboarding runtime cache. If the port, health
    response, or live version is unavailable, report the preflight failure and
-   do not call ECHO under an assumed version.
-3. Look up that exact version under `journals` in
+   make no ECHO call at all.
+4. Look up that exact version under `journals` in
    `~/.echo/state/dogfooding-journals.json`. A valid entry has an absolute
-   `journal_dir` containing `JOURNAL.md`.
-4. If the mapping and journal exist, use that version's actor shard and set
-   `current_version` to the detected version when it differs. This is the
-   automatic link to an existing version journal.
-5. If the mapping or journal is absent, do not call ECHO and do not silently
+   `journal_dir` under `journal_root`, containing a regular-file `JOURNAL.md`.
+   If both health and the mapping provide `artifact_digest`, they must match.
+5. If the mapping and journal exist, use that version's actor shard and
+   atomically set `current_version` in the registry to the detected version
+   when it differs. If the update fails, stop. This is the automatic link to
+   an existing version journal.
+6. If the mapping or journal is absent, do not call ECHO and do not silently
    create or reuse a different version's journal. Ask:
    `ECHO runtime <version> has no dogfooding journal. Create it now and make it current?`
 
-Map the current binding to `claude`, `codex`, `codex-ops`, or `cursor`. Append
-one compact entry to `<journal_dir>/<actor>.md` after the last ECHO call in the
-turn; one entry may cover several calls. If the version journal exists but the
-actor shard does not, create the shard with an `## Interactions` heading.
+If the founder answers yes, create
+`<journal_root>/dogfooding/<version>/JOURNAL.md` and the four actor shards,
+record the live `artifact_digest` when available, and atomically add that exact
+version mapping plus `current_version` to the registry. Use mode `0700` for new
+directories and `0600` for registry/journal files. Do not make the pending
+ECHO call until creation and registry validation both succeed.
+
+The current binding means the host agent making the call: Claude Code uses
+`claude`, Codex uses `codex`, a Codex operations binding uses `codex-ops`, and
+Cursor uses `cursor`. Append one compact entry to
+`<journal_dir>/<actor>.md` after the last ECHO call in the turn; one entry may
+cover several calls. If the version journal exists but the actor shard does
+not, create the shard with an `## Interactions` heading and mode `0600`.
 
 Each entry includes local timestamp, Runtime, Trigger, Query inputs, Returned,
 Sources, Verdict, Note, and optional Conjecture. Include the `/healthz`
