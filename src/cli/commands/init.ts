@@ -438,7 +438,7 @@ export function buildRemediationCopy(mcpServerUrl: string): RemediationCopy {
     'manual-only': () =>
       'Cursor has no headless CLI. Open Cursor and run any prompt to confirm ECHO MCP is reachable.',
     'mcp-not-configured': () =>
-      `Claude Code does not have ECHO MCP configured. Run \`${claudeCodeMcpAddCommand(mcpServerUrl)}\` and then \`echoctl doctor\`.\nIf still degraded, remove a shadowing local entry with \`claude mcp remove echo -s local\` and then run \`echoctl doctor\`.`,
+      `Claude Code could not use the user-scope ECHO MCP registration. Run \`${claudeCodeMcpAddCommand(mcpServerUrl)}\` and then \`echoctl doctor\`.`,
     timeout: (outcome) =>
       `${outcome.agent} took longer than 30s to respond. Re-run \`echoctl doctor\` once if this persists.`,
     'unexpected-output': (outcome) =>

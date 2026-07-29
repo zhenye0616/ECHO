@@ -1,5 +1,6 @@
 import crossSpawn from 'cross-spawn';
 import type { SpawnOptions } from 'node:child_process';
+import { homedir } from 'node:os';
 import type { AgentKind } from './detect-agents.js';
 
 export type ProbeOutcome =
@@ -24,9 +25,15 @@ export interface SpawnResult {
   timedOut: boolean;
 }
 
+export interface ProbeSpawnOptions {
+  timeoutMs: number;
+  cwd: string;
+}
+
 export interface ProbeDeps {
-  spawn?: (cmd: string, args: string[], opts?: { timeoutMs: number }) => Promise<SpawnResult>;
+  spawn?: (cmd: string, args: string[], opts: ProbeSpawnOptions) => Promise<SpawnResult>;
   timeoutMs?: number;
+  probeCwd?: string;
 }
 
 const PROMPT =
@@ -35,11 +42,14 @@ const PROMPT =
 function realSpawn(
   cmd: string,
   args: string[],
-  opts?: { timeoutMs: number },
+  opts: ProbeSpawnOptions,
 ): Promise<SpawnResult> {
   return new Promise((resolvePromise, reject) => {
     // Keep executable names literal; cross-spawn owns Windows .cmd escaping.
-    const spawnOptions: SpawnOptions = { stdio: ['ignore', 'pipe', 'pipe'] };
+    const spawnOptions: SpawnOptions = {
+      cwd: opts.cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    };
     let child;
     if (cmd === 'codex') {
       child = crossSpawn('codex', args, spawnOptions);
@@ -59,7 +69,7 @@ function realSpawn(
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
-    }, opts?.timeoutMs ?? 30_000);
+    }, opts.timeoutMs);
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
@@ -125,6 +135,7 @@ async function probeOne(
   agent: AgentKind,
   spawn: NonNullable<ProbeDeps['spawn']>,
   timeoutMs: number,
+  probeCwd: string,
 ): Promise<ProbeOutcome> {
   if (agent === 'cursor') return { agent, probed: false, reason: 'manual-only' };
   if (agent !== 'codex' && agent !== 'claude-code') {
@@ -148,7 +159,7 @@ async function probeOne(
 
   let result: SpawnResult;
   try {
-    result = await spawn(cmd, args, { timeoutMs });
+    result = await spawn(cmd, args, { timeoutMs, cwd: probeCwd });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       return { agent, probed: false, reason: 'cli-unavailable' };
@@ -182,10 +193,11 @@ export async function probeAgents(
   deps: ProbeDeps = {},
 ): Promise<ProbeOutcome[]> {
   const timeoutMs = deps.timeoutMs ?? 30_000;
+  const probeCwd = deps.probeCwd ?? homedir();
   const spawn = deps.spawn ?? realSpawn;
   const out: ProbeOutcome[] = [];
   for (const agent of agents) {
-    out.push(await probeOne(agent, spawn, timeoutMs));
+    out.push(await probeOne(agent, spawn, timeoutMs, probeCwd));
   }
   return out;
 }
