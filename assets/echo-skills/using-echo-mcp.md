@@ -1,11 +1,11 @@
 ---
 name: using-echo-mcp
-description: Use the ECHO MCP server (mcp__echo__* tools, runtime 0.1.0-beta.5) to recover prior work, decisions, and live cross-tool activity via grouped retrieval, disciplined cursor continuation, and trust-signal interpretation.
+description: Use the ECHO MCP server (mcp__echo__* tools, runtime 0.1.0-beta.6) to recover prior work, decisions, and live cross-tool activity via grouped retrieval, disciplined cursor continuation, and trust-signal interpretation.
 type: skill
 audience: customer
 ---
 
-<!-- synced-copies: ~/.echo/skills/using-echo-mcp.md (source) | ~/.codex/skills/using-echo-mcp/SKILL.md | ~/.claude/commands/using-echo-mcp.md — edit source, copy to all; updated 2026-07-28 for runtime 0.1.0-beta.5 -->
+<!-- synced-copies: ~/.echo/skills/using-echo-mcp.md (source) | ~/.codex/skills/using-echo-mcp/SKILL.md | ~/.claude/commands/using-echo-mcp.md — edit source, copy to all; updated 2026-07-28 for runtime 0.1.0-beta.6 -->
 
 # Using ECHO MCP (`mcp__echo__*`)
 
@@ -18,11 +18,17 @@ WARNING: `echo-memory` / `mcp__echo-memory__*` (`memory_search`, `memory_ingest`
 
 ## Rule 0 — timestamps
 
-Every timestamp you send carries an explicit offset (`Z`). Copy timestamps from responses verbatim — never strip the `Z`. Before reusing a returned `next_since`, sanity-check that it is not in the future.
+Every timestamp you send carries an explicit offset (`Z`, `±HH:MM`, or `±HHMM`; never bare `±HH`). Copy timestamps from responses verbatim — never strip the offset. In beta.6, `wait_for_new_turns` rejects offset-less `since`; `search_memories` and `find_clusters` still accept offset-less bounds but emit `[TZ]`. Never send a future `since` to `wait_for_new_turns`: that call can return no turns, then clamp only its returned `next_since` with `[NEXT_SINCE_CLAMP]`. If the future input was accidental, retry from the intended non-future bound to recover the skipped window.
 
 ## Rule 1 — continuation
 
-Every opaque continuation value goes back in the `cursor` parameter, ALONE — never as a `membership_cursor` or `next_cursor` named parameter. Those are response-field names; as inputs they are silently ignored today. Cursor-only continuation preserves the frozen query. On `get_atoms` continuations, repeat the original `atom_ids`, `fields`, `prefer`, and `view` verbatim alongside the cursor — projection cannot change mid-run.
+Continuation contracts are tool-specific:
+
+- `find_clusters` grouped pages: pass the returned `membership_cursor` or `next_cursor` VALUE as the only input, `cursor`. Its opaque cursor freezes the original query.
+- `search_memories`: pass `next_cursor` as `cursor` AND repeat the original `query`, source selector, `repo_path`, `metadata_match`, time bounds, and `limit` unchanged. Its cursor is only a position; cursor alone drops the filters.
+- `get_atoms`: repeat the original `atom_ids`, `fields`, `prefer`, and `view` verbatim alongside `cursor` — projection cannot change mid-run.
+
+Never send `membership_cursor` or `next_cursor` as input keys. They are response-field names, and beta.6 rejects them as unknown. All seven tools reject unknown top-level keys, so treat a validation error as a contract mismatch instead of retrying with invented arguments.
 
 ## Resume a repo
 
@@ -56,11 +62,11 @@ Every opaque continuation value goes back in the `cursor` parameter, ALONE — n
 
 ## Search (`search_memories`)
 
-Use for exact tokens — SHAs, paths, error strings, quoted phrases. Matching is case-insensitive literal substring, not semantic. Trust that a positive match EXISTS, but check its per-match `truncations` before trusting the content. A zero-match page carrying `[SEARCH_SCAN_BUDGET]` means "not found within the scan budget", not "not captured" — continue the cursor if the answer matters.
+Use for exact tokens — SHAs, paths, error strings, quoted phrases. Matching is case-insensitive literal substring, not semantic. Trust that a positive match EXISTS, but check its per-match `truncations` before trusting the content. A zero-match page carrying `[SEARCH_SCAN_BUDGET]` means "not found within the scan budget", not "not captured" — continue with the original search shape plus `cursor` if the answer matters.
 
 ## Freshness (`wait_for_new_turns`)
 
-Call with a Z-suffixed `since`, non-empty `sources` or `source_prefix`, and a short `timeout`. This tool does NOT warn on offset-less timestamps (its siblings do) — Rule 0 is your only protection. Feed the returned `next_since` into the next call; fetch bodies with `get_atoms`.
+Call with an offset-bearing `since`, non-empty `sources` or `source_prefix`, and a short `timeout`. Beta.6 rejects offset-less `since`; if a computed `next_since` would be in the future, it clamps that returned watermark and emits `[NEXT_SINCE_CLAMP]`. Normally feed each returned `next_since` into the next call, including after an empty timeout. If `[NEXT_SINCE_CLAMP]` followed an accidental future input, first retry from the intended non-future bound per Rule 0 to recover the skipped window. Fetch bodies with `get_atoms`.
 
 ## Escape hatches
 
