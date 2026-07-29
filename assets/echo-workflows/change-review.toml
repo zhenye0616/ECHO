@@ -33,7 +33,7 @@ Use this review rubric:
 - Scope: work outside the stated request, missing required work, or avoidable mechanism expansion.
 - Style: maintainability, clarity, naming, or consistency issues that materially affect the patch.
 
-For surrounding context, best-effort call `mcp__echo__get_recent_work_context`, `mcp__echo__search_memories`, and `mcp__echo__find_clusters`. If any ECHO MCP tool is unavailable, errors, or times out, continue with repository-local context from files and git history.
+For surrounding context, best-effort call `mcp__echo__search_memories` and `mcp__echo__find_clusters`. If any ECHO MCP tool is unavailable, errors, or times out, continue with repository-local context from files and git history.
 
 For each finding, use this format:
 ### Finding N — <severity> — <one-line title>
