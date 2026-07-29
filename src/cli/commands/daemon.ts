@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { resolveDataDir, resolveDbPath } from '../../daemon/lifecycle.js';
 import { ECHO_HOME_PATHS } from '../../echo-home/paths.js';
-import { readPackageVersion, resolveMcpPort } from './init.js';
+import { readPackageVersion, resolveMcpPortSync } from './init.js';
 
 type Writable = Pick<NodeJS.WritableStream, 'write'>;
 type SpawnSyncFn = typeof spawnSync;
@@ -196,7 +196,7 @@ function defaultDaemonPath(): string {
 }
 
 function parsePort(value: string | undefined): number {
-  if (value === undefined || value.length === 0) return resolveMcpPort();
+  if (value === undefined || value.length === 0) return resolveMcpPortSync();
   const n = Number.parseInt(value, 10);
   if (!Number.isInteger(n) || n < 0 || n > 65535) {
     throw new Error(`invalid --port: ${value}`);

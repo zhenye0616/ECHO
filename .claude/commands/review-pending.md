@@ -250,7 +250,18 @@ if not corr or not reviewers:
 with open('tools/review-queue/coord-roles.json') as f:
     roles_cfg = json.load(f)
 headless = {r['name'] for r in roles_cfg['roles'] if r.get('headless')}
-url = os.environ.get('ECHO_MCP_URL', f"http://127.0.0.1:{os.environ.get('ECHO_MCP_PORT', '38478')}/mcp")
+# URL resolution: ECHO_MCP_URL → ECHO_MCP_PORT → recorded bound_port
+# (~/.echo/state/onboarding.json) → package default 38478.
+url = os.environ.get('ECHO_MCP_URL')
+if not url:
+    port = os.environ.get('ECHO_MCP_PORT')
+    if not port:
+        try:
+            with open(os.path.expanduser('~/.echo/state/onboarding.json')) as f:
+                port = json.load(f).get('bound_port')
+        except (OSError, ValueError):
+            port = None
+    url = f"http://127.0.0.1:{port or 38478}/mcp"
 for role in reviewers:
     if role not in headless:
         continue

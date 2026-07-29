@@ -16,7 +16,7 @@ import {
 import { type AgentKind } from '../../echo-home/wizard/detect-agents.js';
 import { probeAgents as realProbeAgents, type ProbeOutcome } from '../../echo-home/wizard/probe.js';
 import { renderDoctorReport } from '../io/render.js';
-import { buildRemediationCopy, parsePort, readPackageVersion, resolveMcpPort } from './init.js';
+import { buildRemediationCopy, parsePort, readPackageVersion, resolveMcpPortSync } from './init.js';
 import type { Storage } from '../../storage/interface.js';
 import { SqliteStorage } from '../../storage/sqlite.js';
 import { GRANOLA_SOURCE, granolaCheckpointPath } from '../../capture/surfaces/granola-poller.js';
@@ -346,7 +346,7 @@ export function parseDoctorArgs(
 }
 
 function resolveDoctorPort(port: DoctorOpts['port']): number {
-  if (port === undefined) return resolveMcpPort();
+  if (port === undefined) return resolveMcpPortSync();
   if (typeof port === 'number') return port;
   return parsePort(port);
 }

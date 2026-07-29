@@ -50,12 +50,17 @@ export function setEchoHomeRoot(homeOverride: string): EchoHomePaths {
 
 export type InstallProfile = 'customer' | 'dogfood';
 
+export type McpPortSource = 'flag' | 'env' | 'record' | 'probe' | 'default';
+
 export interface OnboardingState {
   schema_version: 1;
   created_at: string;
   last_updated_at: string;
   completed: boolean;
   profile?: InstallProfile;
+  bound_port?: number;
+  port_source?: McpPortSource;
+  runtime_version?: string | null;
   agents: OnboardedAgentProfile[];
 }
 
@@ -118,6 +123,9 @@ const onboardingStateSchema: AnySchema = {
     last_updated_at: { type: 'string' },
     completed: { type: 'boolean' },
     profile: { enum: ['customer', 'dogfood'] },
+    bound_port: { type: 'integer', minimum: 1, maximum: 65535 },
+    port_source: { enum: ['flag', 'env', 'record', 'probe', 'default'] },
+    runtime_version: { type: ['string', 'null'] },
     agents: {
       type: 'array',
       items: {

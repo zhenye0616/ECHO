@@ -10,6 +10,7 @@ import {
   readOnboardingStateSnapshot,
   updateProbedAgents,
   wire as wireAgents,
+  type MarkCompletedResult,
   type WireOpts,
   type WireResult,
 } from './wire.js';
@@ -19,6 +20,7 @@ import type { OnboardingState } from '../paths.js';
 export interface CreateWizardOpts {
   mcpServerUrl: string;
   echoVersion: string;
+  runtimeVersion?: string | null;
   detectAgentsDeps?: DetectAgentsDeps;
   detectProjectsDeps?: DetectProjectsDeps;
   wireDepsOverride?: Partial<WireOpts>;
@@ -45,7 +47,7 @@ export interface Wizard {
   ): Promise<WireResult>;
   probe(agents: AgentKind[]): Promise<ProbeOutcome[]>;
   summary(): Promise<WizardSummary>;
-  markCompleted(): Promise<void>;
+  markCompleted(): Promise<MarkCompletedResult>;
 }
 
 export function createWizard(opts: CreateWizardOpts): Wizard {
@@ -77,6 +79,7 @@ export function createWizard(opts: CreateWizardOpts): Wizard {
         ...wireOpts,
         mcpServerUrl: opts.mcpServerUrl,
         echoVersion: opts.echoVersion,
+        runtimeVersion: opts.runtimeVersion ?? null,
         now: now(),
       });
       return wired;
@@ -99,8 +102,8 @@ export function createWizard(opts: CreateWizardOpts): Wizard {
       };
     },
 
-    async markCompleted(): Promise<void> {
-      markOnboardingCompleted(now());
+    async markCompleted(): Promise<MarkCompletedResult> {
+      return markOnboardingCompleted(now());
     },
   };
 }

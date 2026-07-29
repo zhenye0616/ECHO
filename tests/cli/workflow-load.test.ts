@@ -102,7 +102,7 @@ describe('workflow loader', () => {
     expect(prompt).toContain('No findings — diff looks ready to ship.');
     expect(prompt).toContain('No diff source available — nothing to review.');
     expect(/priority unavailable[^.\n]*continue/i.test(prompt)).toBe(true);
-    expect(prompt).toContain('mcp__echo__get_recent_work_context');
+    expect(prompt).not.toContain('mcp__echo__get_recent_work_context');
     expect(prompt).toContain('mcp__echo__search_memories');
     expect(prompt).toContain('mcp__echo__find_clusters');
     expect(prompt).toContain('Keep the review under 600 words');

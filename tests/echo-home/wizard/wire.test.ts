@@ -121,6 +121,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: '/repo/echo',
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       now: new Date('2026-05-25T10:00:00.000Z'),
       cache: cache.cache,
       syncAll: async (profiles) => {
@@ -150,6 +151,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: null,
       mcpServerUrl: 'http://127.0.0.1:41234/mcp',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       cache: cache.cache,
       claudeCodeMcpRegistration: {
         timeoutMs: 5,
@@ -204,6 +206,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: '/repo/echo',
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       now: new Date('2026-05-25T10:00:00.000Z'),
       cache: cache.cache,
       syncAll: async () => ({
@@ -252,6 +255,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: '/repo/echo',
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       cache: cache.cache,
       syncAll: async (profiles) => {
         seen.push(...profiles);
@@ -279,6 +283,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: '/repo/echo',
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       cache: cache.cache,
       syncAll: async () => successResult(['codex']),
     });
@@ -305,6 +310,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: null,
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       now: new Date('2026-05-25T10:00:00.000Z'),
       syncAll: async () => successResult(['codex']),
     });
@@ -325,6 +331,7 @@ describe('wire', () => {
         defaultProjectRepoRoot: null,
         mcpServerUrl: 'http://127.0.0.1:38478',
         echoVersion: '0.0.0',
+        probeMcpEndpoint: async () => ({ ok: true as const }),
         syncAll: async () => successResult(['codex']),
       }),
     ).rejects.toThrow('invalid onboarding state');
@@ -350,6 +357,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: null,
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       syncAll: async () => successResult(['codex']),
     });
     const state = JSON.parse(readFileSync(path, 'utf8')) as {
@@ -366,6 +374,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: null,
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       syncAll: async () => ({
         ...successResult([]),
         agents: [
@@ -395,6 +404,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: '/repo/echo',
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       syncAll: async (profiles) => {
         seen.push(...profiles);
         return successResult(['cursor']);
@@ -414,6 +424,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: null,
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       cache: cache.cache,
       syncAll: async () => {
         throw new Error('boom');
@@ -435,6 +446,7 @@ describe('wire', () => {
       defaultProjectRepoRoot: '/repo/echo',
       mcpServerUrl: 'http://127.0.0.1:38478',
       echoVersion: '0.0.0',
+      probeMcpEndpoint: async () => ({ ok: true as const }),
       now: new Date('2026-05-25T10:00:00.000Z'),
       cache: cache.cache,
       syncAll: async (profiles) => {
@@ -471,6 +483,7 @@ describe('wire', () => {
         defaultProjectRepoRoot: null,
         mcpServerUrl: 'http://127.0.0.1:38478',
         echoVersion: '0.0.0',
+        probeMcpEndpoint: async () => ({ ok: true as const }),
         cache: cache.cache,
         syncAll: async () => ({
           ...successResult([]),
@@ -485,4 +498,173 @@ describe('wire', () => {
       expect(sha(path)).toBe(before);
     },
   );
+
+  it('stamps probed_at for every successfully wired agent when the endpoint probe succeeds', async () => {
+    const path = await writeInitialState();
+    const probedUrls: string[] = [];
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex', 'claude-code', 'cursor'],
+      defaultProjectRepoRoot: null,
+      mcpServerUrl: 'http://127.0.0.1:39478/mcp',
+      echoVersion: '0.0.0',
+      now: new Date('2026-05-25T10:00:00.000Z'),
+      syncAll: async () => successResult(['codex', 'claude-code', 'cursor']),
+      probeMcpEndpoint: async (url) => {
+        probedUrls.push(url);
+        return { ok: true as const };
+      },
+    });
+    expect(probedUrls).toEqual(['http://127.0.0.1:39478/mcp']);
+    const state = JSON.parse(readFileSync(path, 'utf8')) as {
+      agents: Array<{ id: string; probed_at: string | null; wire_error: string | null }>;
+    };
+    for (const id of ['codex', 'claude-code', 'cursor']) {
+      const agent = state.agents.find((entry) => entry.id === id)!;
+      expect(agent.probed_at).toBe('2026-05-25T10:00:00.000Z');
+      expect(agent.wire_error).toBeNull();
+    }
+  });
+
+  it('records a truthful wire_error and leaves probed_at null when the endpoint probe fails', async () => {
+    const path = await writeInitialState();
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['cursor'],
+      defaultProjectRepoRoot: null,
+      mcpServerUrl: 'http://127.0.0.1:39478/mcp',
+      echoVersion: '0.0.0',
+      syncAll: async () => successResult(['cursor']),
+      probeMcpEndpoint: async () => ({ ok: false as const, error: 'connect ECONNREFUSED' }),
+    });
+    const state = JSON.parse(readFileSync(path, 'utf8')) as {
+      agents: Array<{ id: string; probed_at: string | null; wire_error: string | null }>;
+    };
+    const cursor = state.agents.find((entry) => entry.id === 'cursor')!;
+    expect(cursor.probed_at).toBeNull();
+    expect(cursor.wire_error).toContain('mcp endpoint unreachable');
+    expect(cursor.wire_error).toContain('connect ECONNREFUSED');
+  });
+
+  it('skips the endpoint probe when no agent wires successfully', async () => {
+    await writeInitialState();
+    let probeCalls = 0;
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: null,
+      mcpServerUrl: 'http://127.0.0.1:39478/mcp',
+      echoVersion: '0.0.0',
+      syncAll: async () => ({
+        ...successResult([]),
+        agents: [
+          {
+            agent: 'codex',
+            ok: false,
+            conflicts: [conflict('config', '/tmp/config.toml')],
+            errors: [],
+            files_written: [],
+          },
+        ],
+        overallOk: false,
+      }),
+      probeMcpEndpoint: async () => {
+        probeCalls += 1;
+        return { ok: true as const };
+      },
+    });
+    expect(probeCalls).toBe(0);
+  });
+
+  it('passes runtimeVersion through to the rendered echo section', async () => {
+    await writeInitialState();
+    let section = '';
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: '/repo/echo',
+      mcpServerUrl: 'http://127.0.0.1:39478/mcp',
+      echoVersion: '0.1.0-beta.5',
+      runtimeVersion: '0.1.0-beta.5',
+      now: new Date('2026-05-25T10:00:00.000Z'),
+      syncAll: async (profiles) => {
+        section = profiles[0]!.echoSection!;
+        return successResult(['codex']);
+      },
+      probeMcpEndpoint: async () => ({ ok: true as const }),
+    });
+    expect(section).toContain('runtime-version: 0.1.0-beta.5');
+  });
+});
+
+describe('markOnboardingCompleted', () => {
+  beforeEach(() => {
+    originalEchoHome = process.env.ECHO_HOME;
+    tmpRoot = mkdtempSync(join(tmpdir(), 'echo-073-completed-'));
+    echoHome = join(tmpRoot, 'echo-home');
+    process.env.ECHO_HOME = echoHome;
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    if (originalEchoHome === undefined) delete process.env.ECHO_HOME;
+    else process.env.ECHO_HOME = originalEchoHome;
+    rmSync(tmpRoot, { recursive: true, force: true });
+    vi.resetModules();
+  });
+
+  function agentEntry(overrides: Record<string, unknown>): Record<string, unknown> {
+    return {
+      id: 'cursor',
+      detected_at: '2026-05-20T00:00:00.000Z',
+      wired_at: '2026-05-20T00:00:00.000Z',
+      probed_at: null,
+      capabilities: [],
+      wire_error: null,
+      ...overrides,
+    };
+  }
+
+  async function seedAgents(agents: Array<Record<string, unknown>>): Promise<string> {
+    const path = await writeInitialState();
+    const state = JSON.parse(readFileSync(path, 'utf8')) as { agents: unknown[] };
+    state.agents.push(...agents);
+    writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
+    return path;
+  }
+
+  it('refuses to set completed while a wired agent has no probe and no error', async () => {
+    const path = await seedAgents([agentEntry({})]);
+    const { markOnboardingCompleted } = await loadWire();
+    const result = markOnboardingCompleted(new Date('2026-05-25T10:00:00.000Z'));
+    expect(result.completed).toBe(false);
+    expect(result.unverifiedAgents).toEqual(['cursor']);
+    const state = JSON.parse(readFileSync(path, 'utf8')) as { completed: boolean };
+    expect(state.completed).toBe(false);
+  });
+
+  it('sets completed when every wired agent is probed or has a recorded error', async () => {
+    const path = await seedAgents([
+      agentEntry({ id: 'codex', probed_at: '2026-05-25T09:00:00.000Z' }),
+      agentEntry({ id: 'cursor', wire_error: 'mcp endpoint unreachable: refused' }),
+    ]);
+    const { markOnboardingCompleted } = await loadWire();
+    const result = markOnboardingCompleted(new Date('2026-05-25T10:00:00.000Z'));
+    expect(result).toEqual({ completed: true, unverifiedAgents: [] });
+    const state = JSON.parse(readFileSync(path, 'utf8')) as { completed: boolean };
+    expect(state.completed).toBe(true);
+  });
+
+  it('drops completed back to false when an unverified wired agent exists', async () => {
+    const path = await seedAgents([agentEntry({ id: 'claude-code' })]);
+    const state = JSON.parse(readFileSync(path, 'utf8')) as { completed: boolean };
+    state.completed = true;
+    writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
+    const { markOnboardingCompleted } = await loadWire();
+    const result = markOnboardingCompleted(new Date('2026-05-25T10:00:00.000Z'));
+    expect(result.completed).toBe(false);
+    expect(result.unverifiedAgents).toEqual(['claude-code']);
+    const after = JSON.parse(readFileSync(path, 'utf8')) as { completed: boolean };
+    expect(after.completed).toBe(false);
+  });
 });
