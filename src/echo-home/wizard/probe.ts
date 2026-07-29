@@ -39,11 +39,7 @@ export interface ProbeDeps {
 const PROMPT =
   'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.';
 
-function realSpawn(
-  cmd: string,
-  args: string[],
-  opts: ProbeSpawnOptions,
-): Promise<SpawnResult> {
+function realSpawn(cmd: string, args: string[], opts: ProbeSpawnOptions): Promise<SpawnResult> {
   return new Promise((resolvePromise, reject) => {
     // Keep executable names literal; cross-spawn owns Windows .cmd escaping.
     const spawnOptions: SpawnOptions = {
