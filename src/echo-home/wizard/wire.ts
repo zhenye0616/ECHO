@@ -24,6 +24,7 @@ export interface WireOpts {
   defaultProjectRepoRoot: string | null;
   mcpServerUrl: string;
   echoVersion: string;
+  runtimeVersion?: string | null;
   profile?: InstallProfile;
   repoRoot?: string;
   force?: boolean;
@@ -33,7 +34,44 @@ export interface WireOpts {
     read: (kind: AgentKind) => AdapterCacheRecord | null;
     write: (rec: AdapterCacheRecord) => void;
   };
+  probeMcpEndpoint?: (url: string) => Promise<McpEndpointProbeResult>;
   now?: Date;
+}
+
+export type McpEndpointProbeResult = { ok: true } | { ok: false; error: string };
+
+export async function probeMcpEndpointHttp(
+  url: string,
+  clientVersion: string,
+): Promise<McpEndpointProbeResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2000);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 'echoctl-wire', version: clientVersion },
+        },
+        id: 1,
+      }),
+      signal: controller.signal,
+    });
+    if (response.status >= 200 && response.status < 300) return { ok: true };
+    return { ok: false, error: `HTTP ${response.status}` };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface WireResult {
@@ -97,6 +135,7 @@ function buildProfiles(
           agent: kind,
           mcpServerUrl: opts.mcpServerUrl,
           echoVersion: opts.echoVersion,
+          runtimeVersion: opts.runtimeVersion ?? null,
           defaultProjectRepoRoot: opts.defaultProjectRepoRoot,
           renderedAt: nowIso,
         })
@@ -142,6 +181,7 @@ function updateOnboardingState(
   selectedAgents: AgentKind[],
   syncResult: SyncResult,
   nowIso: string,
+  endpointProbe: McpEndpointProbeResult | null,
 ): void {
   const state = readState();
   state.last_updated_at = nowIso;
@@ -163,7 +203,14 @@ function updateOnboardingState(
     const result = agentResult(syncResult, kind);
     if (result?.ok === true) {
       profile.wired_at = nowIso;
-      profile.wire_error = null;
+      if (endpointProbe?.ok === true) {
+        profile.probed_at = nowIso;
+        profile.wire_error = null;
+      } else if (endpointProbe !== null) {
+        profile.wire_error = `mcp endpoint unreachable: ${endpointProbe.error}`;
+      } else {
+        profile.wire_error = null;
+      }
     } else if (result?.ok === false) {
       if (result.errors[0] !== undefined) {
         profile.wire_error = result.errors[0].message;
@@ -203,11 +250,22 @@ function updateProbeTimestamps(
   writeState(state);
 }
 
-export function markOnboardingCompleted(now: Date): void {
+export interface MarkCompletedResult {
+  completed: boolean;
+  unverifiedAgents: string[];
+}
+
+export function markOnboardingCompleted(now: Date): MarkCompletedResult {
   const state = readState();
-  state.completed = true;
+  const unverifiedAgents = state.agents
+    .filter(
+      (agent) => agent.wired_at !== null && agent.probed_at === null && agent.wire_error === null,
+    )
+    .map((agent) => agent.id);
+  state.completed = unverifiedAgents.length === 0;
   state.last_updated_at = now.toISOString();
   writeState(state);
+  return { completed: state.completed, unverifiedAgents };
 }
 
 export function readOnboardingStateSnapshot(): OnboardingState | null {
@@ -271,6 +329,13 @@ export async function wire(opts: WireOpts): Promise<WireResult> {
     cacheUpdates.push({ agent: kind, action: 'written' });
   }
 
-  updateOnboardingState(opts.selectedAgents, syncResult, nowIso);
+  const anyWired = opts.selectedAgents.some((kind) =>
+    isSuccessfulAgent(agentResult(syncResult, kind)),
+  );
+  const probeEndpoint =
+    opts.probeMcpEndpoint ?? ((url: string) => probeMcpEndpointHttp(url, opts.echoVersion));
+  const endpointProbe = anyWired ? await probeEndpoint(opts.mcpServerUrl) : null;
+
+  updateOnboardingState(opts.selectedAgents, syncResult, nowIso, endpointProbe);
   return { syncResult, cacheUpdates, onboardingStateUpdated: true };
 }

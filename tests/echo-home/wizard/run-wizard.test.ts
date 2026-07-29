@@ -154,6 +154,7 @@ describe('createWizard', () => {
       wireDepsOverride: {
         cache: cacheOverride(),
         syncAll: async () => successResult(['codex']),
+        probeMcpEndpoint: async () => ({ ok: true as const }),
       },
       probeDeps: {
         spawn: async () => ({
@@ -192,7 +193,7 @@ describe('createWizard', () => {
     });
   });
 
-  it('probe mutates probed_at only for successful outcomes', async () => {
+  it('agent probe mutates probed_at only for successful outcomes when the endpoint is down', async () => {
     const statePath = await writeInitialState();
     const { createWizard } = await loadWizard();
     const wizard = createWizard({
@@ -201,6 +202,7 @@ describe('createWizard', () => {
       wireDepsOverride: {
         cache: cacheOverride(),
         syncAll: async () => successResult(['codex', 'cursor']),
+        probeMcpEndpoint: async () => ({ ok: false as const, error: 'refused' }),
       },
       probeDeps: {
         spawn: async () => ({
@@ -215,12 +217,36 @@ describe('createWizard', () => {
     await wizard.wire({ selectedAgents: ['codex', 'cursor'], defaultProjectRepoRoot: null });
     await wizard.probe(['codex', 'cursor']);
     const state = JSON.parse(readFileSync(statePath, 'utf8')) as {
-      agents: Array<{ id: string; probed_at: string | null }>;
+      agents: Array<{ id: string; probed_at: string | null; wire_error: string | null }>;
     };
     expect(state.agents.find((agent) => agent.id === 'codex')!.probed_at).toBe(
       '2026-05-25T10:00:00.000Z',
     );
-    expect(state.agents.find((agent) => agent.id === 'cursor')!.probed_at).toBeNull();
+    const cursor = state.agents.find((agent) => agent.id === 'cursor')!;
+    expect(cursor.probed_at).toBeNull();
+    expect(cursor.wire_error).toContain('mcp endpoint unreachable');
+  });
+
+  it('endpoint probe success during wire stamps probed_at for cursor', async () => {
+    const statePath = await writeInitialState();
+    const { createWizard } = await loadWizard();
+    const wizard = createWizard({
+      mcpServerUrl: 'x',
+      echoVersion: '0.0.0',
+      wireDepsOverride: {
+        cache: cacheOverride(),
+        syncAll: async () => successResult(['cursor']),
+        probeMcpEndpoint: async () => ({ ok: true as const }),
+      },
+      now: () => new Date('2026-05-25T10:00:00.000Z'),
+    });
+    await wizard.wire({ selectedAgents: ['cursor'], defaultProjectRepoRoot: null });
+    const state = JSON.parse(readFileSync(statePath, 'utf8')) as {
+      agents: Array<{ id: string; probed_at: string | null }>;
+    };
+    expect(state.agents.find((agent) => agent.id === 'cursor')!.probed_at).toBe(
+      '2026-05-25T10:00:00.000Z',
+    );
   });
 
   it('markCompleted is idempotent and advances last_updated_at', async () => {

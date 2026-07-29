@@ -241,6 +241,7 @@ async function makeCodexSyncWizardFactory(opts: {
         }),
       },
       wireDepsOverride: {
+        probeMcpEndpoint: async () => ({ ok: true as const }),
         syncAll: async (profiles, syncOpts) =>
           syncAll(
             profiles.map((profile): AdapterSyncProfile => {
@@ -287,6 +288,7 @@ async function makeClaudeSyncWizardFactory(opts: {
           })),
       },
       wireDepsOverride: {
+        probeMcpEndpoint: async () => ({ ok: true as const }),
         claudeCodeMcpRegistration: {
           spawn: opts.registerSpawn,
           ...(opts.registerTimeoutMs === undefined ? {} : { timeoutMs: opts.registerTimeoutMs }),
@@ -343,6 +345,7 @@ function successfulWizardFactory(home = echoHome): (wizardOpts: CreateWizardOpts
         };
         state.completed = true;
         writeFileSync(join(home, 'state/onboarding.json'), `${JSON.stringify(state, null, 2)}\n`);
+        return { completed: true, unverifiedAgents: [] };
       },
     } satisfies Wizard;
   }) as never;
@@ -459,6 +462,7 @@ describe('runInit', () => {
           }),
         },
         wireDepsOverride: {
+          probeMcpEndpoint: async () => ({ ok: true as const }),
           syncAll: async (profiles, syncOpts) =>
             syncAll(
               profiles.map((profile): AdapterSyncProfile => {
@@ -631,7 +635,9 @@ describe('runInit', () => {
             onboardingStateSnapshot: null,
           };
         },
-        async markCompleted() {},
+        async markCompleted() {
+          return { completed: true, unverifiedAgents: [] };
+        },
       }) satisfies Wizard) as never;
     const { runInit } = await loadInit();
 
@@ -701,7 +707,9 @@ describe('runInit', () => {
             onboardingStateSnapshot: null,
           };
         },
-        async markCompleted() {},
+        async markCompleted() {
+          return { completed: true, unverifiedAgents: [] };
+        },
       }) satisfies Wizard) as never;
     const { runInit } = await loadInit();
 
@@ -1262,7 +1270,9 @@ describe('runInit', () => {
             onboardingStateSnapshot: null,
           };
         },
-        async markCompleted() {},
+        async markCompleted() {
+          return { completed: true, unverifiedAgents: [] };
+        },
       }) satisfies Wizard) as never;
 
     const code = await runInit({
@@ -1402,6 +1412,7 @@ describe('runInit', () => {
             join(echoHome, 'state/onboarding.json'),
             `${JSON.stringify(state, null, 2)}\n`,
           );
+          return { completed: true, unverifiedAgents: [] };
         },
       } satisfies Wizard;
     }) as never;
@@ -1469,6 +1480,7 @@ describe('runInit', () => {
             join(echoHome, 'state/onboarding.json'),
             `${JSON.stringify(state, null, 2)}\n`,
           );
+          return { completed: true, unverifiedAgents: [] };
         },
       };
     }) as never;
@@ -1499,5 +1511,41 @@ describe('runInit', () => {
     expect(state.agents.find((agent) => agent.id === 'cursor')!.capabilities).toEqual(
       AGENT_CAPABILITIES_BY_KIND.cursor,
     );
+  });
+
+  it('records bound_port, port_source, and runtime_version in the onboarding record', async () => {
+    writeInitialState();
+    const answerFile = writeAnswerFile('bound-port-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const { runInit } = await loadInit();
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: successfulWizardFactory(),
+      quiet: true,
+      portResolution: {
+        env: {},
+        readRecordedPort: () => null,
+        probeHealthz: async (port) =>
+          port === 39478
+            ? { healthy: true, runtimeVersion: '0.1.0-beta.5' }
+            : { healthy: false, runtimeVersion: null },
+      },
+      ...daemonAlreadyRunning(),
+    });
+
+    expect(code).toBe(0);
+    const state = JSON.parse(readFileSync(join(echoHome, 'state/onboarding.json'), 'utf8')) as {
+      bound_port: number;
+      port_source: string;
+      runtime_version: string | null;
+    };
+    expect(state.bound_port).toBe(39478);
+    expect(state.port_source).toBe('probe');
+    expect(state.runtime_version).toBe('0.1.0-beta.5');
   });
 });

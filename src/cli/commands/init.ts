@@ -8,6 +8,7 @@ import {
   setEchoHomeRoot,
   validateOnboardingState,
   type InstallProfile,
+  type McpPortSource,
   type OnboardedAgentProfile,
   type OnboardingState,
 } from '../../echo-home/paths.js';
@@ -80,6 +81,7 @@ export interface InitOpts {
   now?: () => Date;
   packageJsonPath?: string;
   daemonOptions?: DaemonControlOptions;
+  portResolution?: ResolveMcpPortDeps;
 }
 
 export type RemediationCopy = Record<
@@ -153,14 +155,161 @@ export function parsePort(value: string, flag = '--port'): number {
   return n;
 }
 
-export function resolveMcpPort(): number {
-  const raw = process.env['ECHO_MCP_PORT'];
-  if (raw === undefined || raw.length === 0) return 38478;
+export const MCP_PORT_PROBE_ORDER = [39478, 38478] as const;
+export const DEFAULT_MCP_PORT = 38478;
+
+export interface HealthzProbeOutcome {
+  healthy: boolean;
+  runtimeVersion: string | null;
+}
+
+export interface ResolvedMcpPort {
+  port: number;
+  source: McpPortSource;
+  runtimeVersion: string | null;
+}
+
+export interface ResolveMcpPortDeps {
+  flagPort?: number;
+  env?: Record<string, string | undefined>;
+  readRecordedPort?: () => number | null;
+  probeHealthz?: (port: number) => Promise<HealthzProbeOutcome>;
+  warn?: (line: string) => void;
+}
+
+function envMcpPort(env: Record<string, string | undefined>): number | undefined {
+  const raw = env['ECHO_MCP_PORT'];
+  if (raw === undefined || raw.length === 0) return undefined;
   try {
     return parsePort(raw, 'ECHO_MCP_PORT');
   } catch {
-    return 38478;
+    return undefined;
   }
+}
+
+export function readRecordedBoundPort(): number | null {
+  if (!existsSync(ECHO_HOME_PATHS.stateOnboarding)) return null;
+  try {
+    const raw = readJsonFile(ECHO_HOME_PATHS.stateOnboarding);
+    if (!isRecord(raw)) return null;
+    const port = raw['bound_port'];
+    if (typeof port !== 'number' || !Number.isSafeInteger(port) || port <= 0 || port > 65535) {
+      return null;
+    }
+    return port;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: Parameters<typeof fetch>[1],
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function extractRuntimeVersion(payload: unknown): string | null {
+  if (!isRecord(payload)) return null;
+  const components = payload['components'];
+  if (isRecord(components)) {
+    const runtime = components['runtime'];
+    if (isRecord(runtime)) {
+      const details = runtime['details'];
+      if (isRecord(details) && typeof details['version'] === 'string') return details['version'];
+    }
+  }
+  return typeof payload['version'] === 'string' ? payload['version'] : null;
+}
+
+export async function probeDaemonHealthz(port: number): Promise<HealthzProbeOutcome> {
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`http://127.0.0.1:${port}/healthz`, { method: 'GET' }, 2000);
+  } catch {
+    return { healthy: false, runtimeVersion: null };
+  }
+  if (response.ok) {
+    let payload: unknown = null;
+    try {
+      payload = (await response.json()) as unknown;
+    } catch {
+      payload = null;
+    }
+    return { healthy: true, runtimeVersion: extractRuntimeVersion(payload) };
+  }
+  // Older daemons predate /healthz; a successful MCP initialize still proves liveness.
+  try {
+    const mcpResponse = await fetchWithTimeout(
+      `http://127.0.0.1:${port}/mcp`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-06-18',
+            capabilities: {},
+            clientInfo: { name: 'echoctl-init', version: readPackageVersion() },
+          },
+          id: 1,
+        }),
+      },
+      2000,
+    );
+    return {
+      healthy: mcpResponse.status >= 200 && mcpResponse.status < 300,
+      runtimeVersion: null,
+    };
+  } catch {
+    return { healthy: false, runtimeVersion: null };
+  }
+}
+
+export async function resolveMcpPort(deps: ResolveMcpPortDeps = {}): Promise<ResolvedMcpPort> {
+  const probe = deps.probeHealthz ?? probeDaemonHealthz;
+  if (deps.flagPort !== undefined) {
+    const outcome = await probe(deps.flagPort);
+    return { port: deps.flagPort, source: 'flag', runtimeVersion: outcome.runtimeVersion };
+  }
+  const envPort = envMcpPort(deps.env ?? process.env);
+  if (envPort !== undefined) {
+    const outcome = await probe(envPort);
+    return { port: envPort, source: 'env', runtimeVersion: outcome.runtimeVersion };
+  }
+  const recorded = (deps.readRecordedPort ?? readRecordedBoundPort)();
+  if (recorded !== null) {
+    const outcome = await probe(recorded);
+    return { port: recorded, source: 'record', runtimeVersion: outcome.runtimeVersion };
+  }
+  for (const candidate of MCP_PORT_PROBE_ORDER) {
+    const outcome = await probe(candidate);
+    if (outcome.healthy) {
+      return { port: candidate, source: 'probe', runtimeVersion: outcome.runtimeVersion };
+    }
+  }
+  const warn = deps.warn ?? ((line: string): void => void process.stderr.write(`${line}\n`));
+  warn(
+    `echoctl: no live ECHO daemon found on ports ${MCP_PORT_PROBE_ORDER.join(' or ')}; defaulting to ${DEFAULT_MCP_PORT}. Start the daemon (\`echoctl daemon start\`) or set ECHO_MCP_PORT.`,
+  );
+  return { port: DEFAULT_MCP_PORT, source: 'default', runtimeVersion: null };
+}
+
+export function resolveMcpPortSync(): number {
+  const envPort = envMcpPort(process.env);
+  if (envPort !== undefined) return envPort;
+  return readRecordedBoundPort() ?? DEFAULT_MCP_PORT;
 }
 
 function parseNonEmptyOption(value: string | undefined, flag: string): string | undefined {
@@ -379,6 +528,15 @@ function persistInstallProfile(profile: InstallProfile, now: Date): void {
   writeOnboardingState(state);
 }
 
+function persistBoundPortRecord(resolved: ResolvedMcpPort, now: Date): void {
+  const state = readOnboardingState();
+  state.bound_port = resolved.port;
+  state.port_source = resolved.source;
+  state.runtime_version = resolved.runtimeVersion;
+  state.last_updated_at = now.toISOString();
+  writeOnboardingState(state);
+}
+
 function successfulAgents(result: WireResult, selected: readonly AgentKind[]): AgentKind[] {
   const ok = new Set(
     result.syncResult.agents.filter((agent) => agent.ok).map((agent) => agent.agent),
@@ -431,12 +589,18 @@ function daemonFailureCopy(err: DaemonCommandError): string {
 export async function runInit(opts: InitOpts = {}): Promise<number> {
   const stderr = opts.stderr ?? process.stderr;
   let answerFile: LoadedAnswerFile | null = null;
+  let resolvedPort: ResolvedMcpPort;
   let mcpPort: number;
   let installProfile: InstallProfile = 'customer';
   let warnProfileDefault = false;
   try {
     if (opts.home !== undefined) setEchoHomeRoot(opts.home);
-    mcpPort = opts.port === undefined ? resolveMcpPort() : parsePort(opts.port);
+    resolvedPort = await resolveMcpPort({
+      warn: (line) => writeLine(stderr, line),
+      ...(opts.portResolution ?? {}),
+      ...(opts.port === undefined ? {} : { flagPort: parsePort(opts.port) }),
+    });
+    mcpPort = resolvedPort.port;
     if (opts.answerFile !== undefined) answerFile = loadAnswerFile(opts.answerFile);
     const recorded = readRecordedProfile();
     installProfile = resolveInstallProfile({
@@ -477,6 +641,7 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
     const wizard = (opts.wizardFactory ?? createWizard)({
       mcpServerUrl,
       echoVersion,
+      runtimeVersion: resolvedPort.runtimeVersion,
       now: opts.now,
     });
     const prompt = answerFile === null ? (opts.prompt ?? makeTtyPrompt()) : null;
@@ -588,17 +753,37 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
     }
     if (opts.json) emitJson(opts, { event: 'init.daemon', result: daemonResult });
     else emitText(opts, renderDaemonBringup(daemonResult));
-    await wizard.markCompleted();
+    let runtimeVersion = resolvedPort.runtimeVersion;
+    if (runtimeVersion === null) {
+      // The daemon may only have come up during bringup; capture its version now.
+      const probe = opts.portResolution?.probeHealthz ?? probeDaemonHealthz;
+      runtimeVersion = (await probe(mcpPort)).runtimeVersion;
+    }
+    persistBoundPortRecord(
+      { port: mcpPort, source: resolvedPort.source, runtimeVersion },
+      opts.now?.() ?? new Date(),
+    );
+    const completion = await wizard.markCompleted();
     if (opts.json)
       emitJson(
         opts,
-        { event: 'init.done', onboardingStatePath: ECHO_HOME_PATHS.stateOnboarding },
+        {
+          event: 'init.done',
+          onboardingStatePath: ECHO_HOME_PATHS.stateOnboarding,
+          completed: completion.completed,
+          unverified_agents: completion.unverifiedAgents,
+        },
         true,
       );
-    else {
+    else if (completion.completed) {
       emitText(
         opts,
         `You're ready. Try \`echoctl run <workflow>\`; onboarding state: ${ECHO_HOME_PATHS.stateOnboarding}; uninstall: echoctl uninstall`,
+      );
+    } else {
+      emitText(
+        opts,
+        `Setup finished, but onboarding is not marked complete: ${completion.unverifiedAgents.join(', ')} wired without a successful probe or a recorded error. Run \`echoctl doctor\` to verify, then re-run \`echoctl init\`. Onboarding state: ${ECHO_HOME_PATHS.stateOnboarding}`,
       );
     }
     return 0;
