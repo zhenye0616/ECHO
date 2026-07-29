@@ -24,8 +24,10 @@
 # Env contract:
 #   REVIEWER_NAME       — required; sent as X-Echo-Role; the 057a identity gate
 #                         rejects emissions without a header.
-#   ECHO_MCP_URL        — optional; default http://127.0.0.1:${ECHO_MCP_PORT:-38478}/mcp
-#   ECHO_MCP_PORT       — optional; default 38478
+#   ECHO_MCP_URL        — optional; overrides all port resolution.
+#   ECHO_MCP_PORT       — optional; else bound_port from
+#                         ~/.echo/state/onboarding.json (jq, best-effort),
+#                         else package default 38478.
 #
 # Exit semantics (r1 codex-ops F2 HIGH best-effort):
 #   ALWAYS exits 0 — daemon-down does NOT abort the queue tick. Curl's
@@ -112,7 +114,18 @@ else
   tier_key="\"tick_run_id\": \"${tick_run_id}\""
 fi
 
-url="${ECHO_MCP_URL:-http://127.0.0.1:${ECHO_MCP_PORT:-38478}/mcp}"
+# URL resolution: ECHO_MCP_URL → ECHO_MCP_PORT → recorded bound_port
+# (~/.echo/state/onboarding.json, via jq when available — best-effort,
+# any failure falls through) → package default 38478 as last resort.
+if [ -n "${ECHO_MCP_URL:-}" ]; then
+  url="$ECHO_MCP_URL"
+else
+  port="${ECHO_MCP_PORT:-}"
+  if [ -z "$port" ] && command -v jq >/dev/null 2>&1; then
+    port="$(jq -r '.bound_port // empty' "$HOME/.echo/state/onboarding.json" 2>/dev/null || true)"
+  fi
+  url="http://127.0.0.1:${port:-38478}/mcp"
+fi
 
 # Accept header MUST include both application/json AND text/event-stream
 # — the StreamableHTTPServerTransport rejects requests lacking either
