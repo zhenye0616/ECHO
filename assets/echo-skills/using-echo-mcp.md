@@ -5,7 +5,7 @@ type: skill
 audience: customer
 ---
 
-<!-- synced-copies: ~/.echo/skills/using-echo-mcp.md (source) | ~/.codex/skills/using-echo-mcp/SKILL.md | ~/.claude/commands/using-echo-mcp.md — edit source, copy to all; updated 2026-07-28 for runtime 0.1.0-beta.6 -->
+<!-- synced-copies: ~/.echo/skills/using-echo-mcp.md (source) | ~/.codex/skills/using-echo-mcp/SKILL.md | ~/.claude/commands/using-echo-mcp.md — edit source, copy to all; updated 2026-07-29 for optional version-bound dogfooding -->
 
 # Using ECHO MCP (`mcp__echo__*`)
 
@@ -15,6 +15,43 @@ ECHO retrieval tools live on the `echo` MCP server and appear as `mcp__echo__*`:
 `echo_ping`, `echo_resolve_mru`, `find_clusters`, `get_atom`, `get_atoms`, `search_memories`, `wait_for_new_turns`.
 
 WARNING: `echo-memory` / `mcp__echo-memory__*` (`memory_search`, `memory_ingest`, ...) is a DIFFERENT product (EchoChat). It is write-capable and out of scope here — never use it as a substitute for the tools above.
+
+## Optional version-bound dogfooding
+
+Apply this gate only when `~/.echo/state/dogfooding-journals.json` exists and
+contains `"enabled": true`. Otherwise skip it completely; it is founder-live
+instrumentation, not a customer requirement.
+
+Before the first ECHO call in each user turn:
+
+1. Read `bound_port` from `~/.echo/state/onboarding.json`.
+2. Fetch `http://127.0.0.1:<bound_port>/healthz`. Detect the live version from
+   `components.runtime.details.version`, falling back only to the response's
+   top-level `version`. Do not infer it from `echoctl --version`, this skill,
+   package metadata, or the onboarding runtime cache. If the port, health
+   response, or live version is unavailable, report the preflight failure and
+   do not call ECHO under an assumed version.
+3. Look up that exact version under `journals` in
+   `~/.echo/state/dogfooding-journals.json`. A valid entry has an absolute
+   `journal_dir` containing `JOURNAL.md`.
+4. If the mapping and journal exist, use that version's actor shard and set
+   `current_version` to the detected version when it differs. This is the
+   automatic link to an existing version journal.
+5. If the mapping or journal is absent, do not call ECHO and do not silently
+   create or reuse a different version's journal. Ask:
+   `ECHO runtime <version> has no dogfooding journal. Create it now and make it current?`
+
+Map the current binding to `claude`, `codex`, `codex-ops`, or `cursor`. Append
+one compact entry to `<journal_dir>/<actor>.md` after the last ECHO call in the
+turn; one entry may cover several calls. If the version journal exists but the
+actor shard does not, create the shard with an `## Interactions` heading.
+
+Each entry includes local timestamp, Runtime, Trigger, Query inputs, Returned,
+Sources, Verdict, Note, and optional Conjecture. Include the `/healthz`
+preflight in Query inputs. Log errors and zero-result calls too. Never paste
+large raw payloads, secrets, credentials, or sensitive returned prose. If the
+active repository separately mandates an MCP journal, obey that local rule as
+well.
 
 ## Rule 0 — timestamps
 

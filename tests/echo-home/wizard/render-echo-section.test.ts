@@ -33,6 +33,20 @@ describe('renderEchoSection', () => {
     expect(out).toContain('http://127.0.0.1:39478/mcp');
   });
 
+  it('routes agents through the installed skill before ECHO calls', () => {
+    const out = renderEchoSection({
+      agent: 'codex',
+      mcpServerUrl: 'http://127.0.0.1:39478/mcp',
+      echoVersion: '1.2.3',
+      runtimeVersion: '0.1.0-beta.6',
+      defaultProjectRepoRoot: null,
+      renderedAt: '2026-07-29T17:00:55.000Z',
+    });
+    expect(out).toContain('Before calling ECHO');
+    expect(out).toContain('`using-echo-mcp`');
+    expect(out).toContain('version-bound dogfooding journal');
+  });
+
   it('lists the full seven-tool roster', () => {
     const out = renderEchoSection({
       agent: 'claude-code',

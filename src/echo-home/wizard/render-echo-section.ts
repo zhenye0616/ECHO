@@ -30,7 +30,7 @@ export function renderEchoSection(ctx: EchoSectionContext): string {
 
 ECHO is wired to the \`echo\` MCP server (tools prefixed \`mcp__echo__\`) at \`${ctx.mcpServerUrl}\`. Default project: \`${project}\`.
 
-Use the ECHO tools ${roster} to retrieve your prior cross-tool context. See \`~/.echo/state/onboarding.json\` for the install record.
+Before calling ECHO, follow the installed \`using-echo-mcp\` skill for retrieval contracts and any enabled version-bound dogfooding journal. Use the ECHO tools ${roster} to retrieve your prior cross-tool context. See \`~/.echo/state/onboarding.json\` for the install record.
 
 <!-- echo-version: ${ctx.echoVersion} · runtime-version: ${runtime} · rendered-at: ${ctx.renderedAt} -->
 `;
