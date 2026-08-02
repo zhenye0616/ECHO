@@ -7,14 +7,19 @@ import { spawnSanitizedChild } from '../../src/product/spawn-sanitized-child.js'
 
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const VALIDATOR = join(REPO_ROOT, 'tools/product/validate-qualification.mjs');
-const MATRIX = JSON.parse(
-  readFileSync(join(REPO_ROOT, 'schemas/product/qualification-matrix.v1.json'), 'utf8'),
-) as {
+const LEGACY_SCHEMA = join(REPO_ROOT, 'schemas/product/qualification-report.v1.schema.json');
+const LEGACY_MATRIX_PATH = join(REPO_ROOT, 'schemas/product/qualification-matrix.v1.json');
+const CURRENT_SCHEMA = join(REPO_ROOT, 'schemas/product/qualification-report.v2.schema.json');
+const CURRENT_MATRIX_PATH = join(REPO_ROOT, 'schemas/product/qualification-matrix.v2.json');
+type QualificationMatrix = {
+  schema_version: number;
   cells: Array<{
     id: string;
     authority: 'machine' | 'independent-reviewer' | 'founder';
   }>;
 };
+const MATRIX = JSON.parse(readFileSync(CURRENT_MATRIX_PATH, 'utf8')) as QualificationMatrix;
+const LEGACY_MATRIX = JSON.parse(readFileSync(LEGACY_MATRIX_PATH, 'utf8')) as QualificationMatrix;
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'echo-qualification-report-'));
 let sequence = 0;
 
@@ -22,11 +27,11 @@ function hash(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function completeDraft(): Record<string, unknown> {
+function completeDraft(matrix: QualificationMatrix = MATRIX): Record<string, unknown> {
   const sourceSha = '1'.repeat(40);
   const artifactSha = 'a'.repeat(64);
   return {
-    schema_version: 1,
+    schema_version: matrix.schema_version,
     report_kind: 'ci-draft',
     capability_id: 'team-meeting-to-brief',
     spec_id: '2026-07-13-132-product-graduation-foundation',
@@ -50,7 +55,7 @@ function completeDraft(): Record<string, unknown> {
     unexpected_skip_count: 0,
     maturity: 'DEV',
     result: 'incomplete',
-    cells: MATRIX.cells.map((definition) =>
+    cells: matrix.cells.map((definition) =>
       definition.authority === 'machine'
         ? {
             id: definition.id,
@@ -72,11 +77,15 @@ function completeDraft(): Record<string, unknown> {
 async function validate(
   report: Record<string, unknown>,
   artifactManifest?: string,
+  contract?: { schema: string; matrix: string },
 ): Promise<{ status: number | null; result: { ok: boolean; errors: string[] } }> {
   const reportPath = join(temporaryRoot, `report-${sequence++}.json`);
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   const args = [VALIDATOR, '--report', reportPath];
   if (artifactManifest !== undefined) args.push('--artifact-manifest', artifactManifest);
+  if (contract !== undefined) {
+    args.push('--schema', contract.schema, '--matrix', contract.matrix);
+  }
   const child = spawnSanitizedChild(process.execPath, args, { cwd: REPO_ROOT });
   let stdout = '';
   let stderr = '';
@@ -101,6 +110,54 @@ afterAll(() => {
 });
 
 describe('qualification report validator', () => {
+  it('uses INTERNAL LIVE vocabulary for the active qualification matrix', () => {
+    const currentSchema = JSON.parse(readFileSync(CURRENT_SCHEMA, 'utf8')) as {
+      properties: { schema_version: { const: number }; maturity: { enum: string[] } };
+    };
+    expect(MATRIX.schema_version).toBe(2);
+    expect(currentSchema.properties.schema_version.const).toBe(2);
+    expect(currentSchema.properties.maturity.enum).toEqual([
+      'DEV',
+      'INTERNAL LIVE',
+      'QUALIFIED',
+      'CLIENT LIVE',
+    ]);
+    const ids = MATRIX.cells.map((cell) => cell.id);
+    expect(ids).toContain('internal-live-evidence');
+    expect(ids).toContain('internal-staging-smoke');
+    expect(ids.filter((id) => id.endsWith('live-evidence'))).toEqual(['internal-live-evidence']);
+    expect(ids.filter((id) => id.endsWith('staging-smoke'))).toEqual(['internal-staging-smoke']);
+  });
+
+  it('still validates historical v1 reports against the explicit v1 contract', async () => {
+    const legacySchema = JSON.parse(readFileSync(LEGACY_SCHEMA, 'utf8')) as {
+      properties: { maturity: { enum: string[] } };
+    };
+    const report = completeDraft(LEGACY_MATRIX);
+    expect(report.schema_version).toBe(1);
+    expect(legacySchema.properties.maturity.enum).toContain('FOUNDER LIVE');
+    expect(LEGACY_MATRIX.cells.map((cell) => cell.id)).toEqual(
+      expect.arrayContaining(['founder-live-evidence', 'founder-staging-smoke']),
+    );
+    expect(
+      await validate(report, undefined, { schema: LEGACY_SCHEMA, matrix: LEGACY_MATRIX_PATH }),
+    ).toEqual({ status: 0, result: { ok: true, errors: [] } });
+  });
+
+  it('keeps release authorization founder-owned', async () => {
+    expect(MATRIX.cells.find((cell) => cell.id === 'release-authorization')?.authority).toBe(
+      'founder',
+    );
+    const report = completeDraft();
+    const releaseAuthorization = cells(report).find((cell) => cell.id === 'release-authorization')!;
+    releaseAuthorization.authority = 'machine';
+    const response = await validate(report);
+    expect(response.status).toBe(1);
+    expect(response.result.errors).toContain(
+      'release-authorization: authority must be founder, received machine',
+    );
+  });
+
   it('accepts a complete machine-cell CI draft with human cells visibly pending', async () => {
     const response = await validate(completeDraft());
     expect(response).toEqual({ status: 0, result: { ok: true, errors: [] } });
@@ -211,7 +268,7 @@ describe('qualification report validator', () => {
     expect(response.status).toBe(1);
     expect(response.result.errors).toEqual(
       expect.arrayContaining([
-        'qualified result has a non-green cell: founder-live-evidence',
+        'qualified result has a non-green cell: internal-live-evidence',
         'qualified result has a non-green cell: independent-evidence-review',
         'qualified result has a non-green cell: release-authorization',
       ]),

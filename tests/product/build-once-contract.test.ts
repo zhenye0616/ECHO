@@ -241,12 +241,25 @@ describe('qualification workflow build-once and terminal contracts', () => {
       join(REPO_ROOT, 'tools/product/aggregate-evidence.mjs'),
       'utf8',
     );
+    const qualificationSchema = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'schemas/product/qualification-report.v2.schema.json'), 'utf8'),
+    ) as { properties: { maturity: { enum: string[] } } };
 
     expect(packageTemplate.private).toBe(true);
+    expect(qualificationSchema.properties.maturity.enum).toEqual([
+      'DEV',
+      'INTERNAL LIVE',
+      'QUALIFIED',
+      'CLIENT LIVE',
+    ]);
     expect(draftTool).toContain("maturity: 'DEV'");
     expect(draftTool).toContain("result: 'incomplete'");
     expect(aggregateTool).toContain("report.maturity = 'DEV'");
     expect(aggregateTool).toContain("report.result = 'incomplete'");
+    expect(workflow).toContain('qualification-matrix.v2.json');
+    expect(workflow).toContain('qualification-report.v2.schema.json');
+    expect(workflow).not.toContain('qualification-matrix.v1.json');
+    expect(workflow).not.toContain('qualification-report.v1.schema.json');
     expect(workflow).not.toMatch(/^\s+environment:/m);
     expect(workflow).not.toMatch(/\b(?:npm publish|gh release|git tag)\b/);
     for (const excludedTransition of [
@@ -267,7 +280,7 @@ describe('qualification workflow build-once and terminal contracts', () => {
       'rank 2 first-run cutoff and newest-first behavior',
       'rank 3 API-key brain adapter',
       'V2 authentication probes and A2 cold-state grading',
-      'exact-artifact isolated FOUNDER LIVE',
+      'exact-artifact isolated INTERNAL LIVE',
       'repository extraction and cutover before full qualification',
     ];
     let prior = -1;
@@ -306,7 +319,7 @@ describe('qualification workflow build-once and terminal contracts', () => {
         '--artifact-manifest',
         artifactManifest,
         '--matrix',
-        join(REPO_ROOT, 'schemas/product/qualification-matrix.v1.json'),
+        join(REPO_ROOT, 'schemas/product/qualification-matrix.v2.json'),
         '--output',
         draft,
         '--capability-id',
@@ -344,9 +357,9 @@ describe('qualification workflow build-once and terminal contracts', () => {
         '--artifact-manifest',
         artifactManifest,
         '--schema',
-        join(REPO_ROOT, 'schemas/product/qualification-report.v1.schema.json'),
+        join(REPO_ROOT, 'schemas/product/qualification-report.v2.schema.json'),
         '--matrix',
-        join(REPO_ROOT, 'schemas/product/qualification-matrix.v1.json'),
+        join(REPO_ROOT, 'schemas/product/qualification-matrix.v2.json'),
         '--output',
         finalReport,
         '--terminal-output',
@@ -356,11 +369,12 @@ describe('qualification workflow build-once and terminal contracts', () => {
     );
     expect(aggregated.status, aggregated.stderr).toBe(0);
     const report = JSON.parse(readFileSync(finalReport, 'utf8')) as {
+      schema_version: number;
       maturity: string;
       result: string;
       cells: Array<{ id: string; status: string }>;
     };
-    expect(report).toMatchObject({ maturity: 'DEV', result: 'incomplete' });
+    expect(report).toMatchObject({ schema_version: 2, maturity: 'DEV', result: 'incomplete' });
     expect(report.cells.find((cell) => cell.id === 'clean-install')).toMatchObject({
       status: 'fail',
     });

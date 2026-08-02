@@ -35,7 +35,7 @@ The next gates remain, in order:
 1. rank 2 first-run cutoff and newest-first behavior;
 2. rank 3 API-key brain adapter;
 3. V2 authentication probes and A2 cold-state grading;
-4. exact-artifact isolated FOUNDER LIVE;
+4. exact-artifact isolated INTERNAL LIVE;
 5. repository extraction and cutover before full qualification.
 
-Only later evidence may advance `DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE`.
+Only later evidence may advance `DEV -> INTERNAL LIVE -> QUALIFIED -> CLIENT LIVE`.

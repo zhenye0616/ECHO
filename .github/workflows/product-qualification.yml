@@ -160,7 +160,7 @@ jobs:
           [[ '${{ steps.product_tests.outcome }}' == success ]] && product_status=pass
           node tools/product/create-draft-report.mjs \
             --artifact-manifest "$RUNNER_TEMP/qualification-bundle/artifact/artifact-manifest.json" \
-            --matrix "$GITHUB_WORKSPACE/schemas/product/qualification-matrix.v1.json" \
+            --matrix "$GITHUB_WORKSPACE/schemas/product/qualification-matrix.v2.json" \
             --output "$RUNNER_TEMP/qualification-bundle/draft-report.json" \
             --capability-id team-meeting-to-brief \
             --spec-id 2026-07-13-132-product-graduation-foundation \
@@ -280,15 +280,15 @@ jobs:
             --target-evidence "$RUNNER_TEMP/target-evidence/target-evidence.json" \
             --dependency-results "$RUNNER_TEMP/dependency-results.json" \
             --artifact-manifest "$RUNNER_TEMP/qualification-bundle/artifact/artifact-manifest.json" \
-            --schema "$RUNNER_TEMP/qualification-bundle/qualification-support/schemas/product/qualification-report.v1.schema.json" \
-            --matrix "$RUNNER_TEMP/qualification-bundle/qualification-support/schemas/product/qualification-matrix.v1.json" \
+            --schema "$RUNNER_TEMP/qualification-bundle/qualification-support/schemas/product/qualification-report.v2.schema.json" \
+            --matrix "$RUNNER_TEMP/qualification-bundle/qualification-support/schemas/product/qualification-matrix.v2.json" \
             --output "$RUNNER_TEMP/final-report/qualification-report.json" \
             --terminal-output "$RUNNER_TEMP/final-report/terminal-status.json"
           node "$RUNNER_TEMP/qualification-bundle/qualification-support/validate-qualification.mjs" \
             --report "$RUNNER_TEMP/final-report/qualification-report.json" \
             --artifact-manifest "$RUNNER_TEMP/qualification-bundle/artifact/artifact-manifest.json" \
-            --schema "$RUNNER_TEMP/qualification-bundle/qualification-support/schemas/product/qualification-report.v1.schema.json" \
-            --matrix "$RUNNER_TEMP/qualification-bundle/qualification-support/schemas/product/qualification-matrix.v1.json"
+            --schema "$RUNNER_TEMP/qualification-bundle/qualification-support/schemas/product/qualification-report.v2.schema.json" \
+            --matrix "$RUNNER_TEMP/qualification-bundle/qualification-support/schemas/product/qualification-matrix.v2.json"
       - name: Upload immutable final DEV report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

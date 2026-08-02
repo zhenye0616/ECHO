@@ -186,7 +186,7 @@ function main() {
       cpSync(join(TOOL_DIR, script), join(temporary, script));
     }
     mkdirSync(join(temporary, 'schemas/product'), { recursive: true });
-    for (const schema of ['qualification-report.v1.schema.json', 'qualification-matrix.v1.json']) {
+    for (const schema of ['qualification-report.v2.schema.json', 'qualification-matrix.v2.json']) {
       cpSync(
         join(REPO_ROOT, 'schemas/product', schema),
         join(temporary, 'schemas/product', schema),

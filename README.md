@@ -13,7 +13,7 @@ This repository also contains ECHO's cross-tool context substrate and multi-agen
 - The client package and onboarding path are not yet shipped end to end.
 - The current package still boots lab/internal capabilities and requires local CLI auth for meeting-signal extraction.
 - The target carve is a versioned client-machine package with only the meeting→brief dependencies, an API-key brain, local state/health, and documented upgrade/rollback/support boundaries.
-- Graduation is `DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE`. Today the current candidate is formally DEV, with useful founder-regime evidence from its predecessor; the next gate is an isolated candidate-package run on the founder's Mac. The generic npm package and CI jobs do not qualify the Team product. See [the graduation pipeline](raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md).
+- Graduation is `DEV -> INTERNAL LIVE -> QUALIFIED -> CLIENT LIVE`. Today the current candidate is formally DEV, with useful founder-regime evidence from its predecessor; the next gate is an isolated candidate-package run on a team-controlled internal Mac. The generic npm package and CI jobs do not qualify the Team product. See [the graduation pipeline](raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md).
 
 ## Developer/Lab Install
 

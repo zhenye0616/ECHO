@@ -24,7 +24,7 @@ The first saleable Team-product wedge is **meeting→brief**. Its pain and deman
 
 Carve meeting→brief out of the full ECHO lab, make assisted onboarding work, install a versioned package on the client's Mac, remove founder-machine and personal-CLI dependencies, then sell the Team product aggressively. Pricing and buyer mechanics may be refined in parallel; they do not reopen the product choice.
 
-**Graduation path:** `DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE`. The current candidate is formally DEV, with useful founder-regime evidence from its predecessor; it reaches FOUNDER LIVE only after a versioned, pinned, isolated candidate-package run. A build-once artifact must pass product qualification, then client acceptance must prove useful and repeat use before it becomes CLIENT LIVE. Canonical contract: `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`.
+**Graduation path:** `DEV -> INTERNAL LIVE -> QUALIFIED -> CLIENT LIVE`. The current candidate is formally DEV, with useful founder-regime evidence from its predecessor; it reaches INTERNAL LIVE only after a versioned, pinned, isolated candidate-package run. A build-once artifact must pass product qualification, then client acceptance must prove useful and repeat use before it becomes CLIENT LIVE. Canonical contract: `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`.
 
 **Operating gate:** product direction is locked, but no build spec or product code begins until the founder commits the G2 clarity-halt lift at a named SHA. Pre-lift work closes productization questions and advances customer outreach, offer design, and onboarding discovery.
 

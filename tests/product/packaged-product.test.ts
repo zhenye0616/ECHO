@@ -187,7 +187,7 @@ describe('product-only artifact', () => {
         '--artifact-manifest',
         artifactManifestPath,
         '--matrix',
-        join(supportDir, 'schemas/product/qualification-matrix.v1.json'),
+        join(supportDir, 'schemas/product/qualification-matrix.v2.json'),
         '--output',
         draft,
         '--capability-id',
@@ -210,6 +210,11 @@ describe('product-only artifact', () => {
       { cwd: temporaryRoot },
     );
     expect(created.status, created.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(draft, 'utf8'))).toMatchObject({
+      schema_version: 2,
+      maturity: 'DEV',
+      result: 'incomplete',
+    });
     const validated = await run(
       process.execPath,
       [
@@ -219,9 +224,9 @@ describe('product-only artifact', () => {
         '--artifact-manifest',
         artifactManifestPath,
         '--schema',
-        join(supportDir, 'schemas/product/qualification-report.v1.schema.json'),
+        join(supportDir, 'schemas/product/qualification-report.v2.schema.json'),
         '--matrix',
-        join(supportDir, 'schemas/product/qualification-matrix.v1.json'),
+        join(supportDir, 'schemas/product/qualification-matrix.v2.json'),
       ],
       { cwd: temporaryRoot },
     );

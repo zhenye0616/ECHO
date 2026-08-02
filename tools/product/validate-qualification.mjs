@@ -8,8 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(TOOL_DIR, '../..');
-const SCHEMA_PATH = joinRoot('schemas/product/qualification-report.v1.schema.json');
-const MATRIX_PATH = joinRoot('schemas/product/qualification-matrix.v1.json');
+const SCHEMA_PATH = joinRoot('schemas/product/qualification-report.v2.schema.json');
+const MATRIX_PATH = joinRoot('schemas/product/qualification-matrix.v2.json');
 
 function joinRoot(path) {
   return resolve(REPO_ROOT, path);
