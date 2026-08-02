@@ -25,11 +25,11 @@ Three enforced layers, all additive (no existing wedge module moved):
 
 - `test:product` now means only `tests/product/**` (hermetic: in-worker network interception, sanitized-child enforcement, injected clocks, synthetic content). The former broad suite runs honestly as `test:repo`; ci.yml runs both unconditionally.
 - `tools/product/build-artifact.mjs` builds the private, unpublished `echo-brain` tarball **from Git objects at the supplied source SHA** (bytes bound by construction), packs exactly once per lineage with atomic publication, and emits per-file SHA-256 manifests. `prepare-offline-deps.mjs` materializes the exact-lock npm cache + Node headers so target installs run fully offline, including a source-built `better-sqlite3`.
-- `.github/workflows/product-qualification.yml` qualifies the same bytes on the declared phase-1 target with exact-head checkout, `if: always()` evidence uploads, and an always-running terminal gate; reports use `schemas/product/qualification-report.v1.schema.json` and must say `DEV`/`incomplete` until human-authority cells are genuinely green.
+- `.github/workflows/product-qualification.yml` qualifies the same bytes on the declared phase-1 target with exact-head checkout, `if: always()` evidence uploads, and an always-running terminal gate; current reports use `schemas/product/qualification-report.v2.schema.json` and must say `DEV`/`incomplete` until human-authority cells are genuinely green.
 
 ## What it is not
 
-Not client-ready. The API-key brain adapter (rank 3), first-run cutoff/newest-first (rank 2), install/launchd/delivery (ranks 4–5), and all FOUNDER LIVE / QUALIFIED / CLIENT LIVE evidence remain open. The `echo-brain` repository does not exist; extraction waits until an exact artifact from this boundary passes isolated FOUNDER LIVE. Graduation vocabulary and matrix live in `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`.
+Not client-ready. The API-key brain adapter (rank 3), first-run cutoff/newest-first (rank 2), install/launchd/delivery (ranks 4–5), and all INTERNAL LIVE / QUALIFIED / CLIENT LIVE evidence remain open. The `echo-brain` repository does not exist; extraction waits until an exact artifact from this boundary passes isolated INTERNAL LIVE. Graduation vocabulary and matrix live in `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md`.
 
 ## Related
 

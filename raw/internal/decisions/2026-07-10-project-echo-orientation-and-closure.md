@@ -2,6 +2,8 @@
 
 **Date:** 2026-07-10 · **Updated:** 2026-07-12 · **Evidence baseline:** `67f5949e` + founder commercial-focus decision · **Status:** founder orientation view
 
+> **Terminology supersession (2026-08-02):** Read this record's `FOUNDER LIVE` / `founder-live` stage references as `INTERNAL LIVE` / `internal-live` under `2026-07-11-team-product-graduation-pipeline.md`. The criteria are unchanged except that the lane runs on a team-controlled internal Mac; founder release authority is unchanged.
+
 This is the short founder-facing view of the project. It does not replace the evidence-rich `2026-07-10-full-project-map.md` or the execution inventory in `2026-07-10-clarity-sprint-plan.md`. It gives those documents the missing orientation layer: what Project ECHO contains, what the active product slice actually is, how mature each capability is, and what must be true before the clarity halt can lift.
 
 ## Current truth in one paragraph

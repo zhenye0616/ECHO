@@ -2,6 +2,8 @@
 
 **Date:** 2026-07-11 · **Status:** founder-locked · **Decision type:** product focus and commercialization
 
+> **Terminology supersession (2026-08-02):** Read this record's `FOUNDER LIVE` / `founder-live` stage references as `INTERNAL LIVE` / `internal-live` under `2026-07-11-team-product-graduation-pipeline.md`. The criteria are unchanged except that the lane runs on a team-controlled internal Mac; founder release authority is unchanged.
+
 ## Decision
 
 ECHO contains three substantial bodies of work, but they are not three equal product bets:

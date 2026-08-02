@@ -12,7 +12,7 @@ If this file ever conflicts with `CLAUDE.md`, `docs/AGENT_INSTRUCTIONS.md`, `bac
 - **Current proposal gate:** every product spec begins in `backlog/proposed/`, passes cross-vendor review, and is promoted to `ready/` before a builder may claim it.
 - **Product priority:** every product spec must directly serve the Team-product carve, assisted onboarding, client-machine install/operation, delivery, or the commercial/support/data boundary.
 - **Client endpoint:** after onboarding, the versioned package runs on the client's Mac without a repo checkout, founder's machine, or founder's personal CLI session.
-- **Graduation:** `DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE`; a demo, merge, or generic package never skips the qualification matrix.
+- **Graduation:** `DEV -> INTERNAL LIVE -> QUALIFIED -> CLIENT LIVE`; a demo, merge, or generic package never skips the qualification matrix.
 - **Scope guard:** do not build standalone Machine/Fleet features unless the Team product or current ECHO development workflow requires them.
 
 The older e1/e2 friction-first gate remains useful operating-model history, but it no longer controls product prioritization.
@@ -169,7 +169,7 @@ The `CLAUDE.md` drift rules apply to Codex:
 
 - Commercial product: Team decision product.
 - First wedge: meeting→brief; pain/demand are closed.
-- Graduation: DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE; the current candidate is formally DEV with predecessor founder-regime evidence, and a versioned, pinned, isolated candidate-package run is the next gate. Qualification permits client acceptance; useful and repeat client use earns CLIENT LIVE.
+- Graduation: DEV -> INTERNAL LIVE -> QUALIFIED -> CLIENT LIVE; the current candidate is formally DEV with predecessor founder-regime evidence, and a versioned, pinned, isolated candidate-package run is the next gate. Qualification permits client acceptance; useful and repeat client use earns CLIENT LIVE.
 - Goal: assisted onboarding, then install/use on the client's Mac without founder-machine or repo dependency.
 - Internal only unless required: Machine context and Fleet orchestration.
 - Keep out: unrelated lab workers, destination-app work, and autonomous external action.

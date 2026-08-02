@@ -17,7 +17,7 @@ These seven files are required context for every run. Read them before doing any
 | `docs/AGENT_INSTRUCTIONS.md` | This file — your operating manual; loop, drift rules, write/no-write lists |
 | `CLAUDE.md` | Canonical current operating model and post-G2 proposal gate |
 | `raw/internal/decisions/2026-07-11-commercial-focus-team-product-carve.md` | Founder-locked product direction: Team product, meeting→brief wedge, client-machine endpoint |
-| `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md` | DEV -> FOUNDER LIVE -> QUALIFIED -> CLIENT LIVE and release-matrix contract |
+| `raw/internal/decisions/2026-07-11-team-product-graduation-pipeline.md` | DEV -> INTERNAL LIVE -> QUALIFIED -> CLIENT LIVE and release-matrix contract |
 | `raw/internal/decisions/2026-07-12-clarity-halt-lift.md` | Founder-signed G2 lift and its exact approved base |
 | `docs/NORTH_STAR.md` | Daily orient — commercial focus, productization goal, drift questions |
 | `backlog/README.md` | Backlog stages, proposal review, claim mechanics, and founder merge gates |

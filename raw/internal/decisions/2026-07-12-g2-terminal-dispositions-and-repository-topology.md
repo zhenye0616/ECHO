@@ -6,6 +6,8 @@
 **Status:** landed at main SHA `4cc700001ac07b66fdf0700643b29cdde8b83fb7`; independently verified; separate SHA-bound lift signed in `2026-07-12-clarity-halt-lift.md` and effective when that record lands
 **Product maturity:** DEV; unchanged
 
+> **Terminology supersession (2026-08-02):** Read this record's `FOUNDER LIVE` / `founder-live` stage references as `INTERNAL LIVE` / `internal-live` under `2026-07-11-team-product-graduation-pipeline.md`. The criteria are unchanged except that the lane runs on a team-controlled internal Mac; founder release authority is unchanged.
+
 ## Decision boundary
 
 The founder approved the complete terminal package prepared from the Phase 2 decision packet and the subsequent repository-topology refinement. This decision places all 25 previously pending G2 rows into allowed terminal states without reopening product demand.

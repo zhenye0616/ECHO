@@ -51,6 +51,9 @@ function parseArgs(argv) {
 export function createDraftReport({ artifactManifestPath, matrixPath, inputs }) {
   const artifactManifest = readJson(artifactManifestPath);
   const matrix = readJson(matrixPath);
+  if (!Number.isInteger(matrix.schema_version) || matrix.schema_version < 1) {
+    throw new Error('matrix schema_version must be a positive integer');
+  }
   const implemented = new Map([
     ['product-source-boundary', inputs.boundaryStatus],
     ['product-tests', inputs.productTestStatus],
@@ -91,7 +94,7 @@ export function createDraftReport({ artifactManifestPath, matrixPath, inputs }) 
     };
   });
   return {
-    schema_version: 1,
+    schema_version: matrix.schema_version,
     report_kind: 'ci-draft',
     capability_id: inputs.capabilityId,
     spec_id: inputs.specId,
